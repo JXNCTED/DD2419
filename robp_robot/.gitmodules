@@ -1,0 +1,20 @@
+[submodule "robp_interfaces"]
+	path = robp_interfaces
+	url = https://github.com/KTH-CAS-UAV/robp_interfaces.git
+	branch = vt24
+[submodule "robp_arm"]
+	path = robp_arm
+	url = https://github.com/KTH-CAS-UAV/robp_arm.git
+	branch = vt24
+[submodule "robp_description"]
+	path = robp_description
+	url = https://github.com/KTH-CAS-UAV/robp_description.git
+	branch = vt24
+[submodule "robp_launch"]
+	path = robp_launch
+	url = https://github.com/KTH-CAS-UAV/robp_launch.git
+	branch = vt24
+[submodule "robp_phidgets"]
+	path = robp_phidgets
+	url = https://github.com/KTH-CAS-UAV/robp_phidgets.git
+	branch = vt24
