@@ -54,13 +54,43 @@ sudo apt-get install ros-humble-usb-cam
 
 ## arm
 
+- Recompiled the firmware with the new domain id
+
+under 
+
+/home/group7/dd2419_ws/src/robp_robot/robp_arm/Hiwonder_xArm_ROS2/
+
+run `pio lib install`
+
+change the line inside `setup_entities` about the node setup to
+
+```cpp
+	allocator = rcl_get_default_allocator();			// Initialize micro-ROS allocator
+	rclc_support_t support;
+	rcl_init_options_t init_options = rcl_get_zero_initialized_init_options();
+	RCCHECK(rcl_init_options_init(&init_options, allocator));
+
+	size_t DOMAIN_ID = 7;
+	RCCHECK(rcl_init_options_set_domain_id(&init_options, DOMAIN_ID));
+	RCCHECK(rclc_support_init_with_options(&support, 0, NULL, &init_options, &allocator));
+
+	RCCHECK(rclc_node_init_default(&node_hiwonder, "Hiwonder_xArm_node", "", &support)); // create node
+```
+
+run
+
+```
+pio run 
+pio --target upload
+```
+
+In order to upload, set the `upload_port = /dev/ttyUSB2` in the `platformio.ini` to ensure the download device is correct
+
 apart from cloning the repo, also need to 
 
 - setup the micor-ros agent 
 
 https://github.com/migsdigs/Hiwonder_xArm_ESP32/blob/main/Hiwonder_xArm_ROS2/SETUP_README.md#ros2--micro-ros
-
-- set the ROS_DOMAIN_ID to 0 (currently set in .bashrc)
 
 launch the communication with 
 
