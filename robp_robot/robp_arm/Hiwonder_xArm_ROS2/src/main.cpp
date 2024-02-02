@@ -265,12 +265,18 @@ bool create_entities()
 	// allocator = rcl_get_default_allocator();			// Initialize micro-ROS allocator
 	// RCCHECK(rclc_support_init(&support, 0, NULL, &allocator));					// Initialize support options
 	// RCCHECK(rclc_node_init_default(&node_hiwonder, "Hiwonder_xArm_node", "", &support)); // create node
-	allocator = rcl_get_default_allocator();				   // Initialize micro-ROS allocator
-	RCCHECK(rclc_support_init(&support, 0, NULL, &allocator)); // Initialize support options
-	node_hiwonder = rcl_get_zero_initialized_node();
-	rcl_node_options_t node_ops = rcl_node_get_default_options();
-	node_ops.domain_id = 7;
-	RCCHECK(rclc_node_init_with_options(&node_hiwonder, "Hiwonder_xArm_node", "", &support, &node_ops)); // create node
+
+	allocator = rcl_get_default_allocator();			// Initialize micro-ROS allocator
+	rclc_support_t support;
+	rcl_init_options_t init_options = rcl_get_zero_initialized_init_options();
+	RCCHECK(rcl_init_options_init(&init_options, allocator));
+
+	size_t DOMAIN_ID = 7;
+	RCCHECK(rcl_init_options_set_domain_id(&init_options, DOMAIN_ID));
+	RCCHECK(rclc_support_init_with_options(&support, 0, NULL, &init_options, &allocator));
+
+	RCCHECK(rclc_node_init_default(&node_hiwonder, "Hiwonder_xArm_node", "", &support)); // create node
+
 
 	// =====================================================================================================
 	// PUBLISHERS
@@ -483,6 +489,7 @@ void setup()
 	// Assigning dynamic memory to the name string sequence
 
 	bool success = rosidl_runtime_c__String__Sequence__init(&name__string_sequence, 6);
+	(void) success;
 	servo_position_array_msg.name = name__string_sequence;
 	success = rosidl_runtime_c__String__assignn(&servo_position_array_msg.name.data[0], "Servo1", 6);
 	success = rosidl_runtime_c__String__assignn(&servo_position_array_msg.name.data[1], "Servo2", 6);
