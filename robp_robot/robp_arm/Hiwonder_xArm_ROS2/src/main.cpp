@@ -169,48 +169,6 @@ void IRAM_ATTR onTimer2()
 // CALLBACKS
 // =====================================================================================================
 
-// // Subscriber callback for commanding single servo
-// void subscription_callback_single_servo(const void * msgin) {
-// 	// digitalWrite(LED_BUILTIN, LOW);
-// 	// delay(200);
-// 	// digitalWrite(LED_BUILTIN,HIGH);
-// 	// delay(200);
-// 	// digitalWrite(LED_BUILTIN, LOW);
-// 	// delay(200);
-// 	// digitalWrite(LED_BUILTIN,HIGH);
-
-// 	const std_msgs__msg__Int64MultiArray * one_servo = (const std_msgs__msg__Int64MultiArray *)msgin;
-
-// 	// TODO: Add condition that servo pos is positive (i.e. dont do anything if it negative)
-// 	if (one_servo->data.data[0] == 1) {
-// 		servo1.move_time(one_servo->data.data[1], one_servo->data.data[2]);
-// 	}
-// 	else if (one_servo->data.data[0] == 2) {
-// 		servo2.move_time(one_servo->data.data[1], one_servo->data.data[2]);
-// 	}
-// 	else if (one_servo->data.data[0] == 3) {
-// 		servo3.move_time(one_servo->data.data[1], one_servo->data.data[2]);
-// 	}
-// 	else if (one_servo->data.data[0] == 4) {
-// 		servo4.move_time(one_servo->data.data[1], one_servo->data.data[2]);
-// 	}
-// 	else if (one_servo->data.data[0] == 5) {
-// 		servo5.move_time(one_servo->data.data[1], one_servo->data.data[2]);
-// 	}
-// 	else if(one_servo->data.data[0] == 6) {
-// 		servo6.move_time(one_servo->data.data[1], one_servo->data.data[2]);
-// 	}
-// 	else {
-// 		digitalWrite(LED_BUILTIN, LOW);
-// 		delay(200);
-// 		digitalWrite(LED_BUILTIN,HIGH);
-// 		delay(200);
-// 		digitalWrite(LED_BUILTIN, LOW);
-// 		delay(200);
-// 		digitalWrite(LED_BUILTIN,HIGH);
-// 	}
-// }
-
 // Subscriber callback for commanding multi servo
 void subscription_callback_multi_servo(const void *msgin)
 {
@@ -246,14 +204,6 @@ void subscription_callback_multi_servo(const void *msgin)
 	{
 		servo6.move_time(multi_servo->data.data[5], multi_servo->data.data[11]);
 	}
-
-	// digitalWrite(LED_BUILTIN, LOW);
-	// delay(200);
-	// digitalWrite(LED_BUILTIN,HIGH);
-	// delay(200);
-	// digitalWrite(LED_BUILTIN, LOW);
-	// delay(200);
-	// digitalWrite(LED_BUILTIN,HIGH);
 }
 
 bool create_entities()
@@ -267,7 +217,6 @@ bool create_entities()
 	// RCCHECK(rclc_node_init_default(&node_hiwonder, "Hiwonder_xArm_node", "", &support)); // create node
 
 	allocator = rcl_get_default_allocator();			// Initialize micro-ROS allocator
-	rclc_support_t support;
 	rcl_init_options_t init_options = rcl_get_zero_initialized_init_options();
 	RCCHECK(rcl_init_options_init(&init_options, allocator));
 
