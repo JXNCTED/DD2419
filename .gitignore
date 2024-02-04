@@ -15,3 +15,12 @@ build
 install
 log
 *.gif
+
+# python
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# C extensions
+*.so

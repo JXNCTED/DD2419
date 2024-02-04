@@ -25,5 +25,4 @@ setup(
         'console_scripts': [
         ],
     },
-
 )
