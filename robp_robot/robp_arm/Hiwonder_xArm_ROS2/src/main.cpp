@@ -118,7 +118,7 @@ rcl_subscription_t subscriber_multi_servo_cmd;
 // ROS check definitions
 rclc_support_t support;
 rcl_allocator_t allocator;
-
+rcl_init_options_t init_options;
 rcl_service_t service;
 rcl_wait_set_t wait_set;
 
@@ -212,12 +212,12 @@ bool create_entities()
 	// ROS SETUP
 	// =====================================================================================================
 
-	// allocator = rcl_get_default_allocator();			// Initialize micro-ROS allocator
-	// RCCHECK(rclc_support_init(&support, 0, NULL, &allocator));					// Initialize support options
+	// allocator = rcl_get_default_allocator();											 // Initialize micro-ROS allocator
+	// RCCHECK(rclc_support_init(&support, 0, NULL, &allocator));							 // Initialize support options
 	// RCCHECK(rclc_node_init_default(&node_hiwonder, "Hiwonder_xArm_node", "", &support)); // create node
 
-	allocator = rcl_get_default_allocator();			// Initialize micro-ROS allocator
-	rcl_init_options_t init_options = rcl_get_zero_initialized_init_options();
+	allocator = rcl_get_default_allocator(); // Initialize micro-ROS allocator
+	init_options = rcl_get_zero_initialized_init_options();
 	RCCHECK(rcl_init_options_init(&init_options, allocator));
 
 	size_t DOMAIN_ID = 7;
@@ -225,7 +225,6 @@ bool create_entities()
 	RCCHECK(rclc_support_init_with_options(&support, 0, NULL, &init_options, &allocator));
 
 	RCCHECK(rclc_node_init_default(&node_hiwonder, "Hiwonder_xArm_node", "", &support)); // create node
-
 
 	// =====================================================================================================
 	// PUBLISHERS
@@ -299,6 +298,7 @@ void destroy_entities()
 
 	rcl_node_fini(&node_hiwonder);
 	rclc_support_fini(&support);
+	rcl_init_options_fini(&init_options);
 }
 
 // =====================================================================================================
@@ -438,7 +438,7 @@ void setup()
 	// Assigning dynamic memory to the name string sequence
 
 	bool success = rosidl_runtime_c__String__Sequence__init(&name__string_sequence, 6);
-	(void) success;
+	(void)success;
 	servo_position_array_msg.name = name__string_sequence;
 	success = rosidl_runtime_c__String__assignn(&servo_position_array_msg.name.data[0], "Servo1", 6);
 	success = rosidl_runtime_c__String__assignn(&servo_position_array_msg.name.data[1], "Servo2", 6);
@@ -562,6 +562,7 @@ void loop()
 	case AGENT_AVAILABLE:
 		// Create micro-ROS entities
 		state = (true == create_entities()) ? AGENT_CONNECTED : WAITING_AGENT;
+
 		if (state == WAITING_AGENT)
 		{
 			// Creation failed, release allocated resources
