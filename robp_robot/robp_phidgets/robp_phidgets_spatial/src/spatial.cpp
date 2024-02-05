@@ -147,7 +147,7 @@ void Spatial::calibrate()
 	            "the device "
 	            "is not moved during this time.");
 	zeroGyro();
-	rclcpp::sleep_for(2s);
+	// rclcpp::sleep_for(2s);
 	RCLCPP_INFO(this->get_logger(), "Calibrating IMU done.");
 }
 

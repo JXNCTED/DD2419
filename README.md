@@ -1,6 +1,11 @@
+## launch all the hardware (arm, phidgets, lidar, realsense, arm usb cam)
+
+```bash
+ros2 launch bringup hardware_launch.py 
+```
+
 ## Completed
 
-- a port of cartesian controller from workshop (radius, base etc. may not be correct)
 
 the tick per rev is 3600 for this encoder
 
@@ -65,16 +70,21 @@ run `pio lib install`
 change the line inside `setup_entities` about the node setup to
 
 ```cpp
-	allocator = rcl_get_default_allocator();			// Initialize micro-ROS allocator
-	rclc_support_t support;
-	rcl_init_options_t init_options = rcl_get_zero_initialized_init_options();
-	RCCHECK(rcl_init_options_init(&init_options, allocator));
+allocator = rcl_get_default_allocator(); // Initialize micro-ROS allocator
+init_options = rcl_get_zero_initialized_init_options(); // has to be decleared globally
+RCCHECK(rcl_init_options_init(&init_options, allocator));
 
-	size_t DOMAIN_ID = 7;
-	RCCHECK(rcl_init_options_set_domain_id(&init_options, DOMAIN_ID));
-	RCCHECK(rclc_support_init_with_options(&support, 0, NULL, &init_options, &allocator));
+size_t DOMAIN_ID = 7;
+RCCHECK(rcl_init_options_set_domain_id(&init_options, DOMAIN_ID));
+RCCHECK(rclc_support_init_with_options(&support, 0, NULL, &init_options, &allocator));
 
-	RCCHECK(rclc_node_init_default(&node_hiwonder, "Hiwonder_xArm_node", "", &support)); // create node
+RCCHECK(rclc_node_init_default(&node_hiwonder, "Hiwonder_xArm_node", "", &support)); // create node
+
+
+and add this to the `destroy_entities`
+
+```cpp
+rcl_init_options_fini(&init_options);
 ```
 
 run
@@ -119,6 +129,16 @@ Basically, the data in the `/multi_servo_cmd_sub` of type `std_msgs/Int16MultiAr
 and the following 6 data are the time to get the target position in miliseconds.
 
 Problem:Super laggy for some reason, takes ~1s to execute the command
+
+
+ros2 topic pub /multi_servo_cmd_sub --once std_msgs/Int16MultiArray "{layout: {dim: [{label: '', size: 0, stride: 0}], data_offset: 0}, data: 
+[000,12000,12000,12000,12000,12000,2500,2000,2000,2000,2000,2000]}"
+Gripper, joint1, j2,j3,j4,j5,j6, timing6
+
+publisher: beginning loop
+publishing #1: std_msgs.msg.Int16MultiArray(layout=std_msgs.msg.MultiArrayLayout(dim=[std_msgs.msg.MultiArrayDimension(label='', size=0, stride=0)], data_offset=0), data=[0, 12000, 12000, 12000, 12000, 12000, 2500, 2000, 2000, 2000, 2000, 2000])
+
+
 
 ## Realsense SDK
 

@@ -63,7 +63,7 @@ def generate_launch_description():
         Node(
             package='micro_ros_agent',
             executable='micro_ros_agent',
-            arguments=["serial", "--dev", "/dev/ttyUSB0", "-v6"]
+            arguments=["serial", "--dev", "/dev/ttyUSB1", "-v6"]
         ),
 
         # realsense
@@ -78,7 +78,7 @@ def generate_launch_description():
             executable='rplidar_composition',
             output='screen',
             parameters=[{
-                'serial_port': '/dev/ttyUSB1',
+                'serial_port': '/dev/ttyUSB0',
                 'serial_baudrate': 115200,
                 'frame_id': 'lidar_link',
                 'inverted': False,
