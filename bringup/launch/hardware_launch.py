@@ -41,6 +41,21 @@ def generate_launch_description():
 
     bringup_path = get_package_share_directory('bringup')
 
+    aruco_marker_publisher_params = {
+        'image_is_rectified': True,
+        'marker_size': 0.0625,
+        'reference_frame': '',
+        'camera_frame': 'camera_color_optical_frame',
+    }
+
+    aruco_marker_publisher = Node(
+        package='aruco_ros',
+        executable='marker_publisher',
+        parameters=[aruco_marker_publisher_params],
+        remappings=[('/camera_info', '/camera/color/camera_info'),
+                    ('/image', '/camera/color/image_raw')]
+    )
+
     return launch.LaunchDescription([
         # phidgets
         phidgets_container,
@@ -69,7 +84,7 @@ def generate_launch_description():
         # realsense.
         realsense_launch,
         Node(executable='static_transform_publisher', package='tf2_ros', arguments=[
-            '--child-frame-id', 'camera_link', '--frame-id', 'base_link']),
+            '--child-frame-id', 'camera_link', '--frame-id', 'base_link', '--x', '0.08987', '--y', '0.0175', '--z', '0.10456']),
 
         # lidar
         Node(
@@ -93,5 +108,6 @@ def generate_launch_description():
         Node(package='usb_cam',
              executable='usb_cam_node_exe',
              parameters=[os.path.join(bringup_path, 'config/usb_cam_param.yaml')]),
+        aruco_marker_publisher,
 
     ])
