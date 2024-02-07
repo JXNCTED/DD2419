@@ -66,7 +66,7 @@ def generate_launch_description():
             arguments=["serial", "--dev", "/dev/ttyUSB1", "-v6"]
         ),
 
-        # realsense
+        # realsense.
         realsense_launch,
         Node(executable='static_transform_publisher', package='tf2_ros', arguments=[
             '--child-frame-id', 'camera_link', '--frame-id', 'base_link']),
@@ -74,6 +74,7 @@ def generate_launch_description():
         # lidar
         Node(
             name='rplidar_composition',
+            # name='rplidar_node.cpp',
             package='rplidar_ros',
             executable='rplidar_composition',
             output='screen',
@@ -92,4 +93,5 @@ def generate_launch_description():
         Node(package='usb_cam',
              executable='usb_cam_node_exe',
              parameters=[os.path.join(bringup_path, 'config/usb_cam_param.yaml')]),
+
     ])

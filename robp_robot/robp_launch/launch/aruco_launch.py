@@ -7,7 +7,7 @@ from launch_ros.actions import Node
 
 def launch_setup(context, *args, **kwargs):
 
-	camera = perform_substitutions(context, [LaunchConfiguration('camera')])
+    camera = perform_substitutions(context, [LaunchConfiguration('camera')])
 
     aruco_marker_publisher_params = {
         'image_is_rectified': True,
@@ -34,10 +34,10 @@ def generate_launch_description():
         description='Marker size in m. '
     )
 
-	camera = DeclareLaunchArgument(
-		'camera', default_value='front_camera',
-		description='Select what camera.'
-	)
+    camera = DeclareLaunchArgument(
+        'camera', default_value='front_camera',
+        description='Select what camera.'
+    )
 
     reference_frame = DeclareLaunchArgument(
         'reference_frame', default_value='',
@@ -45,10 +45,10 @@ def generate_launch_description():
         'Leave it empty and the pose will be published wrt param parent_name. '
     )
 
-	camera_frame = DeclareLaunchArgument(
-		'camera_frame', default_value='camera_color_optical_frame',
+    camera_frame = DeclareLaunchArgument(
+        'camera_frame', default_value='camera_color_optical_frame',
         description='Camera frame.'
-	)
+    )
 
     # Create the launch description and populate
     ld = LaunchDescription()

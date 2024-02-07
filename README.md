@@ -4,6 +4,9 @@
 ros2 launch bringup hardware_launch.py 
 ```
 
+To run the visualization tool rviz at the same time 
+Open up new terminal and write rviz2
+
 ## Completed
 
 
@@ -154,7 +157,7 @@ sudo apt install ros-humble-realsense2-*
 
 launch the node with 
 ```bash
-ros2 launch realsense2_camera rs_launch.py
+ros2 launch realsense2_camera rs_launch.py 
 ```
 
 ## RP Lidar
@@ -168,10 +171,21 @@ Need to change the USB devie in the launch files. the `/ttyUSB1` is for the Lida
 See a demo rviz
 
 ```bash
-ros2 launch rplidar_ros view_rplidar.launch.py
+ros2 launch rplidar_ros view_rplidar.launch.py 
 ```
 
 ## side note
 
 /ttyUSB0 is the arm
 /ttyUSB1 is the lidar
+
+
+
+
+
+
+
+
+
+
+MILESTONE 0 

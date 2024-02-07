@@ -68,7 +68,7 @@ class JoyController(Node):
         if left_bumper_pressed == 1:
             arm_pub_msg.data[3] = 18000
             arm_pub_msg.data[2] = 8000
-            arm_pub_msg.data[4] = 7000
+            arm_pub_msg.data[4] = 6500
             print("Moving arm!")
 
         # publish to topic only when we change some values

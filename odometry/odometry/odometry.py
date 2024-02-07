@@ -27,7 +27,7 @@ class Odometry(Node):
         self._tf_broadcaster = TransformBroadcaster(self)
 
         # Initialize the path publisher
-        self._path_pub = self.create_publisher(Path, 'path', 10)
+        self._path_pub = self.create_publisher(Path, '/path', 10)
         # Store the path here
         self._path = Path()
 
@@ -54,8 +54,8 @@ class Odometry(Node):
 
         # The kinematic parameters for the differential configuration
         TICK_PER_REV = 3600
-        WHEEL_RADIUS = 0.0352
-        WHEEL_BASE = 0.23
+        WHEEL_RADIUS = 0.04921
+        WHEEL_BASE = 0.3
 
         DT = 50 / 1000
 
@@ -65,7 +65,7 @@ class Odometry(Node):
             TICK_PER_REV * WHEEL_RADIUS / DT
 
         v = (vw1 + vw2) / 2
-        w = (vw1 - vw2) / WHEEL_BASE
+        w = -(vw1 - vw2) / WHEEL_BASE
 
         self._x = self._x + v * DT * cos(self._yaw)
         self._y = self._y + v * DT * sin(self._yaw)
@@ -140,7 +140,7 @@ class Odometry(Node):
         pose.pose.orientation.w = q[3]
 
         self._path.poses.append(pose)
-
+        # print(self._path)
         self._path_pub.publish(self._path)
 
 
