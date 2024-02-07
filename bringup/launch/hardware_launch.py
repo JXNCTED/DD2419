@@ -37,7 +37,8 @@ def generate_launch_description():
     )  # all phidgets node
     realsense_path = get_package_share_directory('realsense2_camera')
     realsense_launch = launch.actions.IncludeLaunchDescription(PythonLaunchDescriptionSource(os.path.join(
-        realsense_path, 'launch/rs_launch.py')), launch_arguments={'pointcloud.enable': 'true'}.items())
+        realsense_path, 'launch/rs_launch.py')), launch_arguments={'pointcloud.enable': 'true', 'enable_rgbd': 'true',
+                                                                   'enable_gyro': 'true', 'enable_accel': 'true'}.items())
 
     bringup_path = get_package_share_directory('bringup')
 
