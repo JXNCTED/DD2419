@@ -46,25 +46,16 @@ class DisplayMarkers(Node):
             t.header.stamp = marker.header.stamp
 
             t.child_frame_id = f'/aruco/detected{marker.id}'
-            t.header.frame_id = "map"
+            t.header.frame_id = 'odom'
 
             # Looks up transform between map and baselink.
             try:
                 look_trans = self.tf_buffer.lookup_transform(
-                    "map", "base_link", marker.header.stamp)
-            except:
-                print("Failed transformation")
-                return
-
-            # Save position in temp before offsetting.
-            temp_x_pos = marker.pose.pose.position.x
-            temp_y_pos = marker.pose.pose.position.y
-            temp_z_pos = marker.pose.pose.position.z
-
-            # Adjust position according to offsets camera and robot.
-            marker.pose.pose.position.x = temp_z_pos + 0.08987
-            marker.pose.pose.position.y = -temp_x_pos + 0.0175
-            marker.pose.pose.position.z = -temp_y_pos + 0.10456
+                    "odom", "camera_color_optical_frame", msg.header.stamp)
+            except Exception as e:
+                # print("Failed transformation")
+                self.get_logger().warn(str(e))
+                continue
 
             # Applies the transformation.
             marker_transformed = tf2_geometry_msgs.do_transform_pose(
@@ -75,18 +66,10 @@ class DisplayMarkers(Node):
             t.transform.translation.y = marker_transformed.position.y
             t.transform.translation.z = marker_transformed.position.z
 
-            # Gets orientation of marker.
-            marker_orientation = (marker.pose.pose.orientation.x, marker.pose.pose.orientation.y,
-                                  marker.pose.pose.orientation.z, marker.pose.pose.orientation.w)
-
-            # For child frame detected2. Rotate 180 degrees around y-axis.
-            # if (t.child_frame_id == '/aruco/detected1'):
-            q_rot = quaternion_about_axis(math.pi, (0, -1, 1))
-            q = quaternion_multiply(marker_orientation, q_rot)
-            t.transform.rotation.x = q[0]
-            t.transform.rotation.y = q[1]
-            t.transform.rotation.z = q[2]
-            t.transform.rotation.w = q[3]
+            t.transform.rotation.x = marker_transformed.orientation.x
+            t.transform.rotation.y = marker_transformed.orientation.y
+            t.transform.rotation.z = marker_transformed.orientation.z
+            t.transform.rotation.w = marker_transformed.orientation.w
 
             # Publish the message.
             try:
