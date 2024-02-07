@@ -105,6 +105,7 @@ def generate_launch_description():
         Node(executable='static_transform_publisher', package='tf2_ros', arguments=[
             '--child-frame-id', 'lidar_link', '--frame-id', 'base_link']),
 
+
         # camera on arm
         Node(package='usb_cam',
              executable='usb_cam_node_exe',
