@@ -4,23 +4,26 @@
   <name>odometry</name>
   <version>0.0.0</version>
   <description>TODO: Package description</description>
-  <maintainer email="rosuser@todo.todo">rosuser</maintainer>
+  <maintainer email="33616271+JXNCTED@users.noreply.github.com">ed</maintainer>
   <license>MIT</license>
 
+  <buildtool_depend>ament_cmake</buildtool_depend>
+
+  <depend>pcl_conversions</depend>
+  <depend>sensor_msgs</depend>
+  <depend>rclcpp</depend>
   <depend>geometry_msgs</depend>
   <depend>nav_msgs</depend>
-  <depend>python3-numpy</depend>
   <depend>robp_interfaces</depend>
-  <depend>rclpy</depend>
   <depend>tf_transformations</depend>
   <depend>tf2_ros</depend>
+  <depend>tf2_geometry_msgs</depend>
 
-  <test_depend>ament_copyright</test_depend>
-  <test_depend>ament_flake8</test_depend>
-  <test_depend>ament_pep257</test_depend>
-  <test_depend>python3-pytest</test_depend>
+
+  <test_depend>ament_lint_auto</test_depend>
+  <test_depend>ament_lint_common</test_depend>
 
   <export>
-    <build_type>ament_python</build_type>
+    <build_type>ament_cmake</build_type>
   </export>
 </package>
