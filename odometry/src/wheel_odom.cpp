@@ -1,10 +1,10 @@
-#include "rclcpp/rclcpp.hpp"
-#include "tf2_ros/transform_broadcaster.h"
-#include "nav_msgs/msg/path.hpp"
-#include "robp_interfaces/msg/encoders.hpp"
 #include "geometry_msgs/msg/pose_stamped.hpp"
-#include "tf2_geometry_msgs/tf2_geometry_msgs.hpp"
+#include "nav_msgs/msg/path.hpp"
+#include "rclcpp/rclcpp.hpp"
+#include "robp_interfaces/msg/encoders.hpp"
 #include "tf2/LinearMath/Quaternion.h"
+#include "tf2_geometry_msgs/tf2_geometry_msgs.hpp"
+#include "tf2_ros/transform_broadcaster.h"
 
 class WheelOdom : public rclcpp::Node
 {
@@ -32,7 +32,7 @@ class WheelOdom : public rclcpp::Node
         path_.header.frame_id = "odom";
         path_.poses.push_back(pose);
         path_pub_->publish(path_);
-    }
+        }
     void broadcast_tf(const rclcpp::Time &stamp, const float &x, const float &y, const float &yaw)
     {
         geometry_msgs::msg::TransformStamped odom_tf;
@@ -65,6 +65,7 @@ class WheelOdom : public rclcpp::Node
         yaw_ += w * DT;
 
         publish_path(msg->header.stamp, x_, y_, yaw_);
+        broadcast_tf(msg->header.stamp, x_, y_, yaw_);
     }
     rclcpp::Publisher<nav_msgs::msg::Path>::SharedPtr path_pub_;
     rclcpp::Subscription<robp_interfaces::msg::Encoders>::SharedPtr encoder_sub_;
