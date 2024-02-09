@@ -14,7 +14,10 @@ find_package(geometry_msgs REQUIRED)
 find_package(nav_msgs REQUIRED)
 find_package(robp_interfaces REQUIRED)
 find_package(tf2_ros REQUIRED)
+find_package(cv_bridge REQUIRED)
 find_package(tf2_geometry_msgs REQUIRED)
+find_package(OpenCV REQUIRED)
+
 
 
 add_executable(vi_odom src/vi_odom.cpp)
@@ -38,6 +41,8 @@ ament_target_dependencies(
   "robp_interfaces"
   "tf2_ros"
   "tf2_geometry_msgs"
+  "cv_bridge"
+  "OpenCV"
 )
 
 ament_target_dependencies(
