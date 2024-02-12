@@ -6,6 +6,11 @@
 #include "string"
 #include "vector"
 
+void drawImage(const cv::Mat &img, const std::string name)
+{
+    cv::imshow(name, img);
+    cv::waitKey(1);
+}
 void drawImage(const cv::Mat &img, const std::vector<cv::Point2f> &pts, const std::string name)
 {
     auto draw = img.clone();
@@ -17,6 +22,7 @@ void drawImage(const cv::Mat &img, const std::vector<cv::Point2f> &pts, const st
     cv::imshow(name, draw);
     cv::waitKey(1);
 }
+
 class VisualOdom : public rclcpp::Node
 {
    public:
@@ -31,9 +37,33 @@ class VisualOdom : public rclcpp::Node
         static std::vector<cv::Point2f> nPts;
 
         cv_bridge::CvImageConstPtr ptr;
-        ptr = cv_bridge::toCvCopy(msg, sensor_msgs::image_encodings::MONO8);
 
-        cv::goodFeaturesToTrack(ptr->image, nPts, 100, 0.01, 12.0, cv::Mat(), 3, false, 0.04);
+        ptr = cv_bridge::toCvCopy(msg, sensor_msgs::image_encodings::MONO8);
+        cv::Mat filtered;
+        cv::bilateralFilter(ptr->image, filtered, 3, 75, 75);
+        drawImage(filtered, "filtered");
+        cv::Mat canny;
+        cv::Canny(filtered, canny, 80, 150, 3, true);
+        cv::convertScaleAbs(canny, canny);
+        drawImage(canny, "canny");
+
+        cv::Mat dilated;
+        cv::dilate(canny, dilated, cv::Mat(), cv::Point(-1, -1), 2, 1, 1);
+        drawImage(dilated, "dilated");
+        std::vector<std::vector<cv::Point>> contours;
+        std::vector<cv::Vec4i> hierarchy;
+
+        cv::findContours(dilated, contours, hierarchy, cv::RETR_TREE, cv::CHAIN_APPROX_SIMPLE);
+
+        cv::Mat contoured = ptr->image.clone();
+
+        for (size_t i = 0; i < contours.size(); i++)
+        {
+            cv::drawContours(contoured, contours, (int)i, cv::Scalar(0, 255, 255), 2, cv::LINE_8, hierarchy, 0);
+        }
+        drawImage(contoured, "contoured");
+
+        cv::goodFeaturesToTrack(filtered, nPts, 100, 0.01, 12.0, cv::Mat(), 3, false, 0.04);
         drawImage(ptr->image, nPts, "feature");
     }
 
