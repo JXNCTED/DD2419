@@ -27,9 +27,16 @@ class CartesianController(Node):
         self.duty_cycle_pub_ = self.create_publisher(
             DutyCycles, '/motor/duty_cycles', 10)
 
+        self.timeout_timer = self.create_timer(0.5, self.timeout_callback)
+
     def twist_callback(self, msg):
+        self.timeout_timer.reset()
         self.target_v = msg.linear.x
         self.target_w = msg.angular.z
+
+    def timeout_callback(self):
+        self.target_v = 0
+        self.target_w = 0
 
     def encoder_callback(self, msg):
         TICK_PER_REV = 3600

@@ -20,7 +20,8 @@ setup(
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
-            'cartesian_controller = controller.cartesian_controller:main'
+            'cartesian_controller = controller.cartesian_controller:main',
+            'arm_controller = controller.arm_controller:main'
         ],
     },
 )
