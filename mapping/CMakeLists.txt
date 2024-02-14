@@ -7,15 +7,46 @@ endif()
 
 # find dependencies
 find_package(ament_cmake REQUIRED)
+find_package(rclcpp REQUIRED)
+find_package(nav_msgs REQUIRED)
+find_package(OpenCV REQUIRED)
 # uncomment the following section in order to fill in
 # further dependencies manually.
 # find_package(<dependency> REQUIRED)
+
+include_directories(${OpenCV_INCLUDE_DIRS})
+
+add_library(Mapper src/Mapper.cpp)
+target_include_directories(Mapper PUBLIC
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+  $<INSTALL_INTERFACE:include>)
+  
+add_library(GridMap src/GridMap.cpp)
+target_include_directories(GridMap PUBLIC
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+  $<INSTALL_INTERFACE:include>)
+
+ament_target_dependencies(
+  GridMap
+  "OpenCV"
+  "nav_msgs"
+  "rclcpp"
+)
+
+
 
 add_executable(mapping src/mapping.cpp)
 target_include_directories(mapping PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
   $<INSTALL_INTERFACE:include>)
 target_compile_features(mapping PUBLIC c_std_99 cxx_std_17)  # Require C99 and C++17
+
+ament_target_dependencies(
+  mapping
+  "rclcpp"
+  "nav_msgs"
+  "OpenCV"
+)
 
 install(TARGETS mapping
   DESTINATION lib/${PROJECT_NAME})
