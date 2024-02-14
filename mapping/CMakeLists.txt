@@ -9,7 +9,9 @@ endif()
 find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(nav_msgs REQUIRED)
+find_package(sensor_msgs REQUIRED)
 find_package(OpenCV REQUIRED)
+find_package(tf2_ros REQUIRED)
 # uncomment the following section in order to fill in
 # further dependencies manually.
 # find_package(<dependency> REQUIRED)
@@ -20,6 +22,15 @@ add_library(Mapper src/Mapper.cpp)
 target_include_directories(Mapper PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
   $<INSTALL_INTERFACE:include>)
+
+ament_target_dependencies(
+  Mapper
+  "OpenCV"
+  "nav_msgs"
+  "sensor_msgs"
+  "tf2_ros"
+  "rclcpp"
+)
   
 add_library(GridMap src/GridMap.cpp)
 target_include_directories(GridMap PUBLIC
@@ -30,6 +41,7 @@ ament_target_dependencies(
   GridMap
   "OpenCV"
   "nav_msgs"
+  "sensor_msgs"
   "rclcpp"
 )
 
@@ -45,7 +57,13 @@ ament_target_dependencies(
   mapping
   "rclcpp"
   "nav_msgs"
-  "OpenCV"
+  "sensor_msgs"
+  "tf2_ros"
+)
+target_link_libraries(
+  mapping
+  GridMap
+  Mapper
 )
 
 install(TARGETS mapping

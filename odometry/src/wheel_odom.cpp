@@ -1,4 +1,5 @@
 #include "geometry_msgs/msg/pose_stamped.hpp"
+#include "nav_msgs/msg/odometry.hpp"
 #include "nav_msgs/msg/path.hpp"
 #include "rclcpp/rclcpp.hpp"
 #include "robp_interfaces/msg/encoders.hpp"
@@ -12,6 +13,7 @@ class WheelOdom : public rclcpp::Node
     WheelOdom() : Node("wheel_odom")
     {
         path_pub_    = this->create_publisher<nav_msgs::msg::Path>("/path", 10);
+        odom_pub_    = this->create_publisher<nav_msgs::msg::Odometry>("/odom", 10);
         encoder_sub_ = this->create_subscription<robp_interfaces::msg::Encoders>(
             "/motor/encoders", 10, std::bind(&WheelOdom::encodersCallback, this, std::placeholders::_1));
         tf_broadcaster_ = std::make_unique<tf2_ros::TransformBroadcaster>(*this);
@@ -32,7 +34,20 @@ class WheelOdom : public rclcpp::Node
         path_.header.frame_id = "odom";
         path_.poses.push_back(pose);
         path_pub_->publish(path_);
-        }
+    }
+    void publish_odom(const rclcpp::Time &stamp, const float &x, const float &y, const float &yaw)
+    {
+        nav_msgs::msg::Odometry odom;
+        odom.header.stamp          = stamp;
+        odom.header.frame_id       = "odom";
+        odom.pose.pose.position.x  = x;
+        odom.pose.pose.position.y  = y;
+        odom.pose.pose.position.z  = 0.0;
+        tf2::Quaternion q          = tf2::Quaternion(tf2::Vector3(0, 0, 1), yaw);
+        odom.pose.pose.orientation = tf2::toMsg(q);
+
+        odom_pub_->publish(odom);
+    }
     void broadcast_tf(const rclcpp::Time &stamp, const float &x, const float &y, const float &yaw)
     {
         geometry_msgs::msg::TransformStamped odom_tf;
@@ -65,9 +80,11 @@ class WheelOdom : public rclcpp::Node
         yaw_ += w * DT;
 
         publish_path(msg->header.stamp, x_, y_, yaw_);
+        publish_odom(msg->header.stamp, x_, y_, yaw_);
         broadcast_tf(msg->header.stamp, x_, y_, yaw_);
     }
     rclcpp::Publisher<nav_msgs::msg::Path>::SharedPtr path_pub_;
+    rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr odom_pub_;
     rclcpp::Subscription<robp_interfaces::msg::Encoders>::SharedPtr encoder_sub_;
     std::unique_ptr<tf2_ros::TransformBroadcaster> tf_broadcaster_;
 

@@ -1,8 +1,11 @@
 #pragma once
 #include "mapping/GridMap.hpp"
-// #include "sensor_msgs/msg/laser_scan.hpp"
-// #include "geometry_msgs/msg/pose2_d.hpp"
+#include "sensor_msgs/msg/laser_scan.hpp"
 
+struct Pose
+{
+    double x, y, theta;
+};
 class Mapper
 {
 public:
@@ -11,8 +14,9 @@ public:
     Mapper(GridMap *map);
 
     // APIs
-    // void updateMapLaser(const sensor_msgs::LaserScan::SharedPtr laserPtr, const geometry_msgs::Pose2d::SharedPtr posePtr);
+    void updateMapLaser(const sensor_msgs::msg::LaserScan::SharedPtr laserPtr, const Pose &pose);
 
 private:
+    void updateGrid(const Eigen::Vector2d grid, const double &pOcc);
     GridMap *map;
 };
