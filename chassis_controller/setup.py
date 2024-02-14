@@ -20,7 +20,9 @@ setup(
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
-            'joy_controller = chassis_controller.joy_controller:main'
+            'joy_controller = chassis_controller.joy_controller:main',
+            'obj_detect_move = chassis_controller.obj_detect_move:main',
+            'aruco_detect_move = chassis_controller.aruco_detect_move:main'
         ],
     },
 )
