@@ -28,7 +28,8 @@ private:
     pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud_filtered(new pcl::PointCloud<pcl::PointXYZRGB>);
     pcl::VoxelGrid<pcl::PointXYZRGB> sor;
     sor.setInputCloud(cloud);
-    sor.setLeafSize(0.03f, 0.01f, 0.01f);
+    sor.setLeafSize(0.01f, 0.01f, 0.01f);
+
     sor.filter(*cloud_filtered);
 
     sensor_msgs::msg::PointCloud2 output;

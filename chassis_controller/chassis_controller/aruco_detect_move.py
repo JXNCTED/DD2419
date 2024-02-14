@@ -60,6 +60,7 @@ class ArucoDetectMove(Node):
             # set the speed of all the controls
             for i in range(6):
                 arm_cmd.data[i+6] = 1000
+
             arm_cmd.data[0+6] = 500
             arm_cmd.data[0] = 11000
 
@@ -103,8 +104,12 @@ class ArucoDetectMove(Node):
         if (self.delay_cnt < 100):
             # move a little bit more
             twist = Twist()
-            twist.linear.x = 0.0
+
+            twist.linear.x = 0.0  # Do not move a little bit more.
             self.publishCoordinates.publish(twist)
+
+            # Wait for ticks to be 0<ticks<1000
+
         elif self.delay_cnt < 1000:
             # initialise at default
             arm_cmd = Int16MultiArray()
@@ -112,7 +117,9 @@ class ArucoDetectMove(Node):
             # set the speed of all the controls
             for i in range(6):
                 arm_cmd.data[i+6] = 1000
-            # set to lower position with closed gripper
+
+            # LOWER ARM TO DROP POSITION (KEEP ITEM GRIPPED STILL)
+
             arm_cmd.data[0] = 11000
             arm_cmd.data[3] = 18000
             arm_cmd.data[2] = 8000
@@ -121,6 +128,9 @@ class ArucoDetectMove(Node):
             # publish twist
             twist = Twist()
             self.publishCoordinates.publish(twist)
+
+            # Wait for ticks to be 1000<ticks<2000
+
         elif self.delay_cnt < 2000:
             # initialise at default
             arm_cmd = Int16MultiArray()
@@ -128,14 +138,18 @@ class ArucoDetectMove(Node):
             # set the speed of all the controls
             for i in range(6):
                 arm_cmd.data[i+6] = 1000
-            # lowered position
+
+            # KEEP ARM IN DROP POSITION
             arm_cmd.data[3] = 18000
             arm_cmd.data[2] = 8000
             arm_cmd.data[4] = 6500
-            # open gripper with higher speed
+            # open gripper with higher speed (DROP ITEM)
             arm_cmd.data[0+6] = 500
             arm_cmd.data[0] = 0
             self.arm_pub_.publish(arm_cmd)
+
+            # Wait for ticks to be 2000<ticks<3000
+
         elif self.delay_cnt < 3000:
             # initialise at default
             arm_cmd = Int16MultiArray()
@@ -178,7 +192,8 @@ class ArucoDetectMove(Node):
                 self.get_logger().info(
                     f"distance to aruco marker: {dist}")
                 # when far away
-                if (dist > 0.2):
+                if (dist > 0.25):
+
                     theta = math.atan2(x, z)
                     self.delay_cnt = 0
                     twist.angular.z = theta * KP
