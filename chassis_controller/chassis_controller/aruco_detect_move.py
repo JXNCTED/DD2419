@@ -15,7 +15,7 @@ class ArucoDetectMove(Node):
     def __init__(self):
         # initialize publisher
         # Initialize subscriber
-        super().__init__('obj_detect_move')
+        super().__init__('aruco_detect_move')
 
         self.target_reached = False
         self.delay_cnt = 0

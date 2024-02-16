@@ -4,7 +4,8 @@ GridMap::GridMap(const double &gridSize, const int &sizeX, const int &sizeY, con
                                                                                                                      startX(startX), startY(startY)
 {
     gridBelief.resize(sizeX, sizeY);
-    gridBelief.setOnes() *= 0.5f;
+    gridBelief.setOnes();
+    gridBelief *= -1.0f;
 }
 
 nav_msgs::msg::OccupancyGrid GridMap::toRosOccGrid(const std::string &frameId)
@@ -22,7 +23,7 @@ nav_msgs::msg::OccupancyGrid GridMap::toRosOccGrid(const std::string &frameId)
     for (int i = 0; i < sizeX * sizeY; i++)
     {
         const double &value = gridBelief.data()[i];
-        if (value == 0.5)
+        if (value == -1.0f)
         {
             ret.data.push_back(-1); // unknown
         }
