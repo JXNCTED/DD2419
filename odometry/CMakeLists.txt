@@ -22,6 +22,7 @@ find_package(OpenCV REQUIRED)
 
 add_executable(vi_odom src/vi_odom.cpp)
 add_executable(wheel_odom src/wheel_odom.cpp)
+add_executable(filter_odom src/filter_odom.cpp)
 
 target_include_directories(vi_odom PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
@@ -57,10 +58,20 @@ ament_target_dependencies(
   "tf2_geometry_msgs"
 )
 
-install(TARGETS vi_odom
-  DESTINATION lib/${PROJECT_NAME})
+ament_target_dependencies(
+  filter_odom
+  "sensor_msgs"
+  "rclcpp"
+  "geometry_msgs"
+  "nav_msgs"
+  "tf2_ros"
+)
 
-install(TARGETS wheel_odom
+
+install(TARGETS 
+  vi_odom 
+  wheel_odom 
+  filter_odom
   DESTINATION lib/${PROJECT_NAME})
 
 if(BUILD_TESTING)
