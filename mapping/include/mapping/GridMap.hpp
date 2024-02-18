@@ -14,7 +14,7 @@ public:
 
     // getter and setter
     void setGridBelief(const double &x, const double &y, const double &belief);
-    void setGridLogBelif(const double &x, const double &y, const double &logBelief);
+    void setGridLogBelief(const double &x, const double &y, const double &logBelief);
 
     double getGridSize() { return gridSize; }
     double getGridLogBelief(const double &x, const double &y);

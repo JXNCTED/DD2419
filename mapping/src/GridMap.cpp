@@ -4,8 +4,7 @@ GridMap::GridMap(const double &gridSize, const int &sizeX, const int &sizeY, con
                                                                                                                      startX(startX), startY(startY)
 {
     gridBelief.resize(sizeX, sizeY);
-    gridBelief.setOnes();
-    gridBelief *= -1.0f;
+    gridBelief.setOnes() *= 0.5;
 }
 
 nav_msgs::msg::OccupancyGrid GridMap::toRosOccGrid(const std::string &frameId)
@@ -23,7 +22,7 @@ nav_msgs::msg::OccupancyGrid GridMap::toRosOccGrid(const std::string &frameId)
     for (int i = 0; i < sizeX * sizeY; i++)
     {
         const double &value = gridBelief.data()[i];
-        if (value == -1.0f)
+        if (value == 0.5f)
         {
             ret.data.push_back(-1); // unknown
         }
@@ -40,7 +39,7 @@ void GridMap::setGridBelief(const double &x, const double &y, const double &beli
 {
     int xOnGrid = cvFloor(x / gridSize) + startX;
     int yOnGrid = cvFloor(y / gridSize) + startY;
-    if (xOnGrid < 0 or xOnGrid > sizeX or yOnGrid < 0 or yOnGrid > sizeY)
+    if (xOnGrid < 0 or xOnGrid >= sizeX or yOnGrid < 0 or yOnGrid >= sizeY)
     {
         return;
     }
@@ -48,7 +47,7 @@ void GridMap::setGridBelief(const double &x, const double &y, const double &beli
     gridBelief(xOnGrid, yOnGrid) = belief;
 }
 
-void GridMap::setGridLogBelif(const double &x, const double &y, const double &logBelief)
+void GridMap::setGridLogBelief(const double &x, const double &y, const double &logBelief)
 {
     const double belief = 1.0f - 1.0f / (1 + exp(logBelief));
     setGridBelief(x, y, belief);
@@ -59,9 +58,9 @@ double GridMap::getGridLogBelief(const double &x, const double &y)
 
     int xOnGrid = cvFloor(x / gridSize) + startX;
     int yOnGrid = cvFloor(y / gridSize) + startY;
-    if (xOnGrid < 0 or xOnGrid > sizeX or yOnGrid < 0 or yOnGrid > sizeY)
+    if (xOnGrid < 0 or xOnGrid >= sizeX or yOnGrid < 0 or yOnGrid >= sizeY)
     {
-        return NAN;
+        return -1.0;
     }
     double belief = gridBelief(xOnGrid, yOnGrid);
     return log(belief / (1.0 - belief));

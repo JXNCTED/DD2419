@@ -1,19 +1,21 @@
 #include "mapping/Mapper.hpp"
+#include "rcpputils/asserts.hpp"
 
 Mapper::Mapper(GridMap *map) : map(map) {}
 
-const double P_FREE = 0.6;
-const double P_PRIOR = 0.4;
-const double P_OCC = 0.5;
+// occupancy probability
+const double P_FREE = 0.4;
+const double P_PRIOR = 0.5;
+const double P_OCC = 0.6;
 
-static inline double laserInvModel(const double &r, const double &R, const double &gridSize)
+double laserInvModel(const double &r, const double &R, const double &gridSize)
 {
     if (r < (R - 0.5 * gridSize))
     {
         return P_FREE;
     }
 
-    if (r > (R - 0.5 * gridSize))
+    if (r > (R + 0.5 * gridSize))
     {
         return P_PRIOR;
     }
@@ -52,7 +54,8 @@ void Mapper::updateMapLaser(const sensor_msgs::msg::LaserScan::SharedPtr laserPt
             {
                 continue;
             }
-            updateGrid(pW, laserInvModel(r, R, gridSize));
+            const double occuProb = laserInvModel(r, R, gridSize);
+            updateGrid(pW, occuProb);
             lastPw = pW;
         }
     }
@@ -61,6 +64,10 @@ void Mapper::updateMapLaser(const sensor_msgs::msg::LaserScan::SharedPtr laserPt
 void Mapper::updateGrid(const Eigen::Vector2d grid, const double &pOcc)
 {
     double logBelief = map->getGridLogBelief(grid(0), grid(1));
+    if (logBelief < 0)
+    {
+        return; // error
+    }
     logBelief += log(pOcc / (1 - pOcc));
-    map->setGridBelief(grid(0), grid(1), logBelief);
+    map->setGridLogBelief(grid(0), grid(1), logBelief);
 }

@@ -31,9 +31,11 @@ class FilterOdom : public rclcpp::Node
         rclcpp::Time stamp = realsense_stamp_;
         // double wheels[2]    = wheel_odom;
         // double realsense[2] = realsense_odom;
-        double dt      = 50.0 / 1000.0;
-        double avg_lin = (wheel_odom[0] + realsense_odom[0]) / 2.0;
-        double avg_ang = (wheel_odom[1] + realsense_odom[1]) / 2.0;
+        double dt = 50.0 / 1000.0;
+        // double avg_lin = (wheel_odom[0] + realsense_odom[0]) / 2.0;
+        // double avg_ang = (wheel_odom[1] + realsense_odom[1]) / 2.0;
+        double avg_lin = wheel_odom[0];
+        double avg_ang = wheel_odom[1];
         x_ += avg_lin * sin(yaw_) * dt;
         y_ += avg_lin * cos(yaw_) * dt;
         yaw_ += avg_ang * dt;
@@ -45,6 +47,7 @@ class FilterOdom : public rclcpp::Node
    private:
     void publish_odom(const rclcpp::Time &stamp)
     {
+        RCLCPP_INFO(rclcpp::get_logger("filter"), "odom published");
         nav_msgs::msg::Odometry odom;
         odom.header.stamp          = stamp;
         odom.header.frame_id       = "odom";
@@ -58,6 +61,7 @@ class FilterOdom : public rclcpp::Node
     }
     void publish_path(const rclcpp::Time &stamp)
     {
+        RCLCPP_INFO(rclcpp::get_logger("filter"), "path published");
         geometry_msgs::msg::PoseStamped pose;
         pose.header.stamp     = stamp;
         pose.header.frame_id  = "odom";
@@ -73,6 +77,7 @@ class FilterOdom : public rclcpp::Node
     }
     void broadcast_tf(const rclcpp::Time &stamp)
     {
+        RCLCPP_INFO(rclcpp::get_logger("filter"), "tf published");
         geometry_msgs::msg::TransformStamped odom_tf;
         odom_tf.header.stamp            = stamp;
         odom_tf.header.frame_id         = "odom";
