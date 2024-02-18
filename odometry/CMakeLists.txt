@@ -65,6 +65,7 @@ ament_target_dependencies(
   "geometry_msgs"
   "nav_msgs"
   "tf2_ros"
+  "tf2_geometry_msgs"
 )
 
 

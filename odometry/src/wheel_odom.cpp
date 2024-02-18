@@ -19,6 +19,8 @@ class WheelOdom : public rclcpp::Node
         const float WHEEL_RADIUS = 0.04921;
         const float WHEEL_BASE   = 0.3;
 
+        const float DT = 50.0 / 1000.0;
+
         float vw1 = msg->delta_encoder_left * 2 * M_PI / TICK_PER_REV / DT;
         float vw2 = msg->delta_encoder_right * 2 * M_PI / TICK_PER_REV / DT;
 
