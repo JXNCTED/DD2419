@@ -32,7 +32,7 @@ class FilterOdom : public rclcpp::Node
         // double wheels[2]    = wheel_odom;
         // double realsense[2] = realsense_odom;
         double dt      = 50.0 / 1000.0;
-        double avg_lin = (wheel_odom[0] + realsense_odom[0]) / 2.0;
+        double avg_lin = wheel_odom[0];
         double avg_ang = (wheel_odom[1] + realsense_odom[1]) / 2.0;
         x_ += avg_lin * sin(yaw_) * dt;
         y_ += avg_lin * cos(yaw_) * dt;
