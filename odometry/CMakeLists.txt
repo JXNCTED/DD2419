@@ -24,6 +24,11 @@ add_executable(vi_odom src/vi_odom.cpp)
 add_executable(wheel_odom src/wheel_odom.cpp)
 add_executable(filter_odom src/filter_odom.cpp)
 
+add_library(ekf src/ekf.cpp)
+target_include_directories(ekf PUBLIC
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+  $<INSTALL_INTERFACE:include>)
+
 target_include_directories(vi_odom PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
   $<INSTALL_INTERFACE:include>)
