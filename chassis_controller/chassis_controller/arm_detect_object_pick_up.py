@@ -22,6 +22,33 @@ class ArucoDetectPick(Node):
         self.arm_pub_ = self.create_publisher(
             Int16MultiArray, '/multi_servo_cmd_sub', 10)
 
+        self.neutral_angles = [12000 for i in range(12)]
+        # set the speed of all the controls
+        for i in range(6):
+            self.neutral_angles[i+6] = 1000
+
+        # HEAD DOWN ASS UP, THAT'S THE WAY WE LIKE TO ...
+        self.detect_angles = [12000 for i in range(12)]
+        # set the speed of all the controls
+        for i in range(6):
+            self.detect_angles[i+6] = 1000
+        self.detect_angles[2] = 2000
+        self.detect_angles[3] = 18000
+        self.detect_angles[4] = 10000
+        self.detect_angles[0] = 5000
+
+        # Pick up shit...
+        self.pickup_angles = [12000 for i in range(12)]
+        # set the speed of all the controls
+        for i in range(6):
+            self.pickup_angles[i+6] = 1000
+        self.pickup_angles[2] = 4000
+        self.pickup_angles[3] = 15400
+        self.pickup_angles[4] = 6160
+
+        self.open_gripper = 5000
+        self.close_gripper = 12000
+
     def theta_1_value(self, degrees):
         return np.max([4000, np.min([20000, int(12000-(degrees-90)*100)])])
 
@@ -29,7 +56,7 @@ class ArucoDetectPick(Node):
         return np.max([4000, np.min([20000, int(12000+(degrees)*100)])])
 
     def theta_3_value(self, degrees):
-        return np.max([4000, np.min([20000, int(12000-(degrees)*100)])])
+        return np.max([1000, np.min([23000, int(12000-(degrees)*100)])])
 
     def inverse_kin(self):
         # Length of links in cm
@@ -37,16 +64,12 @@ class ArucoDetectPick(Node):
         a2 = 9.4
         a3 = 16.9
 
-        # Desired Position of End effector
-        # now if we add to x, it goes in direction of robot
-        # if we minus y, it goes down
-        px = 8
+        px = 10  # With this phi conf, it can only handle 18-15cm
         px = -px
-        py = 10
+        py = -5
+        # 18, -14 for pickup
 
-        phi = 200
-        phi = np.deg2rad(phi)
-        phi = 6  # there are only some valid phi values, check the desmos
+        phi = 4.712  # there are only some valid phi values, check the desmos
 
         # Equations for Inverse kinematics
         wx = px - a3*np.cos(phi)
@@ -54,7 +77,7 @@ class ArucoDetectPick(Node):
 
         delta = wx**2 + wy**2
         c2 = (delta - a1**2 - a2**2)/(2*a1*a2)
-        # print(f"numerator without delta { - a1**2 - a2**2}, and now denominator {(2*a1*a2)}, delta {delta}, total with delta {c2}")
+
         s2 = np.sqrt(1-c2**2)  # elbow down
         theta_2 = np.arctan2(s2, c2)
 
@@ -78,25 +101,6 @@ class ArucoDetectPick(Node):
             arm_cmd.data = [12000 for i in range(12)]
 
             theta_1, theta_2, theta_3 = self.inverse_kin()
-            print(theta_1)
-
-            # theta_1_16bit = self.theta_1_value(theta_1+90)
-            # if (theta_1_16bit < 0):
-            #     theta_1_16bit = -theta_1_16bit
-            # print(theta_1_16bit)
-
-            # theta_2_16bit = self.theta_2_value(theta_2)
-            # theta_3_16bit = self.theta_3_value(180-theta_3)
-
-            # Default values for the servos. Standing straight up.
-            # theta_1_16bit = self.theta_1_value(90)
-            # theta_2_16bit = self.theta_2_value(90)
-            # theta_3_16bit = self.theta_3_value(90)
-
-            # Degrees: 180-(90+bendingDeg) will give proper bending.
-            # if (theta_1 < 0):
-            #     theta_1 = theta_1+180
-            print(theta_1)
 
             theta_1_16bit = self.theta_1_value(theta_1)
             theta_2_16bit = self.theta_2_value(theta_2)
@@ -105,16 +109,8 @@ class ArucoDetectPick(Node):
             print(
                 f"servo1: {theta_1_16bit}, servo2: {theta_2_16bit}, servo3: {theta_3_16bit}")
 
-            # theta_1_16bit = self.theta_1_value(
-            #     180-(90+theta_1))  # BEND 30 degrees
-
-            # theta_2_16bit = self.theta_2_value(
-            #     180-(90+theta_2))  # BEND theta_2 degrees
-            # theta_3_16bit = self.theta_3_value(
-            #     180-(90+theta_3))  # Bend theta_3 degrees
-
             # ID on this servo is 5 THETA_1 4000IS ABOUT 0 DEGREES.
-            # ADD 90 degrees here!!! Important since our robot is angled 90 degrees more than the youtube/github solution.
+            # ADD 90 degrees here!!! Important since our robot is angleddetect_angles 90 degrees more than the youtube/github solution.
             #
             # arm_cmd.data[4] = self.theta_1_value(-67+90)
             bottom_servo = arm_cmd.data[4]
@@ -128,14 +124,21 @@ class ArucoDetectPick(Node):
 
             # Two is actually three (going by Id on the servos)
             arm_cmd.data[2] = theta_3_16bit  # THETA_3
-            # arm_cmd.data[2] = 3000
             # set the speed of all the controls
             for i in range(6):
                 arm_cmd.data[i+6] = 1000
-            arm_cmd.data[0] = 12000
+
+            arm_cmd.data[0] = self.close_gripper
             # arm_cmd.data[4] = 12000
             # arm_cmd.data[3] = 12000
             # arm_cmd.data[2] = 12000
+
+            # arm_cmd.data[5] = 15000            #ROTATION OF THE BASE
+
+            # PREDEFINED POSITION FOR THE ARM
+            # arm_cmd.data = self.neutral_angles  # STRAIGHT UP
+            # arm_cmd.data = self.detect_angles  # DETECTING MODE, SEARCHING
+            # arm_cmd.data = self.pickup_angles  # PICKING UP
             self.arm_pub_.publish(arm_cmd)
         else:
             self.has_set_neutral = True
