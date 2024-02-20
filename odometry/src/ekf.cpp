@@ -1,8 +1,8 @@
 #include "odometry/ekf.hpp"
 
 EKF::EKF(const size_t &n,
-         const VecVecFunc &f,
-         const VecVecFunc &h,
+         const ProcessModelFunc &f,
+         const ObservationModelFunc &h,
          const VecMatFunc &j_f,
          const VecMatFunc &j_h,
          const VoidMatFunc &update_q,
@@ -14,12 +14,12 @@ EKF::EKF(const size_t &n,
 
 void EKF::init(const Eigen::VectorXd &x0) { x_post = x0; }
 
-Eigen::VectorXd EKF::predict()
+Eigen::VectorXd EKF::predict(const Eigen::VectorXd &u)
 {
     F = jacobian_f(x_post);
     Q = update_Q();
 
-    x_pri = f(x_post);
+    x_pri = f(x_post, u);
     P_pri = F * P_post * F.transpose() + Q;
 
     x_post = x_pri;

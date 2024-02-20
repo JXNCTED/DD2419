@@ -1,17 +1,18 @@
 #pragma once
 #include <eigen3/Eigen/Dense>
 
-using VecVecFunc  = Eigen::VectorXd (*)(Eigen::VectorXd);
-using VecMatFunc  = Eigen::MatrixXd (*)(Eigen::VectorXd);
-using VoidMatFunc = Eigen::MatrixXd (*)(void);
+using ProcessModelFunc     = Eigen::VectorXd (*)(Eigen::VectorXd, Eigen::VectorXd);
+using ObservationModelFunc = Eigen::VectorXd (*)(Eigen::VectorXd);
+using VecMatFunc           = Eigen::MatrixXd (*)(Eigen::VectorXd);
+using VoidMatFunc          = Eigen::MatrixXd (*)(void);
 
 class EKF
 {
    public:
     EKF() = delete;
     EKF(const size_t &n,
-        const VecVecFunc &f,
-        const VecVecFunc &h,
+        const ProcessModelFunc &f,
+        const ObservationModelFunc &h,
         const VecMatFunc &j_f,
         const VecMatFunc &j_h,
         const VoidMatFunc &update_q,
@@ -20,7 +21,7 @@ class EKF
 
     void init(const Eigen::VectorXd &x0);
 
-    Eigen::VectorXd predict();
+    Eigen::VectorXd predict(const Eigen::VectorXd &u);
 
     Eigen::VectorXd update(const Eigen::VectorXd &z);
 
@@ -29,9 +30,9 @@ class EKF
     const size_t n;
 
     // process function
-    VecVecFunc f;
+    ProcessModelFunc f;
     // observation function
-    VecVecFunc h;
+    ObservationModelFunc h;
 
     // process jacobian
     VecMatFunc jacobian_f;
