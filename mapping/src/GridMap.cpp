@@ -16,6 +16,25 @@ GridMap::GridMap(const double &gridSize,
     gridBelief.setOnes() *= 0.5;
 }
 
+GridMap::GridMap(const std::string &dir)
+{
+    std::ifstream ifs(dir, std::ifstream::in);
+    if (!ifs)
+    {
+        std::cerr << "Failed to open file: " << dir << std::endl;
+        return;
+    }
+    ifs >> sizeX >> sizeY >> startX >> startY >> gridSize;
+    gridBelief.resize(sizeX, sizeY);
+    for (int i = 0; i < sizeX; i++)
+    {
+        for (int j = 0; j < sizeY; j++)
+        {
+            ifs >> gridBelief(i, j);
+        }
+    }
+    ifs.close();
+}
 nav_msgs::msg::OccupancyGrid GridMap::toRosOccGrid(const std::string &frameId)
 {
     nav_msgs::msg::OccupancyGrid ret;
@@ -78,7 +97,7 @@ double GridMap::getGridLogBelief(const double &x, const double &y)
     return log(belief / (1.0 - belief));
 }
 
-void GridMap::saveMap(const std::string dir &dir)
+void GridMap::saveMap(const std::string &dir)
 {
     std::ofstream ofs(dir, std::ofstream::out);
     if (!ofs)
@@ -86,34 +105,15 @@ void GridMap::saveMap(const std::string dir &dir)
         std::cerr << "Failed to open file: " << dir << std::endl;
         return;
     }
-    ofs << sizeX << " " ofs << sizeY << " " ofs << startX << " " ofs << startY
-        << std::endl;
-    for (size_t i = 0; i < sizeX; i++)
+    ofs << sizeX << " " << sizeY << " " << startX << " " << startY << " "
+        << gridSize << std::endl;
+    for (int i = 0; i < sizeX; i++)
     {
-        for (size_t j = 0; j < sizeY; j++)
+        for (int j = 0; j < sizeY; j++)
         {
             ofs << gridBelief(i, j) << " ";
         }
         ofs << std::endl;
     }
     ofs.close();
-}
-void GridMap::loadMap(const std::string dir &dir)
-{
-    std::ifstream ifs(dir, std::ifstream::in);
-    if (!ifs)
-    {
-        std::cerr << "Failed to open file: " << dir << std::endl;
-        return;
-    }
-    ifs >> sizeX >> sizeY >> startX >> startY;
-    gridBelief.resize(sizeX, sizeY);
-    for (size_t i = 0; i < sizeX; i++)
-    {
-        for (size_t j = 0; j < sizeY; j++)
-        {
-            ifs >> gridBelief(i, j);
-        }
-    }
-    ifs.close();
 }
