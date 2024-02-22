@@ -1,4 +1,5 @@
 #include "mapping/GridMap.hpp"
+#include <fstream>
 
 GridMap::GridMap(const double &gridSize, const int &sizeX, const int &sizeY, const int &startX, const int &startY) : gridSize(gridSize), sizeX(sizeX), sizeY(sizeY),
                                                                                                                      startX(startX), startY(startY)
@@ -64,4 +65,21 @@ double GridMap::getGridLogBelief(const double &x, const double &y)
     }
     double belief = gridBelief(xOnGrid, yOnGrid);
     return log(belief / (1.0 - belief));
+}
+
+void GridMap::saveMap(const std::string dir &dir)
+{
+    std::ofstream ofs(dir, std::ofstream::out);
+    ofs << sizeX << " " ofs << sizeY << " " ofs << startX << " " ofs << startY << std::endl;
+    for (size_t i = 0; i < sizeX; i++)
+    {
+        for (size_t j = 0; j < sizeY; j++)
+        {
+            ofs << gridBelief(i, j) << " ";
+        }
+    }
+    ofs.close();
+}
+void GridMap::loadMap(const std::string dir &dir)
+{
 }

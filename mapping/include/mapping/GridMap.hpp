@@ -20,6 +20,8 @@ public:
     double getGridLogBelief(const double &x, const double &y);
     // APIs
     nav_msgs::msg::OccupancyGrid toRosOccGrid(const std::string &frameId);
+    void saveMap(const std::string dir &dir);
+    void loadMap(const std::string dir &dir);
 
 private:
     const double gridSize = 0.0;
