@@ -14,18 +14,23 @@ class FilterOdom : public rclcpp::Node
    public:
     FilterOdom() : Node("filter_odom")
     {
-        wheel_odom_sub_ = this->create_subscription<geometry_msgs::msg::Vector3>(
+        // Subscriptions
+        wheel_odom_sub_     = this->create_subscription<geometry_msgs::msg::Vector3>(
             "/wheel_odom", 10, std::bind(&FilterOdom::wheel_callback, this, std::placeholders::_1));
         realsense_gyro_sub_ = this->create_subscription<sensor_msgs::msg::Imu>(
             "/camera/gyro/sample", 10, std::bind(&FilterOdom::realsense_callback, this, std::placeholders::_1));
-        phidget_gyro_sub_ = this->create_subscription<sensor_msgs::msg::Imu>(
+        phidget_gyro_sub_   = this->create_subscription<sensor_msgs::msg::Imu>(
             "/imu/data_raw", 10, std::bind(&FilterOdom::phidget_callback, this, std::placeholders::_1));
-        odom_pub_       = this->create_publisher<nav_msgs::msg::Odometry>("/odom", 10);
-        path_pub_       = this->create_publisher<nav_msgs::msg::Path>("/path", 10);
-        tf_broadcaster_ = std::make_unique<tf2_ros::TransformBroadcaster>(*this);
-        timer_          = this->create_wall_timer(50ms, std::bind(&FilterOdom::timer_callback, this));
+        // Publishers
+        odom_pub_           = this->create_publisher<nav_msgs::msg::Odometry>("/odom", 10);
+        path_pub_           = this->create_publisher<nav_msgs::msg::Path>("/path", 10);
+        tf_broadcaster_     = std::make_unique<tf2_ros::TransformBroadcaster>(*this);
+        // Timer
+        timer_              = this->create_wall_timer(50ms, std::bind(&FilterOdom::timer_callback, this));
     }
 
+   private:
+    // This is the main method that combines wheel and IMU odometry and publishes it as odom, path and tf.
     void timer_callback()
     {
         rclcpp::Time stamp = realsense_stamp_;
@@ -42,7 +47,7 @@ class FilterOdom : public rclcpp::Node
         broadcast_tf(stamp);
     }
 
-   private:
+    // Helper method that creates a odom message and publishes it.
     void publish_odom(const rclcpp::Time &stamp)
     {
         nav_msgs::msg::Odometry odom;
@@ -56,6 +61,8 @@ class FilterOdom : public rclcpp::Node
 
         odom_pub_->publish(odom);
     }
+
+    // Helper method that appends to a path the pose and publishes the path.
     void publish_path(const rclcpp::Time &stamp)
     {
         geometry_msgs::msg::PoseStamped pose;
@@ -71,6 +78,8 @@ class FilterOdom : public rclcpp::Node
         path_.poses.push_back(pose);
         path_pub_->publish(path_);
     }
+
+    // Helper method that creates a tf: odom -> base_link, and publishes it.
     void broadcast_tf(const rclcpp::Time &stamp)
     {
         geometry_msgs::msg::TransformStamped odom_tf;
@@ -84,6 +93,8 @@ class FilterOdom : public rclcpp::Node
         odom_tf.transform.rotation      = tf2::toMsg(q);
         tf_broadcaster_->sendTransform(odom_tf);
     }
+
+    // Callbacks from wheel enconders, realsense IMU and phidget IMU.
     void wheel_callback(const geometry_msgs::msg::Vector3::SharedPtr msg)
     {
         wheel_odom[0] = msg->x;
@@ -112,7 +123,7 @@ class FilterOdom : public rclcpp::Node
     rclcpp::Publisher<nav_msgs::msg::Path>::SharedPtr path_pub_;
 
     nav_msgs::msg::Path path_;
-    // Fields
+    // Fields to store the subscriptions values.
     double wheel_odom[2];
     double _realsense_old[2];
     double realsense_odom[2];
@@ -121,6 +132,7 @@ class FilterOdom : public rclcpp::Node
     rclcpp::TimerBase::SharedPtr timer_;
     rclcpp::Time realsense_stamp_;
 
+    // The pose of the robot.
     float x_   = 0.0;
     float y_   = 0.0;
     float yaw_ = 0.0;
