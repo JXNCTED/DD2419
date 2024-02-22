@@ -1,9 +1,9 @@
 #include "mapping/GridMap.hpp"
 #include "mapping/Mapper.hpp"
-#include "rclcpp/rclcpp.hpp"
 #include "nav_msgs/msg/odometry.hpp"
-#include "tf2/LinearMath/Quaternion.h"
+#include "rclcpp/rclcpp.hpp"
 #include "tf2/LinearMath/Matrix3x3.h"
+#include "tf2/LinearMath/Quaternion.h"
 class MappingNode : public rclcpp::Node
 {
    public:
@@ -20,18 +20,19 @@ class MappingNode : public rclcpp::Node
             10,
             std::bind(
                 &MappingNode::laserCallback, this, std::placeholders::_1));
-
         occu_pub_ = this->create_publisher<nav_msgs::msg::OccupancyGrid>(
             "/occupancy", 10);
+        // save the map per 10s
         timer_ = this->create_wall_timer(
-            std::chrono::milliseconds(5000),
+            std::chrono::milliseconds(10000),
             std::bind(&MappingNode::timerCallback, this));
     }
 
     void timerCallback()
     {
         static int count = 0;
-        map.saveMap("~/mappings/" + std::to_string(count) + "map.txt");
+        map.saveMap("/home/group7/maps/" + std::to_string(count) + "_map.txt");
+        count++;
     }
 
     void odomCallback(const nav_msgs::msg::Odometry::SharedPtr msg)

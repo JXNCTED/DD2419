@@ -1,4 +1,5 @@
 #include "mapping/GridMap.hpp"
+
 #include <fstream>
 
 GridMap::GridMap(const double &gridSize,
@@ -99,12 +100,9 @@ double GridMap::getGridLogBelief(const double &x, const double &y)
 
 void GridMap::saveMap(const std::string &dir)
 {
-    std::ofstream ofs(dir, std::ofstream::out);
-    if (!ofs)
-    {
-        std::cerr << "Failed to open file: " << dir << std::endl;
-        return;
-    }
+    std::ofstream ofs;
+    ofs.open(dir);
+
     ofs << sizeX << " " << sizeY << " " << startX << " " << startY << " "
         << gridSize << std::endl;
     for (int i = 0; i < sizeX; i++)
