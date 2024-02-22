@@ -12,6 +12,11 @@ find_package(nav_msgs REQUIRED)
 find_package(sensor_msgs REQUIRED)
 find_package(OpenCV REQUIRED)
 find_package(tf2_ros REQUIRED)
+find_package(rosidl_default_generators REQUIRED)
+
+rosidl_default_generators( ${PROJECT_NAME}
+  "srv/PathPlan.srv"
+)
 # uncomment the following section in order to fill in
 # further dependencies manually.
 # find_package(<dependency> REQUIRED)
