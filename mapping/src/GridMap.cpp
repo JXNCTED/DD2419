@@ -1,31 +1,59 @@
 #include "mapping/GridMap.hpp"
 
-GridMap::GridMap(const double &gridSize, const int &sizeX, const int &sizeY, const int &startX, const int &startY) : gridSize(gridSize), sizeX(sizeX), sizeY(sizeY),
-                                                                                                                     startX(startX), startY(startY)
+#include <fstream>
+
+GridMap::GridMap(const double &gridSize,
+                 const int &sizeX,
+                 const int &sizeY,
+                 const int &startX,
+                 const int &startY)
+    : gridSize(gridSize),
+      sizeX(sizeX),
+      sizeY(sizeY),
+      startX(startX),
+      startY(startY)
 {
     gridBelief.resize(sizeX, sizeY);
-    gridBelief.setOnes();
-    gridBelief *= -1.0f;
+    gridBelief.setOnes() *= 0.5;
 }
 
+GridMap::GridMap(const std::string &dir)
+{
+    std::ifstream ifs(dir, std::ifstream::in);
+    if (!ifs)
+    {
+        std::cerr << "Failed to open file: " << dir << std::endl;
+        return;
+    }
+    ifs >> sizeX >> sizeY >> startX >> startY >> gridSize;
+    gridBelief.resize(sizeX, sizeY);
+    for (int i = 0; i < sizeX; i++)
+    {
+        for (int j = 0; j < sizeY; j++)
+        {
+            ifs >> gridBelief(i, j);
+        }
+    }
+    ifs.close();
+}
 nav_msgs::msg::OccupancyGrid GridMap::toRosOccGrid(const std::string &frameId)
 {
     nav_msgs::msg::OccupancyGrid ret;
     ret.header.frame_id = frameId;
-    ret.header.stamp = lastUpdated;
+    ret.header.stamp    = lastUpdated;
 
-    ret.info.width = sizeX;
-    ret.info.height = sizeY;
-    ret.info.resolution = gridSize;
+    ret.info.width             = sizeX;
+    ret.info.height            = sizeY;
+    ret.info.resolution        = gridSize;
     ret.info.origin.position.x = -startX * gridSize;
     ret.info.origin.position.y = -startY * gridSize;
 
     for (int i = 0; i < sizeX * sizeY; i++)
     {
         const double &value = gridBelief.data()[i];
-        if (value == -1.0f)
+        if (value == 0.5f)
         {
-            ret.data.push_back(-1); // unknown
+            ret.data.push_back(-1);  // unknown
         }
         else
         {
@@ -36,11 +64,13 @@ nav_msgs::msg::OccupancyGrid GridMap::toRosOccGrid(const std::string &frameId)
     return ret;
 }
 
-void GridMap::setGridBelief(const double &x, const double &y, const double &belief)
+void GridMap::setGridBelief(const double &x,
+                            const double &y,
+                            const double &belief)
 {
     int xOnGrid = cvFloor(x / gridSize) + startX;
     int yOnGrid = cvFloor(y / gridSize) + startY;
-    if (xOnGrid < 0 or xOnGrid > sizeX or yOnGrid < 0 or yOnGrid > sizeY)
+    if (xOnGrid < 0 or xOnGrid >= sizeX or yOnGrid < 0 or yOnGrid >= sizeY)
     {
         return;
     }
@@ -48,7 +78,9 @@ void GridMap::setGridBelief(const double &x, const double &y, const double &beli
     gridBelief(xOnGrid, yOnGrid) = belief;
 }
 
-void GridMap::setGridLogBelif(const double &x, const double &y, const double &logBelief)
+void GridMap::setGridLogBelief(const double &x,
+                               const double &y,
+                               const double &logBelief)
 {
     const double belief = 1.0f - 1.0f / (1 + exp(logBelief));
     setGridBelief(x, y, belief);
@@ -56,13 +88,30 @@ void GridMap::setGridLogBelif(const double &x, const double &y, const double &lo
 
 double GridMap::getGridLogBelief(const double &x, const double &y)
 {
-
     int xOnGrid = cvFloor(x / gridSize) + startX;
     int yOnGrid = cvFloor(y / gridSize) + startY;
-    if (xOnGrid < 0 or xOnGrid > sizeX or yOnGrid < 0 or yOnGrid > sizeY)
+    if (xOnGrid < 0 or xOnGrid >= sizeX or yOnGrid < 0 or yOnGrid >= sizeY)
     {
-        return NAN;
+        return -1.0;
     }
     double belief = gridBelief(xOnGrid, yOnGrid);
     return log(belief / (1.0 - belief));
+}
+
+void GridMap::saveMap(const std::string &dir)
+{
+    std::ofstream ofs;
+    ofs.open(dir);
+
+    ofs << sizeX << " " << sizeY << " " << startX << " " << startY << " "
+        << gridSize << std::endl;
+    for (int i = 0; i < sizeX; i++)
+    {
+        for (int j = 0; j < sizeY; j++)
+        {
+            ofs << gridBelief(i, j) << " ";
+        }
+        ofs << std::endl;
+    }
+    ofs.close();
 }

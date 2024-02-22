@@ -7,24 +7,33 @@
 
 class GridMap
 {
-public:
+   public:
     // constructors
     GridMap() = delete;
-    GridMap(const double &gridSize, const int &sizeX, const int &sizeY, const int &startX, const int &startY);
+    GridMap(const double &gridSize,
+            const int &sizeX,
+            const int &sizeY,
+            const int &startX,
+            const int &startY);
+    // constructor from file
+    GridMap(const std::string &dir);
 
     // getter and setter
     void setGridBelief(const double &x, const double &y, const double &belief);
-    void setGridLogBelif(const double &x, const double &y, const double &logBelief);
+    void setGridLogBelief(const double &x,
+                          const double &y,
+                          const double &logBelief);
 
     double getGridSize() { return gridSize; }
     double getGridLogBelief(const double &x, const double &y);
     // APIs
     nav_msgs::msg::OccupancyGrid toRosOccGrid(const std::string &frameId);
+    void saveMap(const std::string &dir);
 
-private:
-    const double gridSize = 0.0;
-    const int sizeX = 0, sizeY = 0;
-    const int startX = 0, startY = 0;
+   private:
+    double gridSize = 0.0;
+    int sizeX = 0, sizeY = 0;
+    int startX = 0, startY = 0;
     Eigen::MatrixXd gridBelief;
     rclcpp::Time lastUpdated;
 };

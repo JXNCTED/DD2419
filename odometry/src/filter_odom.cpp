@@ -54,6 +54,7 @@ class FilterOdom : public rclcpp::Node
     // Helper method that creates a odom message and publishes it.
     void publish_odom(const rclcpp::Time &stamp)
     {
+        RCLCPP_INFO(rclcpp::get_logger("filter"), "odom published");
         nav_msgs::msg::Odometry odom;
         odom.header.stamp          = stamp;
         odom.header.frame_id       = "odom";
@@ -69,6 +70,7 @@ class FilterOdom : public rclcpp::Node
     // Helper method that appends to a path the pose and publishes the path.
     void publish_path(const rclcpp::Time &stamp)
     {
+        RCLCPP_INFO(rclcpp::get_logger("filter"), "path published");
         geometry_msgs::msg::PoseStamped pose;
         pose.header.stamp     = stamp;
         pose.header.frame_id  = "odom";
@@ -86,6 +88,7 @@ class FilterOdom : public rclcpp::Node
     // Helper method that creates a tf: odom -> base_link, and publishes it.
     void broadcast_tf(const rclcpp::Time &stamp)
     {
+        RCLCPP_INFO(rclcpp::get_logger("filter"), "tf published");
         geometry_msgs::msg::TransformStamped odom_tf;
         odom_tf.header.stamp            = stamp;
         odom_tf.header.frame_id         = "odom";
