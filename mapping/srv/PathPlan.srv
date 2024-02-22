@@ -1,5 +1,0 @@
-# Request message
-geometry_msgs/PoseStamped goal
----
-# Response message
-nav_msgs/Path path
