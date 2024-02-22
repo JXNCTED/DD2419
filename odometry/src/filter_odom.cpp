@@ -111,7 +111,6 @@ class FilterOdom : public rclcpp::Node
     {
         realsense_odom[0] = (msg->linear_acceleration.z + _realsense_old[0]) / 2.0;  // ---------------- I dont know if this is the correct axis
         realsense_odom[1] = (-msg->angular_velocity.y + _realsense_old[1]) / 2.0;    // rad/s
-        RCLCPP_INFO(rclcpp::get_logger("filter"), "y ang: %f", realsense_odom[1]);
         _realsense_old[0] = msg->linear_acceleration.z;
         _realsense_old[1] = -msg->angular_velocity.y;
         realsense_stamp_  = msg->header.stamp;
