@@ -13,6 +13,7 @@ find_package(std_msgs REQUIRED)
 set(msg_files
   "msg/DutyCycles.msg"
   "msg/Encoders.msg"
+  "msg/PickAndPlace.msg" 
   )
 
 rosidl_generate_interfaces(${PROJECT_NAME}
