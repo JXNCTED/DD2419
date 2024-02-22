@@ -1,7 +1,8 @@
-#include "geometry_msgs/msg/pose_stamped.hpp"       //path
-#include "geometry_msgs/msg/vector3.hpp"            //wheels
-#include "nav_msgs/msg/odometry.hpp"                //odometry
-#include "nav_msgs/msg/path.hpp"                    //path
+#include "geometry_msgs/msg/pose_stamped.hpp"  //path
+#include "geometry_msgs/msg/vector3.hpp"       //wheels
+#include "nav_msgs/msg/odometry.hpp"           //odometry
+#include "nav_msgs/msg/path.hpp"               //path
+#include "rclcpp/qos.hpp"
 #include "rclcpp/rclcpp.hpp"                        //general
 #include "sensor_msgs/msg/imu.hpp"                  //imu
 #include "tf2/LinearMath/Quaternion.h"              //odometry, path and tf
@@ -14,10 +15,11 @@ class FilterOdom : public rclcpp::Node
    public:
     FilterOdom() : Node("filter_odom")
     {
+        rclcpp::SensorDataQoS sensorQos;
         wheel_odom_sub_ = this->create_subscription<geometry_msgs::msg::Vector3>(
             "/wheel_odom", 10, std::bind(&FilterOdom::wheel_callback, this, std::placeholders::_1));
         realsense_gyro_sub_ = this->create_subscription<sensor_msgs::msg::Imu>(
-            "/camera/gyro/sample", 10, std::bind(&FilterOdom::realsense_callback, this, std::placeholders::_1));
+            "/camera/gyro/sample", sensorQos, std::bind(&FilterOdom::realsense_callback, this, std::placeholders::_1));
         phidget_gyro_sub_ = this->create_subscription<sensor_msgs::msg::Imu>(
             "/imu/data_raw", 10, std::bind(&FilterOdom::phidget_callback, this, std::placeholders::_1));
         odom_pub_       = this->create_publisher<nav_msgs::msg::Odometry>("/odom", 10);
@@ -33,9 +35,11 @@ class FilterOdom : public rclcpp::Node
         // double realsense[2] = realsense_odom;
         double dt      = 50.0 / 1000.0;
         double avg_lin = wheel_odom[0];
-        double avg_ang = (wheel_odom[1] + realsense_odom[1]) / 2.0;
-        x_ += avg_lin * sin(yaw_) * dt;
-        y_ += avg_lin * cos(yaw_) * dt;
+        // double avg_ang = (wheel_odom[1] + realsense_odom[1]) / 2.0;
+        double avg_ang = realsense_odom[1];
+
+        x_ += avg_lin * cos(yaw_) * dt;
+        y_ += avg_lin * sin(yaw_) * dt;
         yaw_ += avg_ang * dt;
         publish_odom(stamp);
         publish_path(stamp);
@@ -92,9 +96,10 @@ class FilterOdom : public rclcpp::Node
     void realsense_callback(const sensor_msgs::msg::Imu::SharedPtr msg)
     {
         realsense_odom[0] = (msg->linear_acceleration.z + _realsense_old[0]) / 2.0;  // ---------------- I dont know if this is the correct axis
-        realsense_odom[1] = (msg->angular_velocity.y + _realsense_old[1]) / 2.0;     // rad/s
+        realsense_odom[1] = (-msg->angular_velocity.y + _realsense_old[1]) / 2.0;    // rad/s
+        RCLCPP_INFO(rclcpp::get_logger("filter"), "y ang: %f", realsense_odom[1]);
         _realsense_old[0] = msg->linear_acceleration.z;
-        _realsense_old[1] = msg->angular_velocity.y;
+        _realsense_old[1] = -msg->angular_velocity.y;
         realsense_stamp_  = msg->header.stamp;
     }
     void phidget_callback(const sensor_msgs::msg::Imu::SharedPtr msg)
