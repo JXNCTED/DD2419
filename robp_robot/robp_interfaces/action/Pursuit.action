@@ -4,5 +4,5 @@ geometry_msgs/Points[] waypoints
 #True if the robot succeeds in moving to the last point
 bool success
 ---
-#Not sure yet, perhaps what point it is currently working towards
-int32 progress
+#What the command to the robot is at the moment
+geometry_msgs/Twist current_velocity
