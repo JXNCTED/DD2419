@@ -1,4 +1,4 @@
-int64 a
-
+geometry_msgs/PoseStamped current_pose
+geometry_msgs/PoseStamped goal_pose
 ---
-int64 b
+nav_msgs/Path path

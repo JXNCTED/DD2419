@@ -27,13 +27,16 @@ class GridMap
     double getGridSize() { return gridSize; }
     double getGridLogBelief(const double &x, const double &y);
     // APIs
-    nav_msgs::msg::OccupancyGrid toRosOccGrid(const std::string &frameId);
+    nav_msgs::msg::OccupancyGrid toRosOccGrid();
     void saveMap(const std::string &dir);
 
    private:
+    nav_msgs::msg::OccupancyGrid rosOccGrid;
     double gridSize = 0.0;
     int sizeX = 0, sizeY = 0;
     int startX = 0, startY = 0;
     Eigen::MatrixXd gridBelief;
+    Eigen::MatrixXd gridBeliefLiDAR;
+    Eigen::MatrixXd gridBeliefRGBD;
     rclcpp::Time lastUpdated;
 };

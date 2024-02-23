@@ -15,6 +15,17 @@ GridMap::GridMap(const double &gridSize,
 {
     gridBelief.resize(sizeX, sizeY);
     gridBelief.setOnes() *= 0.5;
+    gridBeliefLiDAR.resize(sizeX, sizeY);
+    gridBeliefLiDAR.setOnes() *= 0.5;
+    gridBeliefRGBD.resize(sizeX, sizeY);
+    gridBeliefRGBD.setOnes() *= 0.5;
+
+    rosOccGrid.header.frame_id        = "map";
+    rosOccGrid.info.width             = sizeX;
+    rosOccGrid.info.height            = sizeY;
+    rosOccGrid.info.resolution        = gridSize;
+    rosOccGrid.info.origin.position.x = -startX * gridSize;
+    rosOccGrid.info.origin.position.y = -startY * gridSize;
 }
 
 GridMap::GridMap(const std::string &dir)
@@ -36,33 +47,7 @@ GridMap::GridMap(const std::string &dir)
     }
     ifs.close();
 }
-nav_msgs::msg::OccupancyGrid GridMap::toRosOccGrid(const std::string &frameId)
-{
-    nav_msgs::msg::OccupancyGrid ret;
-    ret.header.frame_id = frameId;
-    ret.header.stamp    = lastUpdated;
-
-    ret.info.width             = sizeX;
-    ret.info.height            = sizeY;
-    ret.info.resolution        = gridSize;
-    ret.info.origin.position.x = -startX * gridSize;
-    ret.info.origin.position.y = -startY * gridSize;
-
-    for (int i = 0; i < sizeX * sizeY; i++)
-    {
-        const double &value = gridBelief.data()[i];
-        if (value == 0.5f)
-        {
-            ret.data.push_back(-1);  // unknown
-        }
-        else
-        {
-            ret.data.push_back(value * 100);
-        }
-    }
-
-    return ret;
-}
+nav_msgs::msg::OccupancyGrid GridMap::toRosOccGrid() { return rosOccGrid; }
 
 void GridMap::setGridBelief(const double &x,
                             const double &y,
@@ -76,6 +61,14 @@ void GridMap::setGridBelief(const double &x,
     }
 
     gridBelief(xOnGrid, yOnGrid) = belief;
+    if (belief == 0.5f)
+    {
+        rosOccGrid.data[xOnGrid + yOnGrid * sizeX] = -1;
+    }
+    else
+    {
+        rosOccGrid.data[xOnGrid + yOnGrid * sizeX] = belief * 100;
+    }
 }
 
 void GridMap::setGridLogBelief(const double &x,

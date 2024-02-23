@@ -5,6 +5,7 @@
 #include "rclcpp/rclcpp.hpp"
 #include "tf2/LinearMath/Matrix3x3.h"
 #include "tf2/LinearMath/Quaternion.h"
+#include "mapping_interfaces/srv/path_plan.hpp"
 
 class MappingNode : public rclcpp::Node
 {
@@ -55,7 +56,7 @@ class MappingNode : public rclcpp::Node
     {
         mapper.updateMapLaser(msg, pose);
         nav_msgs::msg::OccupancyGrid occu;
-        occu = map.toRosOccGrid("odom");
+        occu = map.toRosOccGrid();
         occu_pub_->publish(occu);
     }
 
