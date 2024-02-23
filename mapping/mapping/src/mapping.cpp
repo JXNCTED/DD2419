@@ -5,13 +5,11 @@
 #include "rclcpp/rclcpp.hpp"
 #include "tf2/LinearMath/Matrix3x3.h"
 #include "tf2/LinearMath/Quaternion.h"
-#include "mapping_interfaces/srv/path_plan.hpp"
 
 class MappingNode : public rclcpp::Node
 {
    public:
-    MappingNode()
-        : Node("mapping"), map(0.05, 1000, 1000, 500, 500), mapper(&map)
+    MappingNode() : Node("mapping"), map(0.05, 500, 500, 250, 250), mapper(&map)
     {
         odom_sub_ = this->create_subscription<nav_msgs::msg::Odometry>(
             "/odom",
@@ -92,8 +90,9 @@ int main(int argc, char **argv)
     rclcpp::init(argc, argv);
 
     node = std::make_shared<MappingNode>();
-    node->create_service<mapping_interfaces::srv::PathPlan>("path_plan",
-                                                            planPath);
+    rclcpp::Service<mapping_interfaces::srv::PathPlan>::SharedPtr service =
+        node->create_service<mapping_interfaces::srv::PathPlan>("path_plan",
+                                                                planPath);
     rclcpp::spin(node);
     rclcpp::shutdown();
     return 0;
