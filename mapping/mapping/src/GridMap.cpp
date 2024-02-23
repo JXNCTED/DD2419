@@ -1,7 +1,7 @@
 #include "mapping/GridMap.hpp"
 
-#include <vector>
 #include <fstream>
+#include <vector>
 
 GridMap::GridMap(const double &gridSize,
                  const int &sizeX,
@@ -27,6 +27,7 @@ GridMap::GridMap(const double &gridSize,
     rosOccGrid.info.resolution        = gridSize;
     rosOccGrid.info.origin.position.x = -startX * gridSize;
     rosOccGrid.info.origin.position.y = -startY * gridSize;
+    rosOccGrid.data.resize(sizeX * sizeY);
 }
 
 GridMap::GridMap(const std::string &dir)
