@@ -31,10 +31,10 @@ class GridMap
     nav_msgs::msg::OccupancyGrid toRosOccGrid();
     void saveMap(const std::string &dir);
 
-    nav_msgs::msg::Path planPath(const int &startX,
-                                 const int &startY,
-                                 const int &goalX,
-                                 const int &goalY);
+    nav_msgs::msg::Path planPath(const double &startX,
+                                 const double &startY,
+                                 const double &goalX,
+                                 const double &goalY);
 
    private:
     nav_msgs::msg::OccupancyGrid rosOccGrid;

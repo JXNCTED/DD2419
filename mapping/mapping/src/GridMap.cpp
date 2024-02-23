@@ -233,22 +233,27 @@ static std::vector<std::pair<int, int>> aStar(const int &startX,
     return path;
 }
 
-nav_msgs::msg::Path GridMap::planPath(const int &startX,
-                                      const int &startY,
-                                      const int &goalX,
-                                      const int &goalY)
+nav_msgs::msg::Path GridMap::planPath(const double &startX,
+                                      const double &startY,
+                                      const double &goalX,
+                                      const double &goalY)
 {
     nav_msgs::msg::Path path;
     path.header.frame_id = "map";
     path.header.stamp    = rclcpp::Clock().now();
 
+    int startXOnGrid = cvFloor(startX / gridSize) + this->startX;
+    int startYOnGrid = cvFloor(startY / gridSize) + this->startY;
+    int goalXOnGrid  = cvFloor(goalX / gridSize) + this->startX;
+    int goalYOnGrid  = cvFloor(goalY / gridSize) + this->startY;
+
     std::vector<std::pair<int, int>> pathVec =
-        aStar(startX, startY, goalX, goalY, gridBelief);
+        aStar(startXOnGrid, startYOnGrid, goalXOnGrid, goalYOnGrid, gridBelief);
     for (auto &p : pathVec)
     {
         geometry_msgs::msg::PoseStamped pose;
-        pose.pose.position.x = (p.first - startX) * gridSize;
-        pose.pose.position.y = (p.second - startY) * gridSize;
+        pose.pose.position.x = (p.first - this->startX) * gridSize;
+        pose.pose.position.y = (p.second - this->startY) * gridSize;
         path.poses.push_back(pose);
     }
 

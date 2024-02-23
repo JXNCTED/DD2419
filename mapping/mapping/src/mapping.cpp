@@ -72,20 +72,26 @@ class MappingNode : public rclcpp::Node
     rclcpp::TimerBase::SharedPtr timer_;
 };
 
+std::shared_ptr<MappingNode> node;
+
 void planPath(
     const std::shared_ptr<mapping_interfaces::srv::PathPlan::Request> request,
     std::shared_ptr<mapping_interfaces::srv::PathPlan::Response> response)
 {
     RCLCPP_INFO(rclcpp::get_logger("rclcpp"), "Incoming request");
-    (void)request;
-    (void)response;
+    GridMap &map = const_cast<GridMap &>(node->getMap());
+
+    response->path = map.planPath(request->current_pose.pose.position.x,
+                                  request->current_pose.pose.position.y,
+                                  request->goal_pose.pose.position.x,
+                                  request->goal_pose.pose.position.y);
 }
 
 int main(int argc, char **argv)
 {
     rclcpp::init(argc, argv);
 
-    std::shared_ptr<MappingNode> node = std::make_shared<MappingNode>();
+    node = std::make_shared<MappingNode>();
     node->create_service<mapping_interfaces::srv::PathPlan>("path_plan",
                                                             planPath);
     rclcpp::spin(node);
