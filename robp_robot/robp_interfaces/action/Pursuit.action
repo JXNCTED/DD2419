@@ -1,0 +1,8 @@
+#An array of points that the robot will move through
+geometry_msgs/Points[] waypoints
+---
+#True if the robot succeeds in moving to the last point
+bool success
+---
+#Not sure yet, perhaps what point it is currently working towards
+int32 progress
