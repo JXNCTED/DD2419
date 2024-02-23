@@ -2,6 +2,7 @@
 #include <eigen3/Eigen/Core>
 #include <opencv4/opencv2/opencv.hpp>
 #include <nav_msgs/msg/occupancy_grid.hpp>
+#include <nav_msgs/msg/path.hpp>
 #include <string>
 #include <rclcpp/rclcpp.hpp>
 
@@ -29,6 +30,11 @@ class GridMap
     // APIs
     nav_msgs::msg::OccupancyGrid toRosOccGrid();
     void saveMap(const std::string &dir);
+
+    nav_msgs::msg::Path planPath(const int &startX,
+                                 const int &startY,
+                                 const int &goalX,
+                                 const int &goalY);
 
    private:
     nav_msgs::msg::OccupancyGrid rosOccGrid;

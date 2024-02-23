@@ -60,6 +60,8 @@ class MappingNode : public rclcpp::Node
         occu_pub_->publish(occu);
     }
 
+    const GridMap &getMap() { return map; }
+
    private:
     GridMap map;
     Mapper mapper;
@@ -70,12 +72,23 @@ class MappingNode : public rclcpp::Node
     rclcpp::TimerBase::SharedPtr timer_;
 };
 
+void planPath(
+    const std::shared_ptr<mapping_interfaces::srv::PathPlan::Request> request,
+    std::shared_ptr<mapping_interfaces::srv::PathPlan::Response> response)
+{
+    RCLCPP_INFO(rclcpp::get_logger("rclcpp"), "Incoming request");
+    (void)request;
+    (void)response;
+}
+
 int main(int argc, char **argv)
 {
     rclcpp::init(argc, argv);
 
-    rclcpp::spin(std::make_shared<MappingNode>());
-
+    std::shared_ptr<MappingNode> node = std::make_shared<MappingNode>();
+    node->create_service<mapping_interfaces::srv::PathPlan>("path_plan",
+                                                            planPath);
+    rclcpp::spin(node);
     rclcpp::shutdown();
     return 0;
 }
