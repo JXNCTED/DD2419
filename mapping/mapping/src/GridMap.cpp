@@ -201,7 +201,8 @@ std::vector<std::pair<int, int>> GridMap::aStar(const int &startX,
                 float h = heuristic(x, y, goalX, goalY);
                 if (nodes[x][y] == nullptr)
                 {
-                    nodes[x][y] = new Node(x, y, g, h, &current);
+                    nodes[x][y] =
+                        new Node(x, y, g, h, nodes[current.x][current.y]);
                     openSet.push(*nodes[x][y]);
                 }
                 else if (g < nodes[x][y]->g)
