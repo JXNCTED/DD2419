@@ -16,6 +16,8 @@ GridMap::GridMap(const double &gridSize,
 {
     gridBelief.resize(sizeX, sizeY);
     gridBelief.setOnes() *= 0.5;
+    knownGrid.resize(sizeX, sizeY);
+    knownGrid.setZero();
     // gridBeliefLiDAR.resize(sizeX, sizeY);
     // gridBeliefLiDAR.setOnes() *= 0.5;
     // gridBeliefRGBD.resize(sizeX, sizeY);
@@ -51,7 +53,20 @@ GridMap::GridMap(const std::string &dir)
     }
     ifs.close();
 }
-nav_msgs::msg::OccupancyGrid GridMap::toRosOccGrid() { return rosOccGrid; }
+nav_msgs::msg::OccupancyGrid GridMap::toRosOccGrid()
+{
+    for (int i = 0; i < sizeX; i++)
+    {
+        for (int j = 0; j < sizeY; j++)
+        {
+            if (knownGrid(i, j) == 1)
+            {
+                rosOccGrid.data[i + j * sizeX] = 100;
+            }
+        }
+    }
+    return rosOccGrid;
+}
 
 void GridMap::setGridBelief(const double &x,
                             const double &y,
@@ -345,7 +360,8 @@ void GridMap::setLineSegmentOccupied(
         const double ny = dy / d;
         for (double s = 0; s < d; s += gridSize)
         {
-            setGridBelief(x1 + s * nx, y1 + s * ny, 1);
+            knownGrid(cvFloor((x1 + s * nx) / gridSize) + startX,
+                      cvFloor((y1 + s * ny) / gridSize) + startY) = 1;
         }
     }
 }

@@ -29,6 +29,14 @@ class MappingNode : public rclcpp::Node
         timer_ = this->create_wall_timer(
             std::chrono::milliseconds(10000),
             std::bind(&MappingNode::timerCallback, this));
+
+        std::vector<std::pair<double, double>> lineSegments;
+        lineSegments.push_back(std::make_pair(0.0, 0.0));
+        lineSegments.push_back(std::make_pair(5.0, 0.0));
+        lineSegments.push_back(std::make_pair(1.0, 1.0));
+        lineSegments.push_back(std::make_pair(0.0, 1.0));
+
+        map.setLineSegmentOccupied(lineSegments);
     }
 
     // timer call back to save the map, not used for now

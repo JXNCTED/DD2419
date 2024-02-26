@@ -58,6 +58,7 @@ class GridMap
     // belief of the grid, occupancy grid
     Eigen::MatrixXd gridBelief;
     Eigen::MatrixXi expandedGrid;
+    Eigen::MatrixXi knownGrid;
     //     cv::Mat expandedGridCV;
     //     Eigen::MatrixXd gridBeliefLiDAR;
     //     Eigen::MatrixXd gridBeliefRGBD;
