@@ -37,12 +37,20 @@ class GridMap
                                  const double &goalY);
 
    private:
+    std::vector<std::pair<int, int>> aStar(const int &startX,
+                                           const int &startY,
+                                           const int &goalX,
+                                           const int &goalY);
+    void expandGrid();
+    void setOnesAroundPoint(const int &x, const int &y, const int &radius);
     nav_msgs::msg::OccupancyGrid rosOccGrid;
     double gridSize = 0.0;
     int sizeX = 0, sizeY = 0;
     int startX = 0, startY = 0;
     Eigen::MatrixXd gridBelief;
-    Eigen::MatrixXd gridBeliefLiDAR;
-    Eigen::MatrixXd gridBeliefRGBD;
+    Eigen::MatrixXi expandedGrid;
+    cv::Mat expandedGridCV;
+    //     Eigen::MatrixXd gridBeliefLiDAR;
+    //     Eigen::MatrixXd gridBeliefRGBD;
     rclcpp::Time lastUpdated;
 };
