@@ -1,5 +1,5 @@
 import time
-
+import numpy as np
 import rclpy
 from rclpy.node import Node
 from rclpy.action import ActionServer
@@ -37,7 +37,7 @@ class PursuitActionServer(Node):
             feedback_msg.current_velocity.linear.x = lin
             feedback_msg.current_velocity.angular.z = ang
             goal_handle.publish_feedback(feedback_msg)
-            time.sleep(t)
+            # time.sleep(t)
             # while odom.x and y is not close to waypoint stall
 
         result = Pursuit.Result()
@@ -50,6 +50,19 @@ class PursuitActionServer(Node):
         yaw = self.odom.yaw
         dx = target.x - self.odom.x
         dy = target.y - self.odom.y
+        y_cos = np.cos(self.yaw)
+        y_sin = np.sin(self.yaw)
+        tx = dx * y_cos + dy * y_sin
+        ty = -dx * y_sin + dy * y_cos
+        dist = np.hypot(tx, ty)
+        alpha = np.atan2(ty, tx)
+        radius = dist / (2 * np.sin(alpha))
+        lin_v = 1.0
+        if radius < 1000:
+            ang_v = lin_v / radius 
+        else:
+            ang_v = 0.0
+        return lin_v, ang_v, 0.0
 
     # Might want to have a "stupid" odometry of just header,x,y,yaw
     def odom_callback(self, msg):
