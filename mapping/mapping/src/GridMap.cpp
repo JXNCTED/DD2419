@@ -1,7 +1,6 @@
 #include "mapping/GridMap.hpp"
 
 #include <fstream>
-#include <thread>
 #include <vector>
 
 GridMap::GridMap(const double &gridSize,
@@ -167,10 +166,6 @@ std::vector<std::pair<int, int>> GridMap::aStar(const int &startX,
         if (current.x == goalX and current.y == goalY)
         {
             RCLCPP_INFO(rclcpp::get_logger("GridMap::aStar"), "path found");
-            RCLCPP_INFO(rclcpp::get_logger("GridMap::aStar"),
-                        "goal parent %d, %d",
-                        current.parent->parent->x,
-                        current.parent->parent->y);
             found = true;
             break;
         }
@@ -219,13 +214,9 @@ std::vector<std::pair<int, int>> GridMap::aStar(const int &startX,
     if (found)
     {
         Node *current = nodes[goalX][goalY];
-
-        int cnt = 0;
-        while (current != nullptr)
+        int cnt       = 0;
+        while (current != nullptr and cnt++ < 100)
         {
-            cnt++;
-            if (cnt > 100)
-                break;
             RCLCPP_INFO(rclcpp::get_logger("GridMap::aStar"),
                         "adding %d, %d to path",
                         current->x,
@@ -280,8 +271,16 @@ nav_msgs::msg::Path GridMap::planPath(const double &startX,
     for (auto &p : pathVec)
     {
         geometry_msgs::msg::PoseStamped pose;
-        pose.pose.position.x = (p.first - this->startX) * gridSize;
-        pose.pose.position.y = (p.second - this->startY) * gridSize;
+        pose.header.stamp       = rclcpp::Clock().now();
+        pose.header.frame_id    = "map";
+        pose.pose.position.x    = (p.first - this->startX) * gridSize;
+        pose.pose.position.y    = (p.second - this->startY) * gridSize;
+        pose.pose.position.z    = 0;
+        pose.pose.orientation.x = 1;
+        pose.pose.orientation.y = 0;
+        pose.pose.orientation.z = 0;
+        pose.pose.orientation.w = 0;
+
         path.poses.push_back(pose);
     }
 
@@ -305,6 +304,15 @@ void GridMap::expandGrid()
 
 void GridMap::setOnesAroundPoint(const int &x, const int &y, const int &radius)
 {
+    if (gridBelief(x, y) == 0.5)
+    {
+        expandedGrid(x, y) = 1;
+        return;
+    }
+    if (gridBelief(x, y) < 0.75)
+    {
+        return;
+    }
     for (int i = -radius; i <= radius; i++)
     {
         for (int j = -radius; j <= radius; j++)
@@ -312,7 +320,7 @@ void GridMap::setOnesAroundPoint(const int &x, const int &y, const int &radius)
             int xOnGrid = x + i;
             int yOnGrid = y + j;
             if (xOnGrid < 0 or xOnGrid >= sizeX or yOnGrid < 0 or
-                yOnGrid >= sizeY or gridBelief(xOnGrid, yOnGrid) <= 0.7)
+                yOnGrid >= sizeY)
             {
                 continue;
             }
