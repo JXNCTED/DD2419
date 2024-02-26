@@ -301,7 +301,7 @@ nav_msgs::msg::Path GridMap::planPath(const double &startX,
 void GridMap::expandGrid()
 {
     expandedGrid.setZero();
-    const int EXPAND_RADIUS = 0.15 / gridSize;
+    const int EXPAND_RADIUS = 0.1 / gridSize;
     for (int i = 0; i < sizeX; i++)
     {
         for (int j = 0; j < sizeY; j++)
@@ -320,10 +320,7 @@ void GridMap::setOnesAroundPoint(const int &x, const int &y, const int &radius)
         expandedGrid(x, y) = 1;
         return;
     }
-    if (gridBelief(x, y) < 0.75)
-    {
-        return;
-    }
+
     for (int i = -radius; i <= radius; i++)
     {
         for (int j = -radius; j <= radius; j++)
@@ -335,7 +332,8 @@ void GridMap::setOnesAroundPoint(const int &x, const int &y, const int &radius)
             {
                 continue;
             }
-            if (pow(i, 2) + pow(j, 2) <= pow(radius, 2))
+            if (pow(i, 2) + pow(j, 2) <= pow(radius, 2) and
+                (gridBelief(x, y) >= 0.7 or knownGrid(x, y) == 1))
             {
                 expandedGrid(xOnGrid, yOnGrid) = 1;
                 // expandedGridCV.at<uchar>(xOnGrid, yOnGrid) = 255;
