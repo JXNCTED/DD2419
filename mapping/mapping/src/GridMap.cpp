@@ -153,7 +153,7 @@ std::vector<std::pair<int, int>> GridMap::aStar(const int &startX,
 
     openSet.push(Node(
         startX, startY, 0, heuristic(startX, startY, goalX, goalY), nullptr));
-    const int MAX_ITER = 1000;
+    const int MAX_ITER = 10000;
     int iter           = 0;
     bool found         = false;
     expandGrid();
@@ -205,7 +205,7 @@ std::vector<std::pair<int, int>> GridMap::aStar(const int &startX,
                     nodes[x][y]->g      = g;
                     nodes[x][y]->f      = g + h;
                     nodes[x][y]->h      = h;
-                    nodes[x][y]->parent = &current;
+                    nodes[x][y]->parent = nodes[current.x][current.y];
                 }
             }
         }
@@ -215,12 +215,8 @@ std::vector<std::pair<int, int>> GridMap::aStar(const int &startX,
     {
         Node *current = nodes[goalX][goalY];
         int cnt       = 0;
-        while (current != nullptr and cnt++ < 100)
+        while (current != nullptr and cnt++ < 1000)  // sanity check
         {
-            RCLCPP_INFO(rclcpp::get_logger("GridMap::aStar"),
-                        "adding %d, %d to path",
-                        current->x,
-                        current->y);
             path.push_back(std::make_pair(current->x, current->y));
             current = current->parent;
         }
@@ -290,7 +286,7 @@ nav_msgs::msg::Path GridMap::planPath(const double &startX,
 void GridMap::expandGrid()
 {
     expandedGrid.setZero();
-    const int EXPAND_RADIUS = 1;
+    const int EXPAND_RADIUS = 0.15 / gridSize;
     for (int i = 0; i < sizeX; i++)
     {
         for (int j = 0; j < sizeY; j++)
