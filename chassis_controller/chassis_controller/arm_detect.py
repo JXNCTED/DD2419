@@ -3,19 +3,18 @@ from rclpy.node import Node
 
 from sensor_msgs.msg import Image
 import cv2
-from sensor_msgs.msg import Image, CameraInfo
 from cv_bridge import CvBridge, CvBridgeError
 import numpy as np
-from robp_interfaces.msg import PickAndPlace
 
 
-class CameraDetection(Node):
+class ArmDetect(Node):
     def __init__(self):
-        super().__init__('camera_detect_object')
+        super().__init__('arm_detect')
 
         # Create the cv_bridge object
         self.bridge = CvBridge()
 
+        # subscribe to the raw image and then publish a filtered
         self.image_sub = self.create_subscription(
             Image, "/image_raw", self.filter_image_callback, 10)
 
@@ -33,8 +32,6 @@ class CameraDetection(Node):
             print(e)
 
         # Set minimum and max HSV values to display
-        # lower = np.array([68, 67, 138])
-        # upper = np.array([86, 108, 170])
         lower = np.array([65, 125, 94])
         upper = np.array([80, 255, 184])
 
@@ -46,9 +43,6 @@ class CameraDetection(Node):
         # Find contours in the binary mask
         contours, _ = cv2.findContours(
             mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-
-        # # Draw contours on the original image
-        # cv2.drawContours(frame, contours, -1, (0, 255, 0), 2)
 
         # Calculate moments for each contour
         centroids = []
@@ -69,8 +63,8 @@ class CameraDetection(Node):
             self.get_logger().info(f"Middle Coordinates: {middle_coordinates}")
 
             # Display a point at the middle coordinates
-            radius = 3  # Adjust the radius based on your preference
-            color = (0, 0, 255)  # Green color, you can adjust this as well
+            radius = 3
+            color = (0, 0, 255)  # red color
             cv2.circle(output, middle_coordinates, radius,
                        color, -1)  # -1 fills the circle
 
@@ -88,7 +82,7 @@ class CameraDetection(Node):
 
 def main():
     rclpy.init()
-    node = CameraDetection()
+    node = ArmDetect()
     try:
         rclpy.spin(node)
     except KeyboardInterrupt:

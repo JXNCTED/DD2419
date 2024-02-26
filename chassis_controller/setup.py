@@ -25,7 +25,7 @@ setup(
             'aruco_detect_move = chassis_controller.aruco_detect_move:main',
             'nav_goal_move = chassis_controller.nav_goal_move:main',
             'arm_conf = chassis_controller.arm_conf:main',
-            'camera_detection = chassis_controller.camera_detection:main',
+            'arm_detect = chassis_controller.arm_detect:main',
         ],
     },
 )
