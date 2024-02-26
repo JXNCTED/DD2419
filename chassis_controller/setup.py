@@ -26,6 +26,7 @@ setup(
             'nav_goal_move = chassis_controller.nav_goal_move:main',
             'arm_conf = chassis_controller.arm_conf:main',
             'arm_detect = chassis_controller.arm_detect:main',
+            'arm_listen_control = chassis_controller.arm_listen_control:main'
         ],
     },
 )

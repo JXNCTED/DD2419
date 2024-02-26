@@ -114,6 +114,7 @@ class ArmConf(Node):
 # something else I noticed is that when we do the camera detection, if the green cube is not in the image, it will treat
 # noise as real points and get the middle value, maybe we should have something that only detects if there are a certain
 # number of green points in the image? Or maybe this wont be a problem if we only detect when the cube should be visible
+# MÅNS - I have changed it to only react when the amount of green points is >100 which seems to work.
 
 
 def main():

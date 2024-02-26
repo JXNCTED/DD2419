@@ -48,12 +48,14 @@ class ArmDetect(Node):
         centroids = []
         for contour in contours:
             M = cv2.moments(contour)
-            if M["m00"] != 0:
+            # Changed here from being NOT EQUAL TO ZERO to more than 100 to remove most of the effect of noise to the middlepoint.
+            if M["m00"] > 100:
                 cx = int(M["m10"] / M["m00"])
                 cy = int(M["m01"] / M["m00"])
                 centroids.append((cx, cy))
 
         if centroids:
+            print("help", centroids)
             # Calculate the average centroid (middle point)
             middle_coordinates = (
                 int(np.mean([cx for cx, _ in centroids])),
@@ -68,12 +70,16 @@ class ArmDetect(Node):
             cv2.circle(output, middle_coordinates, radius,
                        color, -1)  # -1 fills the circle
 
+            # Check the amount of points?
+
         # Check if the middlepoint is in the middle of the image. (310-245,400-440)
+
             # If so, send information that the pickup phase shall begin
 
             # range: (310-325, 400-440)
         # Use cv_bridge() to convert the ROS image to OpenCV format
         try:
+            # Publish to arm_conf.
             filtered_image = self.bridge.cv2_to_imgmsg(output, "bgr8")
             self.image_pub.publish(filtered_image)
         except CvBridgeError as e:
