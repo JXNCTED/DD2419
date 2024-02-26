@@ -11,6 +11,7 @@ class NavGoalMove(Node):
         self.cli = self.create_client(PathPlan, 'path_plan')
         while not self.cli.wait_for_service(timeout_sec=1.0):
             self.get_logger().info('service not available, waiting again...')
+        self.futures = []
         self.req = PathPlan.Request()
         self.current_pose = PoseStamped()
         self.target_pose = PoseStamped()
@@ -19,21 +20,32 @@ class NavGoalMove(Node):
         self.odom_sub_ = self.create_subscription(Odometry, '/odom', self.odom_callback, 10)
     
     def send_path_plan_request(self):
+        self.get_logger().info('send_path_plan_request...')
         self.req.current_pose = self.current_pose
         self.req.target_pose = self.target_pose
-        self.future = self.cli.call_async(self.req)
-        rclpy.spin_until_future_complete(self, self.future)
-        self.get_logger().info('sending request...')
-        return self.future.result()
+        self.futures.append(self.cli.call_async(self.req))
     
     def target_nav_callback(self, msg: PoseStamped):
         self.get_logger().info('target_nav_callback...')
         self.target_pose = msg
-        response = self.send_path_plan_request()
-        self.path_planned_pub.publish(response.path)
+        self.send_path_plan_request()
     
     def odom_callback(self, msg: Odometry):
         self.current_pose = msg.pose.pose
+    
+    def loop(self):
+        while rclpy.ok():
+            rclpy.spin_once(self)
+            for future in self.futures:
+                if future.done():
+                    try:
+                        response = future.result()
+                    except Exception as e:
+                        self.get_logger().warn('Service call failed %r' % (e,))
+                    else:
+                        self.path_planned_pub.publish(response.path)
+                        self.get_logger.info('Path planned published...')
+                    self.futures.remove(future)
 
 def main():
     rclpy.init()
