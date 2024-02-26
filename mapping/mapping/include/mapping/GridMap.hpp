@@ -31,22 +31,28 @@ class GridMap
     nav_msgs::msg::OccupancyGrid toRosOccGrid();
     void saveMap(const std::string &dir);
 
+    // plan path in map coordinate
     nav_msgs::msg::Path planPath(const double &startX,
                                  const double &startY,
                                  const double &goalX,
                                  const double &goalY);
 
    private:
+    // a star algorithm
     std::vector<std::pair<int, int>> aStar(const int &startX,
                                            const int &startY,
                                            const int &goalX,
                                            const int &goalY);
+    // expand to c-space
     void expandGrid();
+    // helper function for expandGrid, set obstacles around a point
     void setOnesAroundPoint(const int &x, const int &y, const int &radius);
     nav_msgs::msg::OccupancyGrid rosOccGrid;
+    // size of the grid
     double gridSize = 0.0;
     int sizeX = 0, sizeY = 0;
     int startX = 0, startY = 0;
+    // belief of the grid, occupancy grid
     Eigen::MatrixXd gridBelief;
     Eigen::MatrixXi expandedGrid;
     //     cv::Mat expandedGridCV;
