@@ -328,3 +328,24 @@ void GridMap::setOnesAroundPoint(const int &x, const int &y, const int &radius)
         }
     }
 }
+
+void GridMap::setLineSegmentOccupied(
+    const std::vector<std::pair<double, double>> &lineSegments)
+{
+    for (size_t i = 0; i < lineSegments.size(); i++)
+    {
+        const double x1 = lineSegments[i].first;
+        const double y1 = lineSegments[i].second;
+        const double x2 = lineSegments[(i + 1) % lineSegments.size()].first;
+        const double y2 = lineSegments[(i + 1) % lineSegments.size()].second;
+        const double dx = x2 - x1;
+        const double dy = y2 - y1;
+        const double d  = sqrt(dx * dx + dy * dy);
+        const double nx = dx / d;
+        const double ny = dy / d;
+        for (double s = 0; s < d; s += gridSize)
+        {
+            setGridBelief(x1 + s * nx, y1 + s * ny, 1);
+        }
+    }
+}

@@ -37,6 +37,9 @@ class GridMap
                                  const double &goalX,
                                  const double &goalY);
 
+    void setLineSegmentOccupied(
+        const std::vector<std::pair<double, double>> &lineSegments);
+
    private:
     // a star algorithm
     std::vector<std::pair<int, int>> aStar(const int &startX,
