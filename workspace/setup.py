@@ -1,6 +1,6 @@
 from setuptools import find_packages, setup
 
-package_name = 'chassis_controller'
+package_name = 'workspace'
 
 setup(
     name=package_name,
@@ -13,19 +13,14 @@ setup(
     ],
     install_requires=['setuptools'],
     zip_safe=True,
-    maintainer='group7',
-    maintainer_email='group7@todo.todo',
+    maintainer='rosuser',
+    maintainer_email='rosuser@todo.todo',
     description='TODO: Package description',
     license='MIT',
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
-            'joy_controller = chassis_controller.joy_controller:main',
-            'obj_detect_move = chassis_controller.obj_detect_move:main',
-            'aruco_detect_move = chassis_controller.aruco_detect_move:main',
-            'nav_goal_move = chassis_controller.nav_goal_move:main',
-            'arm_conf = chassis_controller.arm_conf:main',
-            'camera_detection = chassis_controller.camera_detection:main',
+            'workspace = workspace.workspace:main'
         ],
     },
 )

@@ -12,6 +12,9 @@ find_package(nav_msgs REQUIRED)
 find_package(sensor_msgs REQUIRED)
 find_package(OpenCV REQUIRED)
 find_package(tf2_ros REQUIRED)
+find_package(mapping_interfaces REQUIRED)
+
+
 # uncomment the following section in order to fill in
 # further dependencies manually.
 # find_package(<dependency> REQUIRED)
@@ -59,6 +62,7 @@ ament_target_dependencies(
   "nav_msgs"
   "sensor_msgs"
   "tf2_ros"
+  "mapping_interfaces"
 )
 target_link_libraries(
   mapping
