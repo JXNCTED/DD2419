@@ -13,9 +13,11 @@ class NavGoalMove(Node):
         while not self.cli.wait_for_service(timeout_sec=1.0):
             self.get_logger().info('service not available, waiting again...')
         self.futures = []
+        # request object
         self.req = PathPlan.Request()
         self.current_pose = PoseStamped()
         self.goal_pose = PoseStamped()
+        # publisher for planned path
         self.path_planned_pub = self.create_publisher(
             Path, '/path_planned', 10)
         self.target_nav_sub_ = self.create_subscription(
@@ -27,6 +29,7 @@ class NavGoalMove(Node):
         self.get_logger().info('send_path_plan_request...')
         self.req.current_pose = self.current_pose
         self.req.goal_pose = self.goal_pose
+        # call the service, returns a future object and appends it to the list
         self.futures.append(self.cli.call_async(self.req))
 
     def target_nav_callback(self, msg: PoseStamped):
@@ -41,12 +44,14 @@ class NavGoalMove(Node):
     def loop(self):
         while rclpy.ok():
             rclpy.spin_once(self)
+            # check if the future object is done
             for future in self.futures:
                 if future.done():
                     try:
                         response = future.result()
                         self.path_planned_pub.publish(response.path)
                         self.get_logger().info('Path planned published...')
+                        # remove the future object from the list
                         self.futures.remove(future)
                     except Exception as e:
                         self.get_logger().warn('Service call failed %r' % (e,))
