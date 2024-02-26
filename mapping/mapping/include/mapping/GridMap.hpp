@@ -1,10 +1,10 @@
 #pragma once
 #include <eigen3/Eigen/Core>
-#include <opencv4/opencv2/opencv.hpp>
 #include <nav_msgs/msg/occupancy_grid.hpp>
 #include <nav_msgs/msg/path.hpp>
-#include <string>
+#include <opencv4/opencv2/opencv.hpp>
 #include <rclcpp/rclcpp.hpp>
+#include <string>
 
 class GridMap
 {
@@ -49,7 +49,7 @@ class GridMap
     int startX = 0, startY = 0;
     Eigen::MatrixXd gridBelief;
     Eigen::MatrixXi expandedGrid;
-    cv::Mat expandedGridCV;
+    //     cv::Mat expandedGridCV;
     //     Eigen::MatrixXd gridBeliefLiDAR;
     //     Eigen::MatrixXd gridBeliefRGBD;
     rclcpp::Time lastUpdated;

@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 import rclpy
 from rclpy.node import Node
-from mapping_interfaces.msv import PathPlan
+from mapping_interfaces.srv import PathPlan
 from nav_msgs.msg import Path, Odometry
 from geometry_msgs.msg import PoseStamped
+
 
 class NavGoalMove(Node):
     def __init__(self):
@@ -14,25 +15,29 @@ class NavGoalMove(Node):
         self.futures = []
         self.req = PathPlan.Request()
         self.current_pose = PoseStamped()
-        self.target_pose = PoseStamped()
-        self.path_planned_pub = self.create_publisher(Path, '/path_planned', 10)
-        self.target_nav_sub_ = self.create_subscription(PoseStamped, '/move_base_simple/goal', self.target_nav_callback, 10)
-        self.odom_sub_ = self.create_subscription(Odometry, '/odom', self.odom_callback, 10)
-    
+        self.goal_pose = PoseStamped()
+        self.path_planned_pub = self.create_publisher(
+            Path, '/path_planned', 10)
+        self.target_nav_sub_ = self.create_subscription(
+            PoseStamped, '/goal_pose', self.target_nav_callback, 10)
+        self.odom_sub_ = self.create_subscription(
+            Odometry, '/odom', self.odom_callback, 10)
+
     def send_path_plan_request(self):
         self.get_logger().info('send_path_plan_request...')
         self.req.current_pose = self.current_pose
-        self.req.target_pose = self.target_pose
+        self.req.goal_pose = self.goal_pose
         self.futures.append(self.cli.call_async(self.req))
-    
+
     def target_nav_callback(self, msg: PoseStamped):
         self.get_logger().info('target_nav_callback...')
-        self.target_pose = msg
+        self.goal_pose = msg
         self.send_path_plan_request()
-    
+
     def odom_callback(self, msg: Odometry):
-        self.current_pose = msg.pose.pose
-    
+        self.current_pose.pose = msg.pose.pose
+        self.current_pose.header = msg.header
+
     def loop(self):
         while rclpy.ok():
             rclpy.spin_once(self)
@@ -40,20 +45,17 @@ class NavGoalMove(Node):
                 if future.done():
                     try:
                         response = future.result()
+                        self.path_planned_pub.publish(response.path)
+                        self.get_logger().info('Path planned published...')
+                        self.futures.remove(future)
                     except Exception as e:
                         self.get_logger().warn('Service call failed %r' % (e,))
-                    else:
-                        self.path_planned_pub.publish(response.path)
-                        self.get_logger.info('Path planned published...')
-                    self.futures.remove(future)
+
 
 def main():
     rclpy.init()
     node = NavGoalMove()
-    try:
-        rclpy.spin(node)
-    except KeyboardInterrupt:
-        pass
+    node.loop()
     rclpy.shutdown()
 
 

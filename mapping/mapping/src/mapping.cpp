@@ -31,9 +31,9 @@ class MappingNode : public rclcpp::Node
 
     void timerCallback()
     {
-        static int count = 0;
-        map.saveMap("/home/group7/maps/" + std::to_string(count) + "_map.txt");
-        count++;
+        // static int count = 0;
+        // map.saveMap("/home/group7/maps/" + std::to_string(count) +
+        // "_map.txt"); count++;
     }
 
     void odomCallback(const nav_msgs::msg::Odometry::SharedPtr msg)
@@ -76,7 +76,7 @@ void planPath(
     const std::shared_ptr<mapping_interfaces::srv::PathPlan::Request> request,
     std::shared_ptr<mapping_interfaces::srv::PathPlan::Response> response)
 {
-    RCLCPP_INFO(rclcpp::get_logger("rclcpp"), "Incoming request");
+    RCLCPP_INFO(rclcpp::get_logger("planPath"), "Incoming request");
     GridMap &map = const_cast<GridMap &>(node->getMap());
 
     response->path = map.planPath(request->current_pose.pose.position.x,

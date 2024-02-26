@@ -1,8 +1,8 @@
 #include "mapping/GridMap.hpp"
 
 #include <fstream>
-#include <vector>
 #include <thread>
+#include <vector>
 
 GridMap::GridMap(const double &gridSize,
                  const int &sizeX,
@@ -29,6 +29,8 @@ GridMap::GridMap(const double &gridSize,
     rosOccGrid.info.origin.position.x = -startX * gridSize;
     rosOccGrid.info.origin.position.y = -startY * gridSize;
     rosOccGrid.data.resize(sizeX * sizeY);
+
+    expandedGrid.resize(sizeX, sizeY);
 }
 
 GridMap::GridMap(const std::string &dir)
@@ -115,9 +117,9 @@ void GridMap::saveMap(const std::string &dir)
 
 struct Node
 {
-    int x, y;
-    float g, h, f;
-    Node *parent;
+    int x = 0, y = 0;
+    float g = 0, h = 0, f = 0;
+    Node *parent = nullptr;
     Node(int x, int y, float g, float h, Node *parent)
         : x(x), y(y), g(g), h(h), f(g + h), parent(parent)
     {
@@ -135,6 +137,11 @@ std::vector<std::pair<int, int>> GridMap::aStar(const int &startX,
                                                 const int &goalX,
                                                 const int &goalY)
 {
+    RCLCPP_INFO(
+        rclcpp::get_logger("GridMap::aStar"), "current %d, %d", startX, startY);
+
+    RCLCPP_INFO(
+        rclcpp::get_logger("GridMap::aStar"), "goal %d, %d", goalX, goalY);
     // return path
     std::vector<std::pair<int, int>> path;
     // openSet and closedSet
@@ -156,8 +163,14 @@ std::vector<std::pair<int, int>> GridMap::aStar(const int &startX,
     {
         Node current = openSet.top();
         openSet.pop();
+
         if (current.x == goalX and current.y == goalY)
         {
+            RCLCPP_INFO(rclcpp::get_logger("GridMap::aStar"), "path found");
+            RCLCPP_INFO(rclcpp::get_logger("GridMap::aStar"),
+                        "goal parent %d, %d",
+                        current.parent->parent->x,
+                        current.parent->parent->y);
             found = true;
             break;
         }
@@ -168,6 +181,10 @@ std::vector<std::pair<int, int>> GridMap::aStar(const int &startX,
             {
                 int x = current.x + i;
                 int y = current.y + j;
+                if (i == 0 and j == 0)
+                {
+                    continue;
+                }
                 if (x < 0 or x >= sizeX or y < 0 or y >= sizeY)
                 {
                     continue;
@@ -191,6 +208,7 @@ std::vector<std::pair<int, int>> GridMap::aStar(const int &startX,
                 {
                     nodes[x][y]->g      = g;
                     nodes[x][y]->f      = g + h;
+                    nodes[x][y]->h      = h;
                     nodes[x][y]->parent = &current;
                 }
             }
@@ -200,11 +218,27 @@ std::vector<std::pair<int, int>> GridMap::aStar(const int &startX,
     if (found)
     {
         Node *current = nodes[goalX][goalY];
+
+        int cnt = 0;
         while (current != nullptr)
         {
+            cnt++;
+            if (cnt > 100)
+                break;
+            RCLCPP_INFO(rclcpp::get_logger("GridMap::aStar"),
+                        "adding %d, %d to path",
+                        current->x,
+                        current->y);
             path.push_back(std::make_pair(current->x, current->y));
             current = current->parent;
         }
+        RCLCPP_INFO(rclcpp::get_logger("GridMap::aStar"),
+                    "path found with length %ld",
+                    path.size());
+    }
+    else
+    {
+        RCLCPP_INFO(rclcpp::get_logger("GridMap::aStar"), "path not found");
     }
 
     for (int i = 0; i < sizeX; i++)
@@ -234,6 +268,8 @@ nav_msgs::msg::Path GridMap::planPath(const double &startX,
     int goalXOnGrid  = cvFloor(goalX / gridSize) + this->startX;
     int goalYOnGrid  = cvFloor(goalY / gridSize) + this->startY;
 
+    RCLCPP_INFO(rclcpp::get_logger("GridMap::planPath"), "received, planning");
+
     std::vector<std::pair<int, int>> pathVec =
         aStar(startXOnGrid, startYOnGrid, goalXOnGrid, goalYOnGrid);
     if (pathVec.empty())
@@ -253,7 +289,6 @@ nav_msgs::msg::Path GridMap::planPath(const double &startX,
 
 void GridMap::expandGrid()
 {
-    expandedGrid.resize(sizeX, sizeY);
     expandedGrid.setZero();
     const int EXPAND_RADIUS = 1;
     for (int i = 0; i < sizeX; i++)
@@ -263,7 +298,8 @@ void GridMap::expandGrid()
             setOnesAroundPoint(i, j, EXPAND_RADIUS);
         }
     }
-    cv::imshow("expandedGrid", expandedGridCV);
+    // cv::imshow("expandedGrid", expandedGridCV);
+    RCLCPP_INFO(rclcpp::get_logger("GridMap::expandGrid"), "expanded");
 }
 
 void GridMap::setOnesAroundPoint(const int &x, const int &y, const int &radius)
@@ -275,14 +311,14 @@ void GridMap::setOnesAroundPoint(const int &x, const int &y, const int &radius)
             int xOnGrid = x + i;
             int yOnGrid = y + j;
             if (xOnGrid < 0 or xOnGrid >= sizeX or yOnGrid < 0 or
-                yOnGrid >= sizeY)
+                yOnGrid >= sizeY or gridBelief(xOnGrid, yOnGrid) <= 0.7)
             {
                 continue;
             }
             if (pow(i, 2) + pow(j, 2) <= pow(radius, 2))
             {
-                expandedGrid(xOnGrid, yOnGrid)             = 1;
-                expandedGridCV.at<uchar>(xOnGrid, yOnGrid) = 255;
+                expandedGrid(xOnGrid, yOnGrid) = 1;
+                // expandedGridCV.at<uchar>(xOnGrid, yOnGrid) = 255;
             }
         }
     }
