@@ -4,6 +4,7 @@ from rclpy.node import Node
 from sensor_msgs.msg import Image
 import cv2
 from cv_bridge import CvBridge, CvBridgeError
+from std_msgs.msg import Bool, Float32
 import numpy as np
 
 
@@ -20,10 +21,26 @@ class ArmDetect(Node):
 
         self.image_pub = self.create_publisher(Image, "/image_filtered", 10)
 
+        # to start the detection
+        # idea is this is published when the distance is low enough (from the realsense)
+        # ros2 topic pub -1 /dist_bool std_msgs/msg/Bool "{data: true}"
+        self.dist_sub = self.create_subscription(
+            Bool, "/dist_bool", self.dist_callback, 10)
+        self.can_detect = False
+        # send to know what twist message
+        self.theta_pub = self.create_publisher(Float32, "/arm_theta", 10)
+
+    def dist_callback(self, msg):
+        self.can_detect = msg
+
     def filter_image_callback(self, msg: Image) -> Image:
         """
         Filters the inputted image to only display certain colours.
         """
+
+        if self.can_detect == False:
+            print("no")
+            return
 
         # Use cv_bridge() to convert the ROS image to OpenCV format
         try:
@@ -55,7 +72,6 @@ class ArmDetect(Node):
                 centroids.append((cx, cy))
 
         if centroids:
-            print("help", centroids)
             # Calculate the average centroid (middle point)
             middle_coordinates = (
                 int(np.mean([cx for cx, _ in centroids])),
@@ -72,11 +88,28 @@ class ArmDetect(Node):
 
             # Check the amount of points?
 
-        # Check if the middlepoint is in the middle of the image. (310-245,400-440)
+            # Check if the middlepoint is in the middle of the image. (310-245,400-440)
 
             # If so, send information that the pickup phase shall begin
 
             # range: (310-325, 400-440)
+
+            # Simulate current middle-point coordinates and desired area center
+            desired_area_center = (320, 240)
+
+            # Calculate the error, use this to get theta
+            # set minus so that it follows normal coords
+            error_x = -float(desired_area_center[0] - middle_coordinates[0])
+            error_y = float(desired_area_center[1] - middle_coordinates[1])
+            # theta as in normal x,y coords
+            theta = np.arctan2(error_y, error_x)
+            self.get_logger().info(f"{theta / np.pi}")
+
+            # convert to float and pub
+            angle = Float32()
+            angle.data = theta
+            self.theta_pub.publish(angle)
+
         # Use cv_bridge() to convert the ROS image to OpenCV format
         try:
             # Publish to arm_conf.

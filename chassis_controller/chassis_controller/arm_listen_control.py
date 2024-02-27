@@ -6,6 +6,7 @@
 # This seems to work fine. Just publish a joint value desired to the topic and then see the node comparing the desired
 # To the actual value right now.
 
+import random
 import rclpy
 from rclpy.node import Node
 
@@ -41,37 +42,45 @@ class ArmListen(Node):
         self.curr_servo_msg = None
         self.set_servo_msg = None
 
+        # Create a timer that calls the timer_callback function every timer_interval seconds
+        self.timer = self.create_timer(1, self.timer_callback)
+        self.timer.cancel()
+
+        # Flag to track the timer state
+        self.is_timer_running = False
+
+        self.i = 0
+
+    def timer_callback(self):
+        self.timer.cancel()
+        self.is_timer_running = False
+        self.get_logger().info("timer stopped")
+
     # When the servo_sub message and the arm_sub are approximately the same, then we can publish the next message.
 
     def check_set_servo(self, msg: Int16MultiArray):
         # These are the value that we want the servos to be!
-        # print("CHECK_SET", msg.data)
         self.set_servo_msg = msg.data
-        self.check_and_publish()
+        print("CHECK_SET", msg)
+
+        self.is_timer_running = True
+        self.timer.reset()
+        # self.check_and_publish()
 
     def check_curr_servo(self, msg: JointState):
-        # print("CHECK_CURR")
-        # print("CHECK CURR", msg.position)
         self.curr_servo_msg = msg.position
-        self.check_and_publish()
+        # print("CHECK CURR", msg)
 
     def check_and_publish(self):
         if self.curr_and_set_values_the_same():
             print("The messages are approximately the same")
-
-        pass
-        # if self.prev_servo_msg is not None and self.curr_servo_msg is not None:
-        #     # Implement logic to check if the messages are approximately the same
-        #     if self.are_messages_approximately_same():
-        #         # Here check the current value of the middle of the cube and set the robot state to correct one.
-        #         self.publish_to_arm_conf()
 
     # Checks if the values are approx the same :)
     def curr_and_set_values_the_same(self):
         break_early = False
         if (self.set_servo_msg and self.curr_servo_msg):
             # Loop through the interesting joints
-            for i in range(0, 6):
+            for i in range(4, 6):
                 # If it differs by more than 10%  ???
                 frac = None
                 if (self.curr_servo_msg[i] > self.set_servo_msg[i]):
@@ -87,14 +96,22 @@ class ArmListen(Node):
                 print("THE SAME")
                 return True
             else:
-                print("NOT THE SAME")
+                randNum = random.randint(0, 100)
+                print("NOT THE SAME", randNum)
                 return False
 
     def publish_to_arm_conf(self):
-        if self.has_finished:
-            # Implement logic to publish to /arm_conf
-            # You may also set self.has_finished to True to prevent repeated publishing
-            pass
+        while self.i < 10000:
+            self.i += 1
+            print(self.i)
+            if not self.is_timer_running:
+                # Implement logic to publish to /arm_conf
+                # You may also set self.has_finished to True to prevent repeated publishing
+                msg = String()
+                msg.data = random.choice(
+                    ["detect", "neutral", "open", "close", "pickup"])
+                self.get_logger.info(f"{msg.data}")
+                self.arm_conf_pub.publish(msg)
 
 
 def main():
@@ -109,3 +126,9 @@ def main():
 
 if __name__ == '__main__':
     main()
+
+# Realsense detect and move to object
+# when distance to object is at 0.25, detect using arm camera - boolean topic + help us Ed
+# find the middle point and move to make it in the middle
+# when this happens, then pickup and close
+# then neutral

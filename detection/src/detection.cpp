@@ -100,6 +100,7 @@ private:
       theta_pub_->publish(thetaMsg);
     }
 
+    float dist;
     if (sor_filtered_green->points.size() > 0)
     {
       float avgCoord[3] = {0};
@@ -113,7 +114,11 @@ private:
       avgCoord[0] /= sor_filtered_green->points.size();
       avgCoord[1] /= sor_filtered_green->points.size();
       avgCoord[2] /= sor_filtered_green->points.size();
+
+      dist = sqrt(avgCoord[0] * avgCoord[0] + avgCoord[1] * avgCoord[1] + avgCoord[2] * avgCoord[2]);
     }
+
+    std::cout << "Distance: " << dist << std::endl;
 
     sensor_msgs::msg::PointCloud2 detected_output;
     pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud_detected(new pcl::PointCloud<pcl::PointXYZRGB>);

@@ -58,8 +58,8 @@ class ArmConf(Node):
             self.pickup_angles[i+6] = 1000
         # set conf
         self.pickup_angles[2] = 4000
-        self.pickup_angles[3] = 15400
-        self.pickup_angles[4] = 6160
+        self.pickup_angles[3] = 15500
+        self.pickup_angles[4] = 5300
         self.pickup_angles[0] = self.open_gripper
 
         # dict for these
