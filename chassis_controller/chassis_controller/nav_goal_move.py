@@ -4,6 +4,9 @@ from rclpy.node import Node
 from mapping_interfaces.srv import PathPlan
 from nav_msgs.msg import Path, Odometry
 from geometry_msgs.msg import PoseStamped
+from robp_interfaces.action import Persuit
+from rclpy.action import ActionClient
+from geometry_msgs.msg import Point
 
 
 class NavGoalMove(Node):
@@ -17,6 +20,8 @@ class NavGoalMove(Node):
         self.req = PathPlan.Request()
         self.current_pose = PoseStamped()
         self.goal_pose = PoseStamped()
+
+        self.action_client = ActionClient(self, Persuit, 'persuit')
         # publisher for planned path
         self.path_planned_pub = self.create_publisher(
             Path, '/path_planned', 10)
@@ -24,6 +29,12 @@ class NavGoalMove(Node):
             PoseStamped, '/goal_pose', self.target_nav_callback, 10)
         self.odom_sub_ = self.create_subscription(
             Odometry, '/odom', self.odom_callback, 10)
+    def send_persuit_goal(self, waypoints):
+        goal_msg = Persuit.Goal()
+        goal_msg.waypoints = waypoints
+        self.action_client.wait_for_server()
+        self.action_client.send_goal_async(goal_msg)
+
 
     def send_path_plan_request(self):
         self.get_logger().info('send_path_plan_request...')
@@ -51,7 +62,14 @@ class NavGoalMove(Node):
                         response = future.result()
                         self.path_planned_pub.publish(response.path)
                         self.get_logger().info('Path planned published...')
+                        waypoints = []
+                        for pose in response.path.poses:
+                            waypoints.append(Point(x=pose.pose.position.x, y=pose.pose.position.y))
+
+                        self.send_persuit_goal(waypoints)
+                        self.get_logger().info('Persuit goal action sent...')
                         # remove the future object from the list
+
                         self.futures.remove(future)
                     except Exception as e:
                         self.get_logger().warn('Service call failed %r' % (e,))
