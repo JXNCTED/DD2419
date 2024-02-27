@@ -98,24 +98,6 @@ class ArmConf(Node):
         # publish
         self.arm_pub_.publish(arm_cmd)
 
-# Hej Måns, just wanted to let you know I refactored some of the code :)
-# I also updated the documentation repo, it should help you get up to speed with what I changed
-# arm_detect is the old camera_detection node, just renamed
-#
-# My current idea for going forward is that we have a new node that listens to both the /multi_servo_cmd_sub
-# (the topic we publish to in this node) and the /servo_pos_publisher (the topic that tells us the current servo values)
-# topics, then we have a self.has_finished variable that only allows a new message to the /arm_conf (topic we listen to here)
-# topic when it is True, which happens when the values from the two topics I mentioned earlier are approximately the same
-# basically, we only let ourselves change state if the servo values we want (previous state message) and
-# the servo values we are actually at are close, that way then we dont mess with timers or anything
-# in that case we'll probably also need a queue of some sort, to make sure messages we send dont get lost
-# if they cant run immediately
-#
-# something else I noticed is that when we do the camera detection, if the green cube is not in the image, it will treat
-# noise as real points and get the middle value, maybe we should have something that only detects if there are a certain
-# number of green points in the image? Or maybe this wont be a problem if we only detect when the cube should be visible
-# MÅNS - I have changed it to only react when the amount of green points is >100 which seems to work.
-
 
 def main():
     rclpy.init()

@@ -4,7 +4,7 @@ from rclpy.node import Node
 from sensor_msgs.msg import Image
 import cv2
 from cv_bridge import CvBridge, CvBridgeError
-from std_msgs.msg import Bool, Float32
+from std_msgs.msg import Bool, Float32, String
 import numpy as np
 
 
@@ -20,6 +20,8 @@ class ArmDetect(Node):
             Image, "/image_raw", self.filter_image_callback, 10)
 
         self.image_pub = self.create_publisher(Image, "/image_filtered", 10)
+        # Wait does this even make sense since we created a node to handle these kind of things?
+        self.control_arm_pub = self.create_publisher(String, '/arm_conf', 10)
 
         # to start the detection
         # idea is this is published when the distance is low enough (from the realsense)
@@ -29,6 +31,7 @@ class ArmDetect(Node):
         self.can_detect = False
         # send to know what twist message
         self.theta_pub = self.create_publisher(Float32, "/arm_theta", 10)
+        self.pick_up = False
 
     def dist_callback(self, msg):
         self.can_detect = msg
@@ -99,16 +102,52 @@ class ArmDetect(Node):
 
             # Calculate the error, use this to get theta
             # set minus so that it follows normal coords
-            error_x = -float(desired_area_center[0] - middle_coordinates[0])
+            error_x = float(desired_area_center[0] - middle_coordinates[0])
             error_y = float(desired_area_center[1] - middle_coordinates[1])
             # theta as in normal x,y coords
             theta = np.arctan2(error_y, error_x)
             self.get_logger().info(f"{theta / np.pi}")
-
+            theta_var = theta/np.pi
             # convert to float and pub
+            # Publishing the angle for controlling the wheels.
             angle = Float32()
             angle.data = theta
             self.theta_pub.publish(angle)
+            if (not self.pick_up):
+                if (320-32 < middle_coordinates[0] < 320+32 and 240-24 < middle_coordinates[1] < 240+24):
+                    # The cube is now in a position where it hopefully can get picked up! ( ~10% margin)
+
+                    self.get_logger().info("PICK UP! !! ")
+                    self.pick_up = True
+                    msg = String()
+                    msg.data = "close"
+                    self.control_arm_pub.publish(msg)
+                    # Here the robot should then check whether or not it has the cube in its grip
+                    # Which is easy, but everything else is hard.
+                    # And then go into neutral mode. Or some kind of structured manouver.
+
+                else:
+                    """My though is that if the box is in the bottom half we just reverse the robot until the box
+                    is in the top half and then we turn and navigate to it. I think that might be the easiest solution to it. 
+                    As for calculating the angle. I am still wondering about that. Maybe it is like the wheel of life.🛞🛞🛞 """
+                    """How do we transform the angle from here to the angle that we can publish to the wheels..."""
+                    if (0 < theta_var < 0.45):
+                        self.get_logger().info("Turn left")
+                    elif (0.45 < theta_var < 0.55):
+                        # In the pickup area. Publish to pick up.
+                        self.get_logger().info("Go straight!  ")
+                        # Set the working theta to 0, linear.x = 0.4
+                    elif (-0.55 < theta_var < -0.45):
+                        # In the pickup area. Publish to pick up.
+                        self.get_logger().info("Just reverse")  # Theta = 0, linear.x = -0.4
+                    elif (0.55 < theta_var < 1):
+                        self.get_logger().info("Turn right")  # Set angle depending on
+                    elif (-0.55 < theta_var < 0):
+                        # Theta = 0, linear.x = -0.4
+                        self.get_logger().info("BACK UP object to the left back")
+                    elif (-1 < theta_var < -0.45):
+                        # Theta = 0, linear.x = -0.4
+                        self.get_logger().info("BACK UP object to the right back")
 
         # Use cv_bridge() to convert the ROS image to OpenCV format
         try:
