@@ -1,11 +1,15 @@
 #!/usr/bin/env python
-import torch
+import os
+import sys
 import cv_bridge
-from dd2419_detector_baseline.detector import Detector
-import rclpy
-from rclpy.node import Node
-from sensor_msgs.msg import Image
+import torch
 import cv2
+from sensor_msgs.msg import Image
+from rclpy.node import Node
+import rclpy
+from dd2419_detector_baseline.detector import Detector
+
+sys.path.insert(0, '/absolute/path/to/application/folder')
 
 
 class DetectionMLNode(Node):
@@ -13,10 +17,10 @@ class DetectionMLNode(Node):
         super().__init__('arm_controller')
         self.model = Detector().eval().to("cuda")
         self.model.load_state_dict(torch.load(
-            "dd2419_detector_baseline/best.pt"))
+            "/home/group7/best.pt"))
 
         self.image_sub = self.create_subscription(
-            Image, "/palceholder", self.img_callback)
+            Image, "/camera/color/image_raw", self.img_callback, 10)
 
     def img_callback(self, msg: Image):
         bridge = cv_bridge.CvBridge()
@@ -34,8 +38,6 @@ class DetectionMLNode(Node):
             cv2.rectangle(show_img, (x, y), (x+w, y+h), (0, 255, 0), 2)
         cv2.imshow("detections", show_img)
         cv2.waitKey(1)
-        
-        
 
 
 def main():
