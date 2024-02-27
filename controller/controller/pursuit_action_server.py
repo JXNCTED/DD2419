@@ -37,7 +37,7 @@ class PursuitActionServer(Node):
             feedback_msg.current_velocity.linear.x = lin
             feedback_msg.current_velocity.angular.z = ang
             goal_handle.publish_feedback(feedback_msg)
-            # time.sleep(t)
+            time.sleep(t)
             # while odom.x and y is not close to waypoint stall
 
         result = Pursuit.Result()
@@ -58,11 +58,13 @@ class PursuitActionServer(Node):
         alpha = np.atan2(ty, tx)
         radius = dist / (2 * np.sin(alpha))
         lin_v = 1.0
+        arc_length = 2.0 * alpha * radius
+        time = arc_length / lin_v
         if radius < 1000:
             ang_v = lin_v / radius 
         else:
             ang_v = 0.0
-        return lin_v, ang_v, 0.0
+        return lin_v, ang_v, time
 
     # Might want to have a "stupid" odometry of just header,x,y,yaw
     def odom_callback(self, msg):
