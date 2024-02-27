@@ -106,7 +106,7 @@ configurable_parameters = [{'name': 'camera_name',                  'default': '
                                'default': 'false', 'description': ''},
                            {'name': 'pointcloud.allow_no_texture_points',
                                'default': 'false', 'description': "''"},
-                           {'name': 'align_depth.enable',           'default': 'false',
+                           {'name': 'align_depth.enable',           'default': 'true',
                                'description': 'enable align depth filter'},
                            {'name': 'colorizer.enable',             'default': 'false',
                                'description': 'enable colorizer filter'},
