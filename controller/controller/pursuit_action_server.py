@@ -34,16 +34,23 @@ class PursuitActionServer(Node):
         self.get_logger().info("Executing goal...")
 
         feedback_msg = Pursuit.Feedback()
-        for waypoint in goal_handle.request.waypoints:
+        twist = Twist()
+        for idx, waypoint in enumerate(goal_handle.request.waypoints):
+            self.get_logger().info("Moving towards waypoint:" + str(idx))
             lin, ang, t = self.velocity(waypoint)
             feedback_msg.current_velocity.linear.x = lin
             feedback_msg.current_velocity.angular.z = ang
-            self.publish_vel.publish(feedback_msg)
+            self.publish_vel.publish(feedback_msg.current_velocity)
             goal_handle.publish_feedback(feedback_msg)
-            time.sleep(t)
+            # time.sleep(t)
             # while odom.x and y is not close to waypoint stall
-
+        twist.linear.x = 0.0
+        twist.angular.z = 0.0
+        self.publish_vel.publish(twist)
+        self.get_logger().info("Done")
+        goal_handle.succeed()
         result = Pursuit.Result()
+        result.success = True
         return result
 
     # Not implemented yet see test_pure_pursuit in robotics_group7
@@ -73,7 +80,12 @@ class PursuitActionServer(Node):
     def odom_callback(self, msg):
         self.odom_x = msg.pose.pose.position.x
         self.odom_y = msg.pose.pose.position.y
-        self.odom_yaw = msg.pose.pose.orientation
+        x = msg.pose.pose.orientation.x
+        y = msg.pose.pose.orientation.y
+        z = msg.pose.pose.orientation.z
+        w = msg.pose.pose.orientation.w
+        self.odom_yaw = np.arctan2(
+            2.0 * (w * z + x * y), w * w + x * x - y * y - z * z)
 
 
 def main(args=None):
