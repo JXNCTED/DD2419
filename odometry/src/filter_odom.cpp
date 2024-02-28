@@ -121,10 +121,11 @@ class FilterOdom : public rclcpp::Node
     void realsense_callback(const sensor_msgs::msg::Imu::SharedPtr msg)
     {
         realsense_odom[0] =
-            (msg->linear_acceleration.z + _realsense_old[0]) /
-            2.0;  // ---------------- I dont know if this is the correct axis
+            (msg->linear_acceleration.z + _realsense_old[0]) / 2.0;
         realsense_odom[1] =
             (-msg->angular_velocity.y + _realsense_old[1]) / 2.0;  // rad/s
+        if (std::abs(realsense_odom[1]) < 0.01)
+            realsense_odom[1] = 0.0;
         _realsense_old[0] = msg->linear_acceleration.z;
         _realsense_old[1] = -msg->angular_velocity.y;
         realsense_stamp_  = msg->header.stamp;
