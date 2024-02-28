@@ -11,6 +11,7 @@ class MappingNode : public rclcpp::Node
    public:
     MappingNode() : Node("mapping"), map(0.05, 500, 500, 250, 250), mapper(&map)
     {
+        // bunch of pubs and subs
         odom_sub_ = this->create_subscription<nav_msgs::msg::Odometry>(
             "/odom",
             10,
@@ -21,19 +22,29 @@ class MappingNode : public rclcpp::Node
             10,
             std::bind(
                 &MappingNode::laserCallback, this, std::placeholders::_1));
+
         occu_pub_ = this->create_publisher<nav_msgs::msg::OccupancyGrid>(
             "/occupancy", 10);
-        // save the map per 10s
+        // save the map per 10s, not used now
         timer_ = this->create_wall_timer(
             std::chrono::milliseconds(10000),
             std::bind(&MappingNode::timerCallback, this));
+
+        std::vector<std::pair<double, double>> lineSegments;
+        lineSegments.push_back(std::make_pair(0.0, 0.0));
+        lineSegments.push_back(std::make_pair(5.0, 0.0));
+        lineSegments.push_back(std::make_pair(1.0, 1.0));
+        lineSegments.push_back(std::make_pair(0.0, 1.0));
+
+        map.setLineSegmentOccupied(lineSegments);
     }
 
+    // timer call back to save the map, not used for now
     void timerCallback()
     {
-        static int count = 0;
-        map.saveMap("/home/group7/maps/" + std::to_string(count) + "_map.txt");
-        count++;
+        // static int count = 0;
+        // map.saveMap("/home/group7/maps/" + std::to_string(count) +
+        // "_map.txt"); count++;
     }
 
     void odomCallback(const nav_msgs::msg::Odometry::SharedPtr msg)
@@ -50,6 +61,7 @@ class MappingNode : public rclcpp::Node
         pose.theta = yaw;
     }
 
+    // get LIDAR measurement and call the updateMapLaser function
     void laserCallback(const sensor_msgs::msg::LaserScan::SharedPtr msg)
     {
         mapper.updateMapLaser(msg, pose);
@@ -72,11 +84,12 @@ class MappingNode : public rclcpp::Node
 
 std::shared_ptr<MappingNode> node;
 
+// path plan service
 void planPath(
     const std::shared_ptr<mapping_interfaces::srv::PathPlan::Request> request,
     std::shared_ptr<mapping_interfaces::srv::PathPlan::Response> response)
 {
-    RCLCPP_INFO(rclcpp::get_logger("rclcpp"), "Incoming request");
+    RCLCPP_INFO(rclcpp::get_logger("planPath"), "Incoming request");
     GridMap &map = const_cast<GridMap &>(node->getMap());
 
     response->path = map.planPath(request->current_pose.pose.position.x,

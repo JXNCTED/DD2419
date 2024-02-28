@@ -1,0 +1,8 @@
+#An array of points that the robot will move through
+geometry_msgs/Points[] waypoints
+---
+#True if the robot succeeds in moving to the last point
+bool success
+---
+#What the command to the robot is at the moment
+geometry_msgs/Twist current_velocity

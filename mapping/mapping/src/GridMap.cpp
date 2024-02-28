@@ -16,10 +16,12 @@ GridMap::GridMap(const double &gridSize,
 {
     gridBelief.resize(sizeX, sizeY);
     gridBelief.setOnes() *= 0.5;
-    gridBeliefLiDAR.resize(sizeX, sizeY);
-    gridBeliefLiDAR.setOnes() *= 0.5;
-    gridBeliefRGBD.resize(sizeX, sizeY);
-    gridBeliefRGBD.setOnes() *= 0.5;
+    knownGrid.resize(sizeX, sizeY);
+    knownGrid.setZero();
+    // gridBeliefLiDAR.resize(sizeX, sizeY);
+    // gridBeliefLiDAR.setOnes() *= 0.5;
+    // gridBeliefRGBD.resize(sizeX, sizeY);
+    // gridBeliefRGBD.setOnes() *= 0.5;
 
     rosOccGrid.header.frame_id        = "map";
     rosOccGrid.info.width             = sizeX;
@@ -28,6 +30,8 @@ GridMap::GridMap(const double &gridSize,
     rosOccGrid.info.origin.position.x = -startX * gridSize;
     rosOccGrid.info.origin.position.y = -startY * gridSize;
     rosOccGrid.data.resize(sizeX * sizeY);
+
+    expandedGrid.resize(sizeX, sizeY);
 }
 
 GridMap::GridMap(const std::string &dir)
@@ -49,7 +53,20 @@ GridMap::GridMap(const std::string &dir)
     }
     ifs.close();
 }
-nav_msgs::msg::OccupancyGrid GridMap::toRosOccGrid() { return rosOccGrid; }
+nav_msgs::msg::OccupancyGrid GridMap::toRosOccGrid()
+{
+    for (int i = 0; i < sizeX; i++)
+    {
+        for (int j = 0; j < sizeY; j++)
+        {
+            if (knownGrid(i, j) == 1)
+            {
+                rosOccGrid.data[i + j * sizeX] = 100;
+            }
+        }
+    }
+    return rosOccGrid;
+}
 
 void GridMap::setGridBelief(const double &x,
                             const double &y,
@@ -112,124 +129,131 @@ void GridMap::saveMap(const std::string &dir)
     ofs.close();
 }
 
-/**
- * @brief A start heuristic euler
- *
- * @param x current x
- * @param y current y
- * @param goalX goal x
- * @param goalY goal y
- * @return int heuristic value
- */
-static inline float h(const int &x,
-                      const int &y,
-                      const int &goalX,
-                      const int &goalY)
+struct Node
+{
+    int x = 0, y = 0;
+    float g = 0, h = 0, f = 0;
+    Node *parent = nullptr;
+    Node(int x, int y, float g, float h, Node *parent)
+        : x(x), y(y), g(g), h(h), f(g + h), parent(parent)
+    {
+    }
+    bool operator<(const Node &rhs) const { return f > rhs.f; }
+};
+
+float heuristic(int x, int y, int goalX, int goalY)
 {
     return sqrt((x - goalX) * (x - goalX) + (y - goalY) * (y - goalY));
 }
 
-static std::vector<std::pair<int, int>> aStar(const int &startX,
-                                              const int &startY,
-                                              const int &goalX,
-                                              const int &goalY,
-                                              const Eigen::MatrixXd &grid)
+std::vector<std::pair<int, int>> GridMap::aStar(const int &startX,
+                                                const int &startY,
+                                                const int &goalX,
+                                                const int &goalY)
 {
-    std::vector<std::pair<int, int>> openSet;
-    std::vector<std::pair<int, int>> closeSet;
+    RCLCPP_INFO(
+        rclcpp::get_logger("GridMap::aStar"), "current %d, %d", startX, startY);
+
+    RCLCPP_INFO(
+        rclcpp::get_logger("GridMap::aStar"), "goal %d, %d", goalX, goalY);
+    // return path
     std::vector<std::pair<int, int>> path;
-    openSet.push_back(std::make_pair(startX, startY));
+    // openSet and closedSet
+    std::priority_queue<Node> openSet;
+    std::vector<std::vector<bool>> closedSet(sizeX,
+                                             std::vector<bool>(sizeY, false));
 
-    std::vector<std::vector<int>> cameFrom(grid.rows(),
-                                           std::vector<int>(grid.cols(), -1));
-    std::vector<std::vector<float>> gScore(
-        grid.rows(), std::vector<float>(grid.cols(), FLT_MAX));
-    std::vector<std::vector<float>> fScore(
-        grid.rows(), std::vector<float>(grid.cols(), FLT_MAX));
+    std::vector<std::vector<Node *>> nodes(sizeX,
+                                           std::vector<Node *>(sizeY, nullptr));
 
-    gScore[startX][startY] = 0;
-    fScore[startX][startY] = h(startX, startY, goalX, goalY);
+    openSet.push(Node(
+        startX, startY, 0, heuristic(startX, startY, goalX, goalY), nullptr));
+    const int MAX_ITER = 10000;
+    int iter           = 0;
+    bool found         = false;
+    expandGrid();
 
-    while (!openSet.empty())
+    while (!openSet.empty() and iter++ < MAX_ITER)
     {
-        std::pair<int, int> current;
-        float minFScore = FLT_MAX;
-        for (auto &p : openSet)
+        Node current = openSet.top();
+        openSet.pop();
+
+        if (current.x == goalX and current.y == goalY)
         {
-            if (fScore[p.first][p.second] < minFScore)
-            {
-                minFScore = fScore[p.first][p.second];
-                current   = p;
-            }
+            RCLCPP_INFO(rclcpp::get_logger("GridMap::aStar"), "path found");
+            found = true;
+            break;
         }
-
-        if (current.first == goalX and current.second == goalY)
-        {
-            while (current.first != startX or current.second != startY)
-            {
-                path.push_back(current);
-                current = std::make_pair(
-                    cameFrom[current.first][current.second], current.second);
-            }
-            path.push_back(std::make_pair(startX, startY));
-            std::reverse(path.begin(), path.end());
-            return path;
-        }
-
-        openSet.erase(std::remove(openSet.begin(), openSet.end(), current),
-                      openSet.end());
-        closeSet.push_back(current);
-
+        closedSet[current.x][current.y] = true;
         for (int i = -1; i <= 1; i++)
         {
             for (int j = -1; j <= 1; j++)
             {
+                int x = current.x + i;
+                int y = current.y + j;
                 if (i == 0 and j == 0)
                 {
                     continue;
                 }
-                int x = current.first + i;
-                int y = current.second + j;
-                if (x < 0 or x >= grid.rows() or y < 0 or y >= grid.cols())
+                if (x < 0 or x >= sizeX or y < 0 or y >= sizeY)
                 {
                     continue;
                 }
-                if (grid(x, y) == 0.5 or grid(x, y) > 0.8)
+                if (closedSet[x][y])
                 {
                     continue;
                 }
-                if (std::find(closeSet.begin(),
-                              closeSet.end(),
-                              std::make_pair(x, y)) != closeSet.end())
+                if (expandedGrid(x, y) == 1)  // if the grid is occupied
                 {
                     continue;
                 }
-                float tentativeGScore = gScore[current.first][current.second] +
-                                        h(current.first, current.second, x, y);
-                if (std::find(openSet.begin(),
-                              openSet.end(),
-                              std::make_pair(x, y)) == openSet.end())
+                float g = current.g + sqrt(i * i + j * j);
+                float h = heuristic(x, y, goalX, goalY);
+                if (nodes[x][y] == nullptr)
                 {
-                    openSet.push_back(std::make_pair(x, y));
+                    nodes[x][y] =
+                        new Node(x, y, g, h, nodes[current.x][current.y]);
+                    openSet.push(*nodes[x][y]);
                 }
-                else if (tentativeGScore >= gScore[x][y])
+                else if (g < nodes[x][y]->g)
                 {
-                    continue;
-                }
-                cameFrom[x][y] = current.first;
-                gScore[x][y]   = tentativeGScore;
-                fScore[x][y]   = gScore[x][y] + h(x, y, goalX, goalY);
-
-                if (std::find(openSet.begin(),
-                              openSet.end(),
-                              std::make_pair(x, y)) == openSet.end())
-                {
-                    openSet.push_back(std::make_pair(x, y));
+                    nodes[x][y]->g      = g;
+                    nodes[x][y]->f      = g + h;
+                    nodes[x][y]->h      = h;
+                    nodes[x][y]->parent = nodes[current.x][current.y];
                 }
             }
         }
     }
-    RCLCPP_ERROR(rclcpp::get_logger("path plan"), "No path found");
+
+    if (found)
+    {
+        Node *current = nodes[goalX][goalY];
+        int cnt       = 0;
+        while (current != nullptr and cnt++ < 1000)  // sanity check
+        {
+            path.push_back(std::make_pair(current->x, current->y));
+            current = current->parent;
+        }
+        RCLCPP_INFO(rclcpp::get_logger("GridMap::aStar"),
+                    "path found with length %ld",
+                    path.size());
+    }
+    else
+    {
+        RCLCPP_INFO(rclcpp::get_logger("GridMap::aStar"), "path not found");
+    }
+
+    for (int i = 0; i < sizeX; i++)
+    {
+        for (int j = 0; j < sizeY; j++)
+        {
+            if (nodes[i][j] != nullptr)
+            {
+                delete nodes[i][j];
+            }
+        }
+    }
     return path;
 }
 
@@ -247,15 +271,95 @@ nav_msgs::msg::Path GridMap::planPath(const double &startX,
     int goalXOnGrid  = cvFloor(goalX / gridSize) + this->startX;
     int goalYOnGrid  = cvFloor(goalY / gridSize) + this->startY;
 
+    RCLCPP_INFO(rclcpp::get_logger("GridMap::planPath"), "received, planning");
+
     std::vector<std::pair<int, int>> pathVec =
-        aStar(startXOnGrid, startYOnGrid, goalXOnGrid, goalYOnGrid, gridBelief);
+        aStar(startXOnGrid, startYOnGrid, goalXOnGrid, goalYOnGrid);
+    if (pathVec.empty())
+    {
+        return path;
+    }
     for (auto &p : pathVec)
     {
         geometry_msgs::msg::PoseStamped pose;
-        pose.pose.position.x = (p.first - this->startX) * gridSize;
-        pose.pose.position.y = (p.second - this->startY) * gridSize;
+        pose.header.stamp       = rclcpp::Clock().now();
+        pose.header.frame_id    = "map";
+        pose.pose.position.x    = (p.first - this->startX) * gridSize;
+        pose.pose.position.y    = (p.second - this->startY) * gridSize;
+        pose.pose.position.z    = 0;
+        pose.pose.orientation.x = 1;
+        pose.pose.orientation.y = 0;
+        pose.pose.orientation.z = 0;
+        pose.pose.orientation.w = 0;
+
         path.poses.push_back(pose);
     }
 
     return path;
+}
+
+void GridMap::expandGrid()
+{
+    expandedGrid.setZero();
+    const int EXPAND_RADIUS = 0.1 / gridSize;
+    for (int i = 0; i < sizeX; i++)
+    {
+        for (int j = 0; j < sizeY; j++)
+        {
+            setOnesAroundPoint(i, j, EXPAND_RADIUS);
+        }
+    }
+    // cv::imshow("expandedGrid", expandedGridCV);
+    RCLCPP_INFO(rclcpp::get_logger("GridMap::expandGrid"), "expanded");
+}
+
+void GridMap::setOnesAroundPoint(const int &x, const int &y, const int &radius)
+{
+    if (gridBelief(x, y) == 0.5)
+    {
+        expandedGrid(x, y) = 1;
+        return;
+    }
+
+    for (int i = -radius; i <= radius; i++)
+    {
+        for (int j = -radius; j <= radius; j++)
+        {
+            int xOnGrid = x + i;
+            int yOnGrid = y + j;
+            if (xOnGrid < 0 or xOnGrid >= sizeX or yOnGrid < 0 or
+                yOnGrid >= sizeY)
+            {
+                continue;
+            }
+            if (pow(i, 2) + pow(j, 2) <= pow(radius, 2) and
+                (gridBelief(x, y) >= 0.7 or knownGrid(x, y) == 1))
+            {
+                expandedGrid(xOnGrid, yOnGrid) = 1;
+                // expandedGridCV.at<uchar>(xOnGrid, yOnGrid) = 255;
+            }
+        }
+    }
+}
+
+void GridMap::setLineSegmentOccupied(
+    const std::vector<std::pair<double, double>> &lineSegments)
+{
+    for (size_t i = 0; i < lineSegments.size(); i++)
+    {
+        const double x1 = lineSegments[i].first;
+        const double y1 = lineSegments[i].second;
+        const double x2 = lineSegments[(i + 1) % lineSegments.size()].first;
+        const double y2 = lineSegments[(i + 1) % lineSegments.size()].second;
+        const double dx = x2 - x1;
+        const double dy = y2 - y1;
+        const double d  = sqrt(dx * dx + dy * dy);
+        const double nx = dx / d;
+        const double ny = dy / d;
+        for (double s = 0; s < d; s += gridSize)
+        {
+            knownGrid(cvFloor((x1 + s * nx) / gridSize) + startX,
+                      cvFloor((y1 + s * ny) / gridSize) + startY) = 1;
+        }
+    }
 }

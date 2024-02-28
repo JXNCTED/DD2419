@@ -5,6 +5,7 @@ from launch_ros.actions import Node
 from launch_ros.actions import ComposableNodeContainer
 from launch_ros.descriptions import ComposableNode
 from ament_index_python.packages import get_package_share_directory
+from launch.actions import IncludeLaunchDescription
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 import os
 
@@ -35,11 +36,12 @@ def generate_launch_description():
         ],
         output='both',
     )  # all phidgets node
-    realsense_path = get_package_share_directory('realsense2_camera')
-    realsense_launch = launch.actions.IncludeLaunchDescription(PythonLaunchDescriptionSource(os.path.join(
-        realsense_path, 'launch/rs_launch.py')), launch_arguments={'pointcloud.enable': 'true', 'enable_rgbd': 'true',
-                                                                   'enable_gyro': 'true', 'enable_accel': 'true',
-                                                                   'rgb_camera.enable_auto_exposure': 'true', 'initial_reset': 'true'}.items())
+    # realsense_path = get_package_share_directory('realsense2_camera')
+    # realsense_launch = launch.actions.IncludeLaunchDescription(PythonLaunchDescriptionSource(os.path.join(
+    #     realsense_path, 'launch/rs_launch.py')), launch_arguments={'pointcloud.enable': 'true', 'enable_rgbd': 'true',
+    #                                                                'enable_gyro': 'true', 'enable_accel': 'true',
+    #                                                                'rgb_camera.enable_auto_exposure': 'true', 'initial_reset': 'true',
+    #                                                                'align_depth': 'true', ''}.items())
 
     bringup_path = get_package_share_directory('bringup')
 
@@ -83,11 +85,9 @@ def generate_launch_description():
             arguments=["serial", "--dev", "/dev/ttyUSB1", "-v6"]
         ),
 
-        # realsense.
-        realsense_launch,
-        Node(executable='static_transform_publisher', package='tf2_ros', arguments=[
-            '--child-frame-id', 'camera_link', '--frame-id', 'base_link', '--x', '0.08987', '--y', '0.0175', '--z', '0.10456']),
 
+        IncludeLaunchDescription(PythonLaunchDescriptionSource(
+            os.path.join(bringup_path, 'launch', 'realsense_launch.py'))),
         # lidar
         Node(
             name='rplidar_composition',
