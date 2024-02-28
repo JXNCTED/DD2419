@@ -7,7 +7,18 @@ from cv_bridge import CvBridge, CvBridgeError
 from std_msgs.msg import Bool, Float32, String, Float32MultiArray
 import numpy as np
 import time
+"""
+    Run bringup hardware
+    run bringup sensing
+    run arm_conf
+        publish message via terminal ros2 topic pub -1 /arm_conf std_msgs/msg/String "{data: 'detect'}" To set arm into detection mode
 
+    run arm_detect
+        Publish true to start detecting: ros2 topic pub -1 /dist_bool std_msgs/msg/Bool "{data: true}"
+
+    run arm_detect_move (To move the robot to the green cube.)
+
+"""
 
 class ArmDetect(Node):
     def __init__(self):
@@ -79,8 +90,10 @@ class ArmDetect(Node):
             print(e)
 
         # Set minimum and max HSV values to display
-        lower = np.array([65, 125, 94])
-        upper = np.array([80, 255, 184])
+        # lower = np.array([65, 125, 94])
+        # upper = np.array([80, 255, 184])
+        lower = np.array([60, 110, 80])
+        upper = np.array([85, 255, 200])
 
         # Create HSV Image and threshold into a range.
         hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
@@ -143,11 +156,10 @@ class ArmDetect(Node):
             theta_linear.data = [0.0, 0.0]  # linear [0], theta [1]
             if (not self.pick_up):
                 if (320-32 < middle_coordinates[0] < 320+32 and 240-60 < middle_coordinates[1] < 240+30):
-                    time.sleep(2)
+
                     # The cube is now in a position where it hopefully can get picked up! ( ~10% margin)
                     self.get_logger().info("PICK UP! !! ")
                     self.pick_up = True
-
                     # tell arm to shtap
                     self.timer.reset()
 
@@ -158,6 +170,7 @@ class ArmDetect(Node):
                     # Here the robot should then check whether or not it has the cube in its grip
                     # Which is easy, but everything else is hard.
                     # And then go into neutral mode. Or some kind of structured manouver.
+                    self.can_detect = False
 
                 else:
                     """My though is that if the box is in the bottom half we just reverse the robot until the box
