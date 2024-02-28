@@ -7,6 +7,8 @@ from geometry_msgs.msg import Point32, PolygonStamped, Point
 from visualization_msgs.msg import Marker, MarkerArray
 from std_msgs.msg import Bool
 
+from robp_robot.robp_interfaces.srv import IsInWorkspace
+
 import csv
 
 
@@ -34,6 +36,8 @@ class Workspace(Node):
             self.handle_boundary_check,
             10)
         self.check_publisher = self.create_publisher(Bool, 'workspace/boundary_check/response', 10)
+
+        self.srv = self.create_service(IsInWorkspace, 'is_in_workspace', self.is_point_inside_workspace_service)
 
     def read_workspace_points(self):
         # Specify the file path
@@ -109,6 +113,39 @@ class Workspace(Node):
         r = Bool()
         r.data = inside
         return r
+
+
+    def is_point_inside_workspace_service(self, point, response):
+
+        # Check if a point is inside a polygon using ray-casting algorithm.
+
+        # Args:
+        #     point (Point32): The point to check.
+        #     polygon (PolygonStamped): The polygon.
+
+        # Returns:
+        #     bool: True if the point is inside the polygon, False otherwise.
+
+        # num_vertices = len(polygon.polygon.points)
+        num_vertices = len(self.WORKSPACE.polygon.points)
+        inside = False
+
+        # Create a ray starting from the point and extending to the right
+        ray_start = point
+        ray_end = Point32(x=1e6, y=point.y, z=0.0)  # Extend ray to a very large x value
+
+        # Count intersections of the ray with the edges of the polygon
+        for i in range(num_vertices):
+            p1 = self.WORKSPACE.polygon.points[i]
+            p2 = self.WORKSPACE.polygon.points[(i + 1) % num_vertices]
+
+            # Check if the ray intersects the edge
+            if (p1.y > ray_start.y) != (p2.y > ray_start.y) and (
+                    ray_start.x < (p2.x - p1.x) * (ray_start.y - p1.y) / (p2.y - p1.y) + p1.x):
+                inside = not inside
+        response = inside
+        return 
+    
 
     def handle_boundary_check(self, msg):
         inside = self.is_point_inside_workspace(msg)
