@@ -79,8 +79,13 @@ class CartesianController(Node):
         pwm_2 = min(max(KP * error_wheel2 + KI *
                     self.int_error_wheel2, -1.0), 1.0)
 
-        # self.get_logger().info(f"pwm: {pwm_1} {pwm_2}")
-        # self.get_logger().info(f"error: {error_wheel1} {error_wheel2}")
+        self.get_logger().info(f"pwm: {pwm_1} {pwm_2}")
+        self.get_logger().info(f"error: {error_wheel1} {error_wheel2}")
+
+        if target_wheel1 == 0 and target_wheel2 == 0:
+            self.get_logger().info("zero")
+            pwm_1 = 0.0
+            pwm_2 = 0.0
 
         pub_msg = DutyCycles()
         pub_msg.duty_cycle_left = pwm_1

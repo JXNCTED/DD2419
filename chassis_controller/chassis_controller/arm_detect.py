@@ -6,6 +6,7 @@ import cv2
 from cv_bridge import CvBridge, CvBridgeError
 from std_msgs.msg import Bool, Float32, String, Float32MultiArray
 import numpy as np
+import time
 
 
 class ArmDetect(Node):
@@ -23,10 +24,9 @@ class ArmDetect(Node):
         # Wait does this even make sense since we created a node to handle these kind of things?
         self.control_arm_pub = self.create_publisher(String, '/arm_conf', 10)
 
-        self.control_odom_pub = self.create_publisher(
-            Float32,
-            '/arm/camera/object/theta',
-            self.target_theta_callback,
+        self.theta_linear_pub = self.create_publisher(
+            Float32MultiArray,
+            '/arm/camera/object/theta_linear',
             10
         )
 
@@ -40,8 +40,28 @@ class ArmDetect(Node):
         self.theta_pub = self.create_publisher(Float32, "/arm_theta", 10)
         self.pick_up = False
 
+        # Create a timer that calls the timer_callback function every timer_interval seconds
+        self.ticks = 0
+        self.timer = self.create_timer(0.01, self.timer_callback)
+        self.timer.cancel()
+
     def dist_callback(self, msg):
         self.can_detect = msg
+
+    def timer_callback(self):
+        self.ticks += 1
+        if self.ticks == 1:
+            msg = String()
+            msg.data = "pickup"
+            self.control_arm_pub.publish(msg)
+        if self.ticks == 500:
+            msg = String()
+            msg.data = "close"
+            self.control_arm_pub.publish(msg)
+        if self.ticks == 1000:
+            msg = String()
+            msg.data = "neutral"
+            self.control_arm_pub.publish(msg)
 
     def filter_image_callback(self, msg: Image) -> Image:
         """
@@ -81,6 +101,8 @@ class ArmDetect(Node):
                 cy = int(M["m01"] / M["m00"])
                 centroids.append((cx, cy))
 
+        theta_linear = Float32MultiArray()
+        theta_linear.data = [0.0, 0.0]  # linear [0], theta [1]
         if centroids:
             # Calculate the average centroid (middle point)
             middle_coordinates = (
@@ -115,20 +137,24 @@ class ArmDetect(Node):
             theta = np.arctan2(error_y, error_x)
             self.get_logger().info(f"{theta / np.pi}")
             theta_var = theta/np.pi
-            # convert to float and pub
-            # Publishing the angle for controlling the wheels.
-            angle = Float32()
-            angle.data = theta
-            self.theta_pub.publish(angle)
-            if (not self.pick_up):
-                if (320-32 < middle_coordinates[0] < 320+32 and 240-24 < middle_coordinates[1] < 240+24):
-                    # The cube is now in a position where it hopefully can get picked up! ( ~10% margin)
 
+            # define theta linear message to publish, default to 0
+            theta_linear = Float32MultiArray()
+            theta_linear.data = [0.0, 0.0]  # linear [0], theta [1]
+            if (not self.pick_up):
+                if (320-32 < middle_coordinates[0] < 320+32 and 240-60 < middle_coordinates[1] < 240+30):
+                    time.sleep(2)
+                    # The cube is now in a position where it hopefully can get picked up! ( ~10% margin)
                     self.get_logger().info("PICK UP! !! ")
                     self.pick_up = True
-                    msg = String()
-                    msg.data = "close"
-                    self.control_arm_pub.publish(msg)
+
+                    # tell arm to shtap
+                    self.timer.reset()
+
+                    # tell wheels to sthap
+                    theta_linear.data[0] = 0.0  # this is linear
+                    theta_linear.data[1] = 0.0  # this is theta
+
                     # Here the robot should then check whether or not it has the cube in its grip
                     # Which is easy, but everything else is hard.
                     # And then go into neutral mode. Or some kind of structured manouver.
@@ -138,24 +164,35 @@ class ArmDetect(Node):
                     is in the top half and then we turn and navigate to it. I think that might be the easiest solution to it. 
                     As for calculating the angle. I am still wondering about that. Maybe it is like the wheel of life.🛞🛞🛞 """
                     """How do we transform the angle from here to the angle that we can publish to the wheels..."""
-                    if (0 < theta_var < 0.45):
+                    if (0 < theta_var < 0.4):
                         self.get_logger().info("Turn left")
-                    elif (0.45 < theta_var < 0.55):
+                        theta_linear.data[0] = 0.1  # this is linear
+                        # this is theta
+                        theta_linear.data[1] = -(0.5 - theta_var)
+                    elif (0.6 < theta_var < 1):
+                        self.get_logger().info("Turn right")    # Set angle depending on
+                        theta_linear.data[0] = 0.1  # this is linear
+                        theta_linear.data[1] = (
+                            theta_var - 0.5)  # this is theta
+                    elif (0.4 < theta_var < 0.6):
                         # In the pickup area. Publish to pick up.
                         self.get_logger().info("Go straight!  ")
-                        # Set the working theta to 0, linear.x = 0.4
-                    elif (-0.55 < theta_var < -0.45):
-                        # In the pickup area. Publish to pick up.
+                        theta_linear.data[0] = 0.1  # this is linear
+                        theta_linear.data[1] = 0.0  # this is theta
+                    elif (-0.6 < theta_var < -0.4):
                         self.get_logger().info("Just reverse")  # Theta = 0, linear.x = -0.4
-                    elif (0.55 < theta_var < 1):
-                        self.get_logger().info("Turn right")    # Set angle depending on
-                    elif (-0.55 < theta_var < 0):
-                        # Theta = 0, linear.x = -0.4
+                        theta_linear.data[0] = -0.1  # this is linear
+                        theta_linear.data[1] = 0  # this is theta
+                    elif (-0.4 < theta_var < 0):
                         self.get_logger().info("BACK UP object to the left back")
-
-                    elif (-1 < theta_var < -0.45):
-                        # Theta = 0, linear.x = -0.4
+                        theta_linear.data[0] = -0.1  # this is linear
+                        theta_linear.data[1] = 0  # this is theta
+                    elif (-1 < theta_var < -0.6):
                         self.get_logger().info("BACK UP object to the right back")
+                        theta_linear.data[0] = -0.1  # this is linear
+                        theta_linear.data[1] = 0  # this is theta
+
+        self.theta_linear_pub.publish(theta_linear)
 
         # Use cv_bridge() to convert the ROS image to OpenCV format
         try:

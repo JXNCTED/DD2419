@@ -10,7 +10,7 @@ class ArmDetectMove(Node):
         super().__init__('arm_detect_move')
 
         self.theta_linear_sub = self.create_subscription(
-            Float32,
+            Float32MultiArray,
             '/arm/camera/object/theta_linear',
             self.target_theta_callback,
             10
@@ -25,10 +25,10 @@ class ArmDetectMove(Node):
     def target_theta_callback(self, msg: Float32MultiArray):
         KP = -2.0
         twist = Twist()
-        self.get_logger().info(f"set w: {msg.data * KP}")
+        self.get_logger().info(f"set w: {msg.data[1] * KP}")
 
-        twist.angular.z = msg.data * KP
-        twist.linear.x = 0.2
+        twist.angular.z = msg.data[1] * KP
+        twist.linear.x = msg.data[0]
 
         self.publishCoordinates.publish(twist)
 
