@@ -64,13 +64,14 @@ class NavGoalMove(Node):
                         self.get_logger().info('Path planned published...')
                         waypoints = []
                         for pose in response.path.poses:
-                            waypoints.append(
-                                Point(x=pose.pose.position.x, y=pose.pose.position.y))
+                            waypoints.insert(0, Point(
+                                x=pose.pose.position.x, y=pose.pose.position.y))
+                            # waypoints.append(
+                            #     Point(x=pose.pose.position.x, y=pose.pose.position.y))
 
                         self.send_persuit_goal(waypoints)
                         self.get_logger().info('Persuit goal action sent...')
                         # remove the future object from the list
-
                         self.futures.remove(future)
                     except Exception as e:
                         self.get_logger().warn('Service call failed %r' % (e,))

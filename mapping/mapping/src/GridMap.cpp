@@ -175,6 +175,13 @@ std::vector<std::pair<int, int>> GridMap::aStar(const int &startX,
 
     while (!openSet.empty() and iter++ < MAX_ITER)
     {
+        if (iter % 1000 == 0)
+        {
+            RCLCPP_INFO(rclcpp::get_logger("GridMap::aStar"),
+                        "iter %d, openSet size %ld",
+                        iter,
+                        openSet.size());
+        }
         Node current = openSet.top();
         openSet.pop();
 
@@ -301,7 +308,7 @@ nav_msgs::msg::Path GridMap::planPath(const double &startX,
 void GridMap::expandGrid()
 {
     expandedGrid.setZero();
-    const int EXPAND_RADIUS = 0.1 / gridSize;
+    const int EXPAND_RADIUS = 0.30 / gridSize;
     for (int i = 0; i < sizeX; i++)
     {
         for (int j = 0; j < sizeY; j++)
