@@ -5,6 +5,7 @@
 #include "pcl/filters/voxel_grid.h"
 // #include "pcl/common/io.h"
 #include "std_msgs/msg/float32.hpp"
+#include "geometry_msgs/msg/vector3.hpp"
 #include "cmath"
 
 class Dectection : public rclcpp::Node
@@ -15,7 +16,9 @@ public:
     sub_ = this->create_subscription<sensor_msgs::msg::PointCloud2>(
         "/camera/depth/color/points", 10, std::bind(&Dectection::cloud_callback, this, std::placeholders::_1));
     pub_ = this->create_publisher<sensor_msgs::msg::PointCloud2>("/camera/depth/color/ds_points", 10);
-    theta_pub_ = this->create_publisher<std_msgs::msg::Float32>("/camera/depth/color/target_theta", 10);
+    // theta_pub_ = this->create_publisher<std_msgs::msg::Float32>("/camera/depth/color/target_theta", 10);
+    // yaw and distance in detected position
+    detected_pos_pub_ = this->create_publisher<geometry_msgs::msg::Vector3>("/camera/depth/color/detected_pos", 10);
     detected_pub_ = this->create_publisher<sensor_msgs::msg::PointCloud2>("/camera/depth/color/detected_points", 10);
   }
 
@@ -92,12 +95,12 @@ private:
       avgCoord[1] /= sor_filtered_red->points.size();
       avgCoord[2] /= sor_filtered_red->points.size();
 
-      float theta = std::atan(avgCoord[0] / avgCoord[2]);
+      // float theta = std::atan(avgCoord[0] / avgCoord[2]);
 
-      std_msgs::msg::Float32 thetaMsg;
-      thetaMsg.data = theta;
+      // std_msgs::msg::Float32 thetaMsg;
+      // thetaMsg.data = theta;
 
-      theta_pub_->publish(thetaMsg);
+      // theta_pub_->publish(thetaMsg);
     }
 
     float dist;
@@ -116,6 +119,13 @@ private:
       avgCoord[2] /= sor_filtered_green->points.size();
 
       dist = sqrt(avgCoord[0] * avgCoord[0] + avgCoord[1] * avgCoord[1] + avgCoord[2] * avgCoord[2]);
+
+      double yaw = std::atan(avgCoord[0] / avgCoord[2]);
+      geometry_msgs::msg::Vector3 detected_pos;
+      detected_pos.x = yaw;
+      detected_pos.y = dist;
+      detected_pos.z = 0;
+      detected_pos_pub_->publish(detected_pos);
     }
 
     std::cout << "Distance: " << dist << std::endl;
@@ -131,7 +141,8 @@ private:
 
   rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr sub_;
   rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pub_;
-  rclcpp::Publisher<std_msgs::msg::Float32>::SharedPtr theta_pub_;
+  // rclcpp::Publisher<std_msgs::msg::Float32>::SharedPtr theta_pub_;
+  rclcpp::Publisher<geometry_msgs::msg::Vector3>::SharedPtr detected_pos_pub_;
 
   rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr detected_pub_;
 };

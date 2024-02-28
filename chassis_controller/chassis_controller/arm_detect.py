@@ -6,7 +6,7 @@ import cv2
 from cv_bridge import CvBridge, CvBridgeError
 from std_msgs.msg import Bool, Float32, String, Float32MultiArray
 import numpy as np
-import time
+
 """
     Run bringup hardware
     run bringup sensing
@@ -19,6 +19,7 @@ import time
     run arm_detect_move (To move the robot to the green cube.)
 
 """
+
 
 class ArmDetect(Node):
     def __init__(self):
@@ -57,7 +58,7 @@ class ArmDetect(Node):
         self.timer.cancel()
 
     def dist_callback(self, msg):
-        self.can_detect = msg
+        self.can_detect = msg.data
 
     def timer_callback(self):
         self.ticks += 1
@@ -80,8 +81,10 @@ class ArmDetect(Node):
         """
 
         if self.can_detect == False:
-            print("no")
+            self.get_logger().info("Not detecting")
             return
+        else:
+            self.get_logger().info("Detecting")
 
         # Use cv_bridge() to convert the ROS image to OpenCV format
         try:
@@ -204,7 +207,7 @@ class ArmDetect(Node):
                         self.get_logger().info("BACK UP object to the right back")
                         theta_linear.data[0] = -0.1  # this is linear
                         theta_linear.data[1] = 0  # this is theta
-
+        self.get_logger().info(f"twist pub: {theta_linear.data}")
         self.theta_linear_pub.publish(theta_linear)
 
         # Use cv_bridge() to convert the ROS image to OpenCV format
