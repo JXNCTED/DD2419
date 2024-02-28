@@ -4,7 +4,7 @@ from rclpy.node import Node
 from sensor_msgs.msg import Image
 import cv2
 from cv_bridge import CvBridge, CvBridgeError
-from std_msgs.msg import Bool, Float32, String
+from std_msgs.msg import Bool, Float32, String, Float32MultiArray
 import numpy as np
 
 
@@ -22,6 +22,13 @@ class ArmDetect(Node):
         self.image_pub = self.create_publisher(Image, "/image_filtered", 10)
         # Wait does this even make sense since we created a node to handle these kind of things?
         self.control_arm_pub = self.create_publisher(String, '/arm_conf', 10)
+
+        self.control_odom_pub = self.create_publisher(
+            Float32,
+            '/arm/camera/object/theta',
+            self.target_theta_callback,
+            10
+        )
 
         # to start the detection
         # idea is this is published when the distance is low enough (from the realsense)
@@ -141,10 +148,11 @@ class ArmDetect(Node):
                         # In the pickup area. Publish to pick up.
                         self.get_logger().info("Just reverse")  # Theta = 0, linear.x = -0.4
                     elif (0.55 < theta_var < 1):
-                        self.get_logger().info("Turn right")  # Set angle depending on
+                        self.get_logger().info("Turn right")    # Set angle depending on
                     elif (-0.55 < theta_var < 0):
                         # Theta = 0, linear.x = -0.4
                         self.get_logger().info("BACK UP object to the left back")
+
                     elif (-1 < theta_var < -0.45):
                         # Theta = 0, linear.x = -0.4
                         self.get_logger().info("BACK UP object to the right back")
