@@ -1,5 +1,5 @@
 #An array of points that the robot will move through
-geometry_msgs/Points[] waypoints
+geometry_msgs/Point[] waypoints
 ---
 #True if the robot succeeds in moving to the last point
 bool success

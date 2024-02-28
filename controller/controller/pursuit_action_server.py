@@ -4,9 +4,9 @@ import rclpy
 from rclpy.node import Node
 from rclpy.action import ActionServer
 
-from robp_interfaces.action import Pursuit
 from nav_msgs.msg import Odometry
-from geometry_msgs.msg import Twist
+from geometry_msgs.msg import Twist, Point
+from robp_interfaces.action import Pursuit
 
 
 class PursuitActionServer(Node):
@@ -23,6 +23,11 @@ class PursuitActionServer(Node):
         self.odom_sub = self.create_subscription(
             Odometry, "/odom", self.odom_callback, 10
         )
+        self.publish_vel = self.create_publisher(
+            Twist,
+            '/motor_controller/twist',
+            10
+        )
 
     # Pseudo code sort of
     def execute_callback(self, goal_handle):
@@ -33,6 +38,7 @@ class PursuitActionServer(Node):
             lin, ang, t = self.velocity(waypoint)
             feedback_msg.current_velocity.linear.x = lin
             feedback_msg.current_velocity.angular.z = ang
+            self.publish_vel.publish(feedback_msg)
             goal_handle.publish_feedback(feedback_msg)
             time.sleep(t)
             # while odom.x and y is not close to waypoint stall
