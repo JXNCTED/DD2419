@@ -7,7 +7,7 @@ from geometry_msgs.msg import Point32, PolygonStamped, Point
 from visualization_msgs.msg import Marker, MarkerArray
 from std_msgs.msg import Bool
 
-from robp_robot.robp_interfaces.srv import IsInWorkspace
+from robp_interfaces.srv import IsInWorkspace
 
 import csv
 
