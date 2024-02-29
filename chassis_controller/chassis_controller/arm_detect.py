@@ -45,8 +45,9 @@ class ArmDetect(Node):
         # to start the detection
         # idea is this is published when the distance is low enough (from the realsense)
         # ros2 topic pub -1 /dist_bool std_msgs/msg/Bool "{data: true}"
-        self.dist_sub = self.create_subscription(
+        self.dist_sub = self.create_subscription(  # Publish true to this topic when the distance is low enough to start detecting
             Bool, "/dist_bool", self.dist_callback, 10)
+
         self.can_detect = False
         # send to know what twist message
         self.theta_pub = self.create_publisher(Float32, "/arm_theta", 10)
@@ -176,10 +177,6 @@ class ArmDetect(Node):
                     self.can_detect = False
 
                 else:
-                    """My though is that if the box is in the bottom half we just reverse the robot until the box
-                    is in the top half and then we turn and navigate to it. I think that might be the easiest solution to it. 
-                    As for calculating the angle. I am still wondering about that. Maybe it is like the wheel of life.🛞🛞🛞 """
-                    """How do we transform the angle from here to the angle that we can publish to the wheels..."""
                     if (0 < theta_var < 0.4):
                         self.get_logger().info("Turn left")
                         theta_linear.data[0] = 0.1  # this is linear
