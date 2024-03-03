@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-import sys
 import cv_bridge
 import torch
 from torchvision.transforms import v2
@@ -11,13 +10,12 @@ from dd2419_detector_baseline.detector import Detector, BoundingBox
 import time
 import numpy as np
 
-sys.path.insert(0, '/absolute/path/to/application/folder')
-
 
 class DetectionMLNode(Node):
     def __init__(self):
         super().__init__('arm_controller')
         self.model = Detector().eval().to("cuda")
+        # i can't figure out how to load the model with launch, so i'm just hardcoding the path
         self.model.load_state_dict(torch.load(
             "/home/group7/best.pt"))
 
@@ -36,7 +34,6 @@ class DetectionMLNode(Node):
         )
         bridge = cv_bridge.CvBridge()
         img = bridge.imgmsg_to_cv2(msg, "rgb8")
-        # img = torch.from_numpy(img).permute(2, 0, 1).float().to("cuda") / 255.0
         input_img = torch.stack([val_input_transforms(img)]).to("cuda")
         with torch.no_grad():
             out = self.model(input_img).cpu()
@@ -48,7 +45,6 @@ class DetectionMLNode(Node):
         bbs_nms = non_max_suppression(bbs[0], IOU_THRESHOLD)
         for bb in bbs_nms:
             print(bb.shape)
-            # x, y, w, h, score, category = int(bb[0]), int(bb[1], bb[2], bb[3], bb[4], bb[5]
             x, y, w, h, score, category = int(bb[0]), int(bb[1]), int(
                 bb[2]), int(bb[3]), bb[4], int(bb[5])
 
@@ -64,6 +60,12 @@ class DetectionMLNode(Node):
 
 
 def non_max_suppression(boxes, threshold):
+    """
+    Perform non-maximum suppression on the bounding boxes.
+    :param boxes: A list of bounding box dictionaries.
+    :param threshold: The threshold for the overlap ratio.
+    :return: np array of the picked boxes, in the format of [x, y, w, h, score, category]
+    """
     if len(boxes) == 0:
         return []
 
