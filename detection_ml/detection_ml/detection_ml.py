@@ -13,7 +13,7 @@ import numpy as np
 
 class DetectionMLNode(Node):
     def __init__(self):
-        super().__init__('arm_controller')
+        super().__init__('detection_ml')
         self.model = Detector().eval().to("cuda")
         # i can't figure out how to load the model with launch, so i'm just hardcoding the path
         self.model.load_state_dict(torch.load(
@@ -46,7 +46,7 @@ class DetectionMLNode(Node):
         for bb in bbs_nms:
             print(bb.shape)
             x, y, w, h, score, category = int(bb[0]), int(bb[1]), int(
-                bb[2]), int(bb[3]), bb[4], int(bb[5])
+                bb[2]), int(bb[3]), round(bb[4], 2), int(bb[5])
 
             cata_str = f"{category} scr:{score}"
             cv2.rectangle(show_img, (x, y), (x+w, y+h),
@@ -54,7 +54,9 @@ class DetectionMLNode(Node):
             cv2.putText(show_img, cata_str, (x, y),
                         cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
 
-        self.get_logger().info(f"Time taken: {time.time() - start}")
+        fps = round(1/(time.time()-start), 2)
+        cv2.putText(show_img, f"FPS: {fps}", (10, 30),
+                    cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
         cv2.imshow("detections", show_img)
         cv2.waitKey(1)
 
