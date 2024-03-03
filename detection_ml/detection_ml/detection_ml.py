@@ -9,6 +9,7 @@ import rclpy
 from dd2419_detector_baseline.detector import Detector, BoundingBox
 import time
 import numpy as np
+from std_msgs.msg import Float32MultiArray
 
 
 class DetectionMLNode(Node):
@@ -21,6 +22,9 @@ class DetectionMLNode(Node):
 
         self.image_sub = self.create_subscription(
             Image, "/camera/color/image_raw", self.img_callback, 10)
+
+        self.bounding_box_pub = self.create_publisher(
+            Float32MultiArray, "/detection_ml/bounding_box", 10)
 
     def img_callback(self, msg: Image):
         start = time.time()
@@ -37,14 +41,13 @@ class DetectionMLNode(Node):
         input_img = torch.stack([val_input_transforms(img)]).to("cuda")
         with torch.no_grad():
             out = self.model(input_img).cpu()
-        DETECT_THRESHOLD = 0.5
+        DETECT_THRESHOLD = 0.75
         bbs = self.model.out_to_bbs(out, DETECT_THRESHOLD)
 
         show_img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
         IOU_THRESHOLD = 0.5
         bbs_nms = non_max_suppression(bbs[0], IOU_THRESHOLD)
         for bb in bbs_nms:
-            print(bb.shape)
             x, y, w, h, score, category = int(bb[0]), int(bb[1]), int(
                 bb[2]), int(bb[3]), round(bb[4], 2), int(bb[5])
 
@@ -59,6 +62,11 @@ class DetectionMLNode(Node):
                     cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
         cv2.imshow("detections", show_img)
         cv2.waitKey(1)
+
+        # if len(bbs_nms) > 0:
+        #     bbs_nms = np.array(bbs_nms)
+        #     self.bounding_box_pub.publish(
+        #         Float32MultiArray(data=bbs_nms.flatten()))
 
 
 def non_max_suppression(boxes, threshold):

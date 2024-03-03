@@ -108,7 +108,7 @@ configurable_parameters = [{'name': 'camera_name',                  'default': '
                                'default': 'false', 'description': "''"},
                            {'name': 'align_depth.enable',           'default': 'true',
                                'description': 'enable align depth filter'},
-                           {'name': 'colorizer.enable',             'default': 'false',
+                           {'name': 'colorizer.enable',             'default': 'true',
                                'description': 'enable colorizer filter'},
                            {'name': 'decimation_filter.enable',     'default': 'false',
                                'description': 'enable_decimation_filter'},
