@@ -20,6 +20,9 @@ class DetectionMLNode(Node):
         self.model.load_state_dict(torch.load(
             "/home/group7/best.pt"))
 
+        self.model_trace = torch.jit.trace(
+            self.model, torch.rand(1, 3, 480, 640).to("cuda"))
+
         self.image_sub = self.create_subscription(
             Image, "/camera/color/image_raw", self.img_callback, 10)
 
@@ -40,7 +43,7 @@ class DetectionMLNode(Node):
         img = bridge.imgmsg_to_cv2(msg, "rgb8")
         input_img = torch.stack([val_input_transforms(img)]).to("cuda")
         with torch.no_grad():
-            out = self.model(input_img).cpu()
+            out = self.model_trace(input_img).cpu()
         DETECT_THRESHOLD = 0.75
         bbs = self.model.out_to_bbs(out, DETECT_THRESHOLD)
 
@@ -63,10 +66,10 @@ class DetectionMLNode(Node):
         cv2.imshow("detections", show_img)
         cv2.waitKey(1)
 
-        # if len(bbs_nms) > 0:
-        #     bbs_nms = np.array(bbs_nms)
-        #     self.bounding_box_pub.publish(
-        #         Float32MultiArray(data=bbs_nms.flatten()))
+        if len(bbs_nms) > 0:
+            bbs_nms = np.array(bbs_nms)
+            self.bounding_box_pub.publish(
+                Float32MultiArray(data=bbs_nms.flatten()))
 
 
 def non_max_suppression(boxes, threshold):
