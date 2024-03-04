@@ -21,6 +21,9 @@ import numpy as np
 """
 
 
+"""Create a filter for the red sphere, blue sphere/cube. Also a filter for detecting the animals.."""
+
+
 class ArmDetect(Node):
     def __init__(self):
         super().__init__('arm_detect')
