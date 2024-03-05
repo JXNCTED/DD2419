@@ -26,3 +26,4 @@ __pycache__/
 *.so
 
 AMENT_IGNORE
+COLCON_IGNORE
