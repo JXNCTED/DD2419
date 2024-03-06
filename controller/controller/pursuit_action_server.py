@@ -1,78 +1,122 @@
-import time
 import numpy as np
 import rclpy
 from rclpy.node import Node
-from rclpy.action import ActionServer
+from rclpy.action import ActionServer, GoalResponse, CancelResponse
+from rclpy.callback_groups import ReentrantCallbackGroup
 
 from nav_msgs.msg import Odometry
-from geometry_msgs.msg import Twist, Point
+from geometry_msgs.msg import Twist  # , Point
 from robp_interfaces.action import Pursuit
 
 
 class PursuitActionServer(Node):
     def __init__(self):
-        super().__init__("pursuit_action_server")
+        super().__init__('pursuit_action_server')
 
         self.odom_x = 0
         self.odom_y = 0
         self.odom_yaw = 0
-        self.waypoints = None
+        self._cb_group = ReentrantCallbackGroup()
+        self.waypoints = []
+        self.rate = self.create_rate(100, self.get_clock())
 
-        self.action_server = ActionServer(
-            self, Pursuit, "pursuit", self.execute_callback
+        self._action_server = ActionServer(
+            self,
+            Pursuit,
+            'pursuit',
+            execute_callback=self.execute_callback,
+            callback_group=self._cb_group,
+            goal_callback=self.goal_callback,
+            cancel_callback=self.cancel_callback
         )
-        self.odom_sub = self.create_subscription(
-            Odometry, "/odom", self.odom_callback, 10
+        self._odom_sub = self.create_subscription(
+            Odometry,
+            '/odom',
+            callback=self.odom_callback,
+            qos_profile=10,
+            callback_group=self._cb_group
         )
-        self.publish_vel = self.create_publisher(
+        self._publish_vel = self.create_publisher(
             Twist,
             '/motor_controller/twist',
-            10
+            qos_profile=10,
+            callback_group=self._cb_group
         )
 
-    # Pseudo code sort of
-    def execute_callback(self, goal_handle):
-        self.get_logger().info("goal received")
-        self.waypoints = goal_handle.request.waypoints
-        self.get_logger().info(f"waypoints number: {len(self.waypoints)}")
-        self.get_logger().info(
-            f"start with {self.waypoints[0]}, end with {self.waypoints[-1]}")
-        goal_handle.succeed()
-        result = Pursuit.Result()
-        return result
+    def goal_callback(self, goal_request):
+        """Accepts goal or rejects goal"""
+        waypoints = goal_request.request.waypoints
+        self.get_logger().info('Received goal request')
+        if waypoints is None or len(waypoints) == 0:
+            self.get_logger().info('Rejecting the goal request')
+            return GoalResponse.REJECT
+        else:
+            self.waypoints = waypoints
+        self.get_logger().info('Accepting the goal request')
+        return GoalResponse.ACCEPT
 
-    def loop(self):
-        while (rclpy.ok()):
-            rclpy.spin_once(self)
-            if not self.waypoints or len(self.waypoints) == 0:
-                # self.get_logger().info("No waypoints")
+    def cancel_callback(self, cancel_request):
+        """Accepts the cancel requests"""
+        self.get_logger().info('Accepting cancel request')
+        return CancelResponse.ACCEPT
+
+    def execute_callback(self, goal_handle):
+        """Execute the pursuit goal"""
+        self.get_logger().info('Executing pursuit goal...')
+        result = Pursuit.Result()
+        result.success = False
+
+        goal_point = self.waypoints[-1]
+        while (len(self.waypoints) > 0):
+            if goal_handle.is_cancel_requested:
                 twist = Twist()
                 twist.linear.x = 0.0
                 twist.angular.z = 0.0
-                self.publish_vel.publish(twist)
-                continue
+                self._publish_vel.publish(twist)
+                goal_handle.canceled()
+                self.get_logger('Goal canceled')
+                return result
             if np.hypot(self.waypoints[-1].x - self.odom_x, self.waypoints[-1].y - self.odom_y) < 0.1:
-                self.get_logger().info("Reached waypoint")
-                twist = Twist()
-                twist.linear.x = 0.0
-                twist.angular.z = 0.0
-                self.publish_vel.publish(twist)
-                self.waypoints = None
-                continue
-            for idx, waypoint in enumerate(self.waypoints):
+                self.waypoints = []
+                break
+            for waypoint in self.waypoints:
                 LOOK_AHEAD = 0.2
+                # if current waypoint is beyond LOOK_AHEAD, use it as waypoint
+                # I imagine this could cause a problem if the last waypoint is beyond 0.1 but within 0.2
+                # could check for this case and move based on time to the goal point.
                 if np.hypot(waypoint.x - self.odom_x, waypoint.y - self.odom_y) > LOOK_AHEAD:
                     break
                 self.waypoints.pop(0)
             if len(self.waypoints) == 0:
-                continue
+                break
+
             lin, ang, t = self.velocity(self.waypoints[0])
             twist = Twist()
             twist.linear.x = lin
             twist.angular.z = ang
-            self.publish_vel.publish(twist)
+            self._publish_vel.publish(twist)
+            self.rate.sleep()
+
+        twist = Twist()
+        twist.linear.x = 0.0
+        twist.angular.z = 0.0
+        self._publish_vel.publish(twist)
+
+        if np.hypot(goal_point.x - self.odom_x, goal_point.y - self.odom_y) < 0.1:
+            self.get_logger().info('Reached goal')
+            goal_handle.succeed()
+            result.success = True
+        else:
+            self.get_logger().info('Failed to reach goal')
+            goal_handle.abort()
+
+        return result
 
     def velocity(self, target):
+        """
+        Calculate the angular velocity from the constant linear velocity,
+        the position of the robot and the waypoint using a circle.
+        """
         x = self.odom_x
         y = self.odom_y
         yaw = self.odom_yaw
@@ -85,14 +129,14 @@ class PursuitActionServer(Node):
         dist = np.hypot(tx, ty)
         alpha = np.arctan2(ty, tx)
         radius = dist / (2 * np.sin(alpha))
-        lin_v = 0.5
+        lin_v = 0.5  # the constant linear velocity
         arc_length = 2.0 * alpha * radius
-        time = arc_length / lin_v
+        t = arc_length / lin_v  # time to move to the waypoint, not used
         if radius < 1000:
             ang_v = lin_v / radius
         else:
             ang_v = 0.0
-        return lin_v, ang_v, time
+        return lin_v, ang_v, t
 
     def odom_callback(self, msg):
         self.odom_x = msg.pose.pose.position.x
@@ -110,8 +154,8 @@ def main(args=None):
 
     pursuit_action_server = PursuitActionServer()
 
-    # rclpy.spin(pursuit_action_server)
-    pursuit_action_server.loop()
+    rclpy.spin(pursuit_action_server)
+
     rclpy.shutdown()
 
 
