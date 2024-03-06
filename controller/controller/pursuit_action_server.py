@@ -5,7 +5,7 @@ from rclpy.action import ActionServer, GoalResponse, CancelResponse
 from rclpy.callback_groups import ReentrantCallbackGroup
 
 from nav_msgs.msg import Odometry
-from geometry_msgs.msg import Twist  # , Point
+from geometry_msgs.msg import Twist
 from robp_interfaces.action import Pursuit
 
 
@@ -43,8 +43,13 @@ class PursuitActionServer(Node):
             callback_group=self._cb_group
         )
 
+    def destroy(self):
+        """Cleanup"""
+        self._action_server.destroy()
+        super().destroy_node()
+
     def goal_callback(self, goal_request):
-        """Accepts goal or rejects goal"""
+        """Accepts goal if there are waypoints, otherwise rejects goal"""
         waypoints = goal_request.request.waypoints
         self.get_logger().info('Received goal request')
         if waypoints is None or len(waypoints) == 0:
@@ -82,8 +87,9 @@ class PursuitActionServer(Node):
             for waypoint in self.waypoints:
                 LOOK_AHEAD = 0.2
                 # if current waypoint is beyond LOOK_AHEAD, use it as waypoint
-                # I imagine this could cause a problem if the last waypoint is beyond 0.1 but within 0.2
-                # could check for this case and move based on time to the goal point.
+                # I imagine this could cause a problem if the last waypoint is
+                # beyond 0.1 but within 0.2 could check for this case and move
+                # based on time to the goal point.
                 if np.hypot(waypoint.x - self.odom_x, waypoint.y - self.odom_y) > LOOK_AHEAD:
                     break
                 self.waypoints.pop(0)
@@ -131,7 +137,7 @@ class PursuitActionServer(Node):
         radius = dist / (2 * np.sin(alpha))
         lin_v = 0.5  # the constant linear velocity
         arc_length = 2.0 * alpha * radius
-        t = arc_length / lin_v  # time to move to the waypoint, not used
+        t = arc_length / lin_v  # time to move to the waypoint, not used atm
         if radius < 1000:
             ang_v = lin_v / radius
         else:
@@ -139,6 +145,10 @@ class PursuitActionServer(Node):
         return lin_v, ang_v, t
 
     def odom_callback(self, msg):
+        """
+        Extract the x, y and yaw from the odometry.
+        https://robotics.stackexchange.com/questions/16471/get-yaw-from-quaternion
+        """
         self.odom_x = msg.pose.pose.position.x
         self.odom_y = msg.pose.pose.position.y
         x = msg.pose.pose.orientation.x
@@ -156,6 +166,7 @@ def main(args=None):
 
     rclpy.spin(pursuit_action_server)
 
+    pursuit_action_server.destroy()
     rclpy.shutdown()
 
 
