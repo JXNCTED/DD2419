@@ -50,8 +50,8 @@ class ArmDetect(Node):
         # ros2 topic pub -1 /dist_bool std_msgs/msg/Bool "{data: true}"
         self.dist_sub = self.create_subscription(  # Publish true to this topic when the distance is low enough to start detecting
             Bool, "/dist_bool", self.dist_callback, 10)
-
         self.can_detect = False
+
         # send to know what twist message
         self.theta_pub = self.create_publisher(Float32, "/arm_theta", 10)
         self.pick_up = False
