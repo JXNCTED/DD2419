@@ -23,6 +23,7 @@ find_package(OpenCV REQUIRED)
 add_executable(vi_odom src/vi_odom.cpp)
 add_executable(wheel_odom src/wheel_odom.cpp)
 add_executable(filter_odom src/filter_odom.cpp)
+add_executable(lidar_compensator src/lidar_compensator.cpp)
 
 add_library(ekf src/ekf.cpp)
 target_include_directories(ekf PUBLIC
@@ -73,11 +74,20 @@ ament_target_dependencies(
   "tf2_geometry_msgs"
 )
 
+ament_target_dependencies(
+  lidar_compensator
+  "sensor_msgs"
+  "rclcpp"
+  "geometry_msgs"
+  "nav_msgs"
+)
+
 
 install(TARGETS 
   vi_odom 
   wheel_odom 
   filter_odom
+  lidar_compensator
   DESTINATION lib/${PROJECT_NAME})
 
 if(BUILD_TESTING)
