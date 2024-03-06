@@ -50,7 +50,7 @@ class PursuitActionServer(Node):
 
     def goal_callback(self, goal_request):
         """Accepts goal if there are waypoints, otherwise rejects goal"""
-        waypoints = goal_request.request.waypoints
+        waypoints = goal_request.waypoints
         self.get_logger().info('Received goal request')
         if waypoints is None or len(waypoints) == 0:
             self.get_logger().info('Rejecting the goal request')
@@ -85,6 +85,7 @@ class PursuitActionServer(Node):
                 self.waypoints = []
                 break
             for waypoint in self.waypoints:
+                # TODO: make this a parameter to to set
                 LOOK_AHEAD = 0.2
                 # if current waypoint is beyond LOOK_AHEAD, use it as waypoint
                 # I imagine this could cause a problem if the last waypoint is
@@ -109,7 +110,6 @@ class PursuitActionServer(Node):
         self._publish_vel.publish(twist)
 
         if np.hypot(goal_point.x - self.odom_x, goal_point.y - self.odom_y) < 0.1:
-            self.get_logger().info('Reached goal')
             goal_handle.succeed()
             result.success = True
         else:
@@ -135,6 +135,7 @@ class PursuitActionServer(Node):
         dist = np.hypot(tx, ty)
         alpha = np.arctan2(ty, tx)
         radius = dist / (2 * np.sin(alpha))
+        # TODO: Make lin_v a parameter
         lin_v = 0.5  # the constant linear velocity
         arc_length = 2.0 * alpha * radius
         t = arc_length / lin_v  # time to move to the waypoint, not used atm
@@ -149,6 +150,7 @@ class PursuitActionServer(Node):
         Extract the x, y and yaw from the odometry.
         https://robotics.stackexchange.com/questions/16471/get-yaw-from-quaternion
         """
+        self.get_logger().info('Received odometry')
         self.odom_x = msg.pose.pose.position.x
         self.odom_y = msg.pose.pose.position.y
         x = msg.pose.pose.orientation.x
@@ -162,9 +164,10 @@ class PursuitActionServer(Node):
 def main(args=None):
     rclpy.init(args=args)
 
+    executor = rclpy.executors.MultiThreadedExecutor(3)
     pursuit_action_server = PursuitActionServer()
 
-    rclpy.spin(pursuit_action_server)
+    rclpy.spin(pursuit_action_server, executor=executor)
 
     pursuit_action_server.destroy()
     rclpy.shutdown()
