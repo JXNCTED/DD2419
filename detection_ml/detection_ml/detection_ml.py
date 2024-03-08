@@ -3,7 +3,7 @@ import cv_bridge
 import torch
 from torchvision.transforms import v2
 import cv2
-from sensor_msgs.msg import Image
+from sensor_msgs.msg import Image, CameraInfo
 from rclpy.node import Node
 import rclpy
 from dd2419_detector_baseline.detector import Detector, BoundingBox
@@ -11,6 +11,8 @@ import time
 import numpy as np
 from std_msgs.msg import Float32MultiArray
 import torch_tensorrt
+from PIL import Image as PILImage
+from tf2_geometry_msgs import PointStamped
 
 
 class DetectionMLNode(Node):
@@ -49,15 +51,48 @@ class DetectionMLNode(Node):
         )
         self.get_logger().info("Model loaded")
 
+        self.K = None
+
+        self.np_depth = None
+
         self.image_sub = self.create_subscription(
             Image, "/camera/color/image_raw", self.img_callback, 10)
+        self.cam_info_sub = self.create_subscription(
+            CameraInfo, "/camera/aligned_depth_to_color/camera_info", self.cam_info_callback, 10)
+        self.depth_sub = self.create_subscription(
+            Image, "/camera/aligned_depth_to_color/image_raw", self.depth_callback, 10)
 
         self.bounding_box_pub = self.create_publisher(
             Float32MultiArray, "/detection_ml/bounding_box", 10)
+        self.pose_pub = self.create_publisher(
+            PointStamped, "/detection_ml/pose", 10)
 
         self.get_logger().info("Node initialized")
 
+    def cam_info_callback(self, msg: CameraInfo):
+        self.K = np.array(msg.k).reshape(3, 3)
+
+    def depth_callback(self, msg: Image):
+        bridge = cv_bridge.CvBridge()
+        img = bridge.imgmsg_to_cv2(msg, "passthrough")
+        self.np_depth = img
+
+    def get_position(self, bb):
+        x, y, w, h = bb[0], bb[1], bb[2], bb[3]
+        u = x + w/2
+        v = y + h/2
+        world_z = self.np_depth[int(v), int(u)]
+        if world_z == 0:
+            return np.array([0.0, 0.0, 0.0])
+        world_x = (u - self.K[0, 2]) * world_z / self.K[0, 0]
+        world_y = (v - self.K[1, 2]) * world_z / self.K[1, 1]
+        return np.array([world_x, world_y, world_z]) / 1000.0
+
     def img_callback(self, msg: Image):
+        if self.K is None:
+            self.get_logger().info("No camera info received yet")
+            return
+
         bridge = cv_bridge.CvBridge()
         img = bridge.imgmsg_to_cv2(msg, "rgb8")
         input_img = torch.stack([self.val_input_transforms(img)]).to(
@@ -73,6 +108,14 @@ class DetectionMLNode(Node):
         for bb in bbs_nms:
             x, y, w, h, score, category = int(bb[0]), int(bb[1]), int(
                 bb[2]), int(bb[3]), round(bb[4], 2), int(bb[5])
+            position = self.get_position(bb)
+            pose = PointStamped()
+            pose.header.frame_id = "camera_color_optical_frame"
+            pose.header.stamp = msg.header.stamp
+            pose.point.x = position[0]
+            pose.point.y = position[1]
+            pose.point.z = position[2]
+            self.pose_pub.publish(pose)
 
             cata_str = f"{category} scr:{score}"
             cv2.rectangle(show_img, (x, y), (x+w, y+h),
