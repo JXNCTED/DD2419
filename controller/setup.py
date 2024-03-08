@@ -21,7 +21,8 @@ setup(
     entry_points={
         'console_scripts': [
             'cartesian_controller = controller.cartesian_controller:main',
-            'arm_controller = controller.arm_controller:main'
+            'arm_controller = controller.arm_controller:main',
+            'pursuit_action_server = controller.pursuit_action_server:main',
         ],
     },
 )

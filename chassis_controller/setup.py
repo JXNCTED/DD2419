@@ -22,7 +22,9 @@ setup(
         'console_scripts': [
             'joy_controller = chassis_controller.joy_controller:main',
             'obj_detect_move = chassis_controller.obj_detect_move:main',
-            'aruco_detect_move = chassis_controller.aruco_detect_move:main'
+            'aruco_detect_move = chassis_controller.aruco_detect_move:main',
+            'arm_detect_object_pick_up = chassis_controller.arm_detect_object_pick_up:main',
+            'nav_goal_move = chassis_controller.nav_goal_move:main',
         ],
     },
 )
