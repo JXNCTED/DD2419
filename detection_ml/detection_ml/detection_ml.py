@@ -17,20 +17,27 @@ class DetectionMLNode(Node):
     def __init__(self):
         super().__init__('detection_ml')
         self.last_time = time.time()
-        self.model = Detector().eval().to("cuda")
-        # i can't figure out how to load the model with launch, so i'm just hardcoding the path
-        self.model.load_state_dict(torch.load(
-            "/home/group7/best.pt"))
 
-        self.get_logger().info("Model loaded")
+        # This is to export the model to tensorrt
 
-        self.trt_model = torch_tensorrt.compile(
-            self.model, inputs=[torch.rand(1, 3, 480, 640)],
-            enabled_precisions={torch.float32})  # or {torch.float32}
-        torch.save(self.trt_model.state_dict(), "~/trt_model.pth")
+        self.model = Detector().eval().cuda()
+        # # i can't figure out how to load the model with launch, so i'm just hardcoding the path
+        # self.model.load_state_dict(torch.load(
+        #     "/home/group7/best.pt"))
 
-        self.get_logger().info("Model compiled to TensorRT")
-        # save the tensorrt model
+        # self.get_logger().info("Model loaded")
+
+        # inputs = [torch.rand(1, 3, 480, 640).cuda()]
+
+        # self.trt_model = torch_tensorrt.compile(
+        #     self.model, ir="ts", inputs=inputs)
+
+        # self.get_logger().info("Model compiled to TensorRT")
+        # # save the tensorrt model
+        # torch.jit.save(self.trt_model, "/home/group7/trt_model.ts")
+
+        # load the tensorrt model after it's been saved
+        self.trt_model = torch.jit.load("/home/group7/trt_model.ts")
 
         self.val_input_transforms = v2.Compose(
             [
@@ -40,6 +47,7 @@ class DetectionMLNode(Node):
                              std=[0.229, 0.224, 0.225]),
             ]
         )
+        self.get_logger().info("Model loaded")
 
         self.image_sub = self.create_subscription(
             Image, "/camera/color/image_raw", self.img_callback, 10)
@@ -54,12 +62,8 @@ class DetectionMLNode(Node):
         img = bridge.imgmsg_to_cv2(msg, "rgb8")
         input_img = torch.stack([self.val_input_transforms(img)]).to(
             "cuda")
-        # with torch.no_grad():
-        #     out = self.model_trace(input_img).cpu()
-        # TODO
-        out = self.trt_model(input_img)
-        print(out)
-        out = list(out)
+        with torch.no_grad():
+            out = self.trt_model(input_img)
         DETECT_THRESHOLD = 0.75
         bbs = self.model.out_to_bbs(out, DETECT_THRESHOLD)
 
@@ -78,7 +82,8 @@ class DetectionMLNode(Node):
 
         fps = round(1/(time.time()-self.last_time), 2)
         self.last_time = time.time()
-        cv2.putText(show_img, f"FPS: {fps}", (10, 30),
+        status_str = f"FPS: {fps}"
+        cv2.putText(show_img, status_str, (10, 30),
                     cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
         cv2.imshow("detections", show_img)
         cv2.waitKey(1)
