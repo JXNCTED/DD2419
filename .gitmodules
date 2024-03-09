@@ -3,4 +3,4 @@
 	url = git@gits-15.sys.kth.se:robotics-group7/dd2419_detector_baseline.git
 [submodule "realsense-ros"]
 	path = realsense-ros
-	url = ./realsense-ros/
+	url = git@github.com:IntelRealSense/realsense-ros.git
