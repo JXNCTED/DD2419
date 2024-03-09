@@ -27,16 +27,9 @@ class CartesianController(Node):
         self.duty_cycle_pub_ = self.create_publisher(
             DutyCycles, '/motor/duty_cycles', 10)
 
-        # self.timeout_timer = self.create_timer(0.5, self.timeout_callback)
-
     def twist_callback(self, msg):
-        # self.timeout_timer.reset()
         self.target_v = msg.linear.x
         self.target_w = msg.angular.z
-
-    # def timeout_callback(self):
-    #     self.target_v = 0
-    #     self.target_w = 0
 
     def encoder_callback(self, msg):
         TICK_PER_REV = 3600
@@ -58,9 +51,6 @@ class CartesianController(Node):
             TICK_PER_REV * WHEEL_RADIUS / DT
         vw2 = (self.last_delta_right * 2 * pi) / \
             TICK_PER_REV * WHEEL_RADIUS / DT
-
-        # v = (vw1 + vw2) / 2
-        # w = (vw1 - vw2) / WHEEL_BASE
 
         target_wheel1 = (self.target_v - self.target_w * WHEEL_BASE)
         target_wheel2 = (self.target_v + self.target_w * WHEEL_BASE)
