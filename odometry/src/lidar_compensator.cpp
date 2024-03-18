@@ -2,11 +2,11 @@
 #include <mutex>
 #include <vector>
 
+#include "pcl_conversions/pcl_conversions.h"
 #include "rclcpp/rclcpp.hpp"
 #include "sensor_msgs/msg/imu.hpp"
 #include "sensor_msgs/msg/laser_scan.hpp"
 #include "sensor_msgs/msg/point_cloud2.hpp"
-#include "pcl_conversions/pcl_conversions.h"
 
 constexpr size_t QUEUE_SIZE = 2000;
 class LidarCompensator : public rclcpp::Node
@@ -60,14 +60,10 @@ class LidarCompensator : public rclcpp::Node
             return;
         }
         // get the first scan
-        sensor_msgs::msg::LaserScan &scan = scan_queue.front();
+        sensor_msgs::msg::LaserScan scan = scan_queue.front();
         scan_queue.pop_front();
 
         // get start and end of scan time
-        // const double scanStartTime =
-        // rclcpp::Time(scan.header.stamp).seconds(); const double scanEndTime
-        // = rclcpp::Time(scan.header.stamp).seconds() +
-        //                            scan.time_increment * scan.ranges.size();
         const double scanEndTime   = rclcpp::Time(scan.header.stamp).seconds();
         const double scanStartTime = rclcpp::Time(scan.header.stamp).seconds() -
                                      scan.time_increment * scan.ranges.size();
@@ -95,9 +91,20 @@ class LidarCompensator : public rclcpp::Node
 
             int imuIndex = (t - scanStartTime) / scan.time_increment;
             double rot   = 0.5 * (rotZ[imuIndex] + rotZ[imuIndex + 1]);
+            if (rot < 0.0001)
+            {
+                rot = 0;
+            }
 
             double xCompensated = x * std::cos(rot) - y * std::sin(rot);
             double yCompensated = x * std::sin(rot) + y * std::cos(rot);
+
+            // hacky way to remove points that are too far from the original
+            if (std::abs(x - xCompensated) > 0.1 or
+                std::abs(y - yCompensated) > 0.1)
+            {
+                continue;
+            }
 
             pcl::PointXYZ point;
             point.x = xCompensated;
@@ -144,12 +151,15 @@ class LidarCompensator : public rclcpp::Node
             rclcpp::Time(imu_queue.front().header.stamp).seconds();
         for (size_t i = 0; i < imu_queue.size(); i++)
         {
+            // if imu data is before scan start time, set rotation to 0
             if (rclcpp::Time(imu_queue[i].header.stamp).seconds() <
                 scanStartTime)
             {
                 rotZ.push_back(0);
                 lastTime = rclcpp::Time(imu_queue[i].header.stamp).seconds();
             }
+            // if imu data is after scan end time, calculate the last rotation
+            // and break
             else if (rclcpp::Time(imu_queue[i].header.stamp).seconds() >
                      scanEndTime)
             {
@@ -158,6 +168,8 @@ class LidarCompensator : public rclcpp::Node
                                rotZ.back());
                 break;
             }
+            // if imu data is between scan start and end time, calculate the
+            // rotation
             else
             {
                 double dt = rclcpp::Time(imu_queue[i].header.stamp).seconds() -
