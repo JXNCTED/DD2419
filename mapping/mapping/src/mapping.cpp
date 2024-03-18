@@ -1,3 +1,13 @@
+/**
+ * @file mapping.cpp
+ * @author ZOU Hetai
+ * @brief the node for mapping and path planning
+ * @version 0.1
+ * @date 2024-03-05
+ *
+ * @copyright Copyright (c) 2024
+ *
+ */
 #include "mapping/GridMap.hpp"
 #include "mapping/Mapper.hpp"
 #include "mapping_interfaces/srv/path_plan.hpp"
@@ -30,18 +40,20 @@ class MappingNode : public rclcpp::Node
             std::chrono::milliseconds(10000),
             std::bind(&MappingNode::timerCallback, this));
 
-        std::vector<std::pair<double, double>> lineSegments;
-        lineSegments.push_back(std::make_pair(0.0, 0.0));
-        lineSegments.push_back(std::make_pair(5.0, 0.0));
-        lineSegments.push_back(std::make_pair(1.0, 1.0));
-        lineSegments.push_back(std::make_pair(0.0, 1.0));
+        // workspace shit, hard coded for now
+        // std::vector<std::pair<double, double>> lineSegments;
+        // lineSegments.push_back(std::make_pair(0.0, 0.0));
+        // lineSegments.push_back(std::make_pair(5.0, 0.0));
+        // lineSegments.push_back(std::make_pair(1.0, 1.0));
+        // lineSegments.push_back(std::make_pair(0.0, 1.0));
 
-        map.setLineSegmentOccupied(lineSegments);
+        // map.setLineSegmentOccupied(lineSegments);
     }
 
     // timer call back to save the map, not used for now
     void timerCallback()
     {
+        assert(false);  // not used
         // static int count = 0;
         // map.saveMap("/home/group7/maps/" + std::to_string(count) +
         // "_map.txt"); count++;
@@ -84,7 +96,13 @@ class MappingNode : public rclcpp::Node
 
 std::shared_ptr<MappingNode> node;
 
-// path plan service
+/**
+ * @brief path plan service handle function, request and response are defined in
+ * mapping_interfaces/srv/PathPlan
+ *
+ * @param request
+ * @param response
+ */
 void planPath(
     const std::shared_ptr<mapping_interfaces::srv::PathPlan::Request> request,
     std::shared_ptr<mapping_interfaces::srv::PathPlan::Response> response)

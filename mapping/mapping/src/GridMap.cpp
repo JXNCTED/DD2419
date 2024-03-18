@@ -2,6 +2,7 @@
 
 #include <fstream>
 #include <vector>
+#include <assert.h>
 
 GridMap::GridMap(const double &gridSize,
                  const int &sizeX,
@@ -36,6 +37,7 @@ GridMap::GridMap(const double &gridSize,
 
 GridMap::GridMap(const std::string &dir)
 {
+    assert(false);  // not tested
     std::ifstream ifs(dir, std::ifstream::in);
     if (!ifs)
     {
@@ -59,8 +61,11 @@ nav_msgs::msg::OccupancyGrid GridMap::toRosOccGrid()
     {
         for (int j = 0; j < sizeY; j++)
         {
+            // bad practice, the lidar occ grid is set in the callback already
             if (knownGrid(i, j) == 1)
             {
+                // ros message is 0-100 for occupancy probability, and -1 for
+                // unknown
                 rosOccGrid.data[i + j * sizeX] = 100;
             }
         }
@@ -72,6 +77,7 @@ void GridMap::setGridBelief(const double &x,
                             const double &y,
                             const double &belief)
 {
+    // convert from coordinate to grid index
     int xOnGrid = cvFloor(x / gridSize) + startX;
     int yOnGrid = cvFloor(y / gridSize) + startY;
     if (xOnGrid < 0 or xOnGrid >= sizeX or yOnGrid < 0 or yOnGrid >= sizeY)
@@ -79,8 +85,12 @@ void GridMap::setGridBelief(const double &x,
         return;
     }
 
+    // set the belief
     gridBelief(xOnGrid, yOnGrid) = belief;
-    rosOccGrid.header.stamp      = rclcpp::Clock().now();
+    // update the ros message also
+    rosOccGrid.header.stamp = rclcpp::Clock().now();
+    // belief = 0.5 means not updated yet, set ros message to -1 to indicate
+    // unknown
     if (belief == 0.5f)
     {
         rosOccGrid.data[xOnGrid + yOnGrid * sizeX] = -1;
@@ -129,18 +139,27 @@ void GridMap::saveMap(const std::string &dir)
     ofs.close();
 }
 
+/**
+ * @brief Node struct for A* algorithm
+ *
+ */
 struct Node
 {
     int x = 0, y = 0;
+    // g is the cost from start to current node
+    // h is the heuristic cost from current node to goal
+    // f is the total cost
     float g = 0, h = 0, f = 0;
     Node *parent = nullptr;
     Node(int x, int y, float g, float h, Node *parent)
         : x(x), y(y), g(g), h(h), f(g + h), parent(parent)
     {
     }
+    // for priority queue
     bool operator<(const Node &rhs) const { return f > rhs.f; }
 };
 
+// euclidean distance
 float heuristic(int x, int y, int goalX, int goalY)
 {
     return sqrt((x - goalX) * (x - goalX) + (y - goalY) * (y - goalY));
@@ -166,15 +185,27 @@ std::vector<std::pair<int, int>> GridMap::aStar(const int &startX,
     std::vector<std::vector<Node *>> nodes(sizeX,
                                            std::vector<Node *>(sizeY, nullptr));
 
+    // push the start node to the openSet
     openSet.push(Node(
         startX, startY, 0, heuristic(startX, startY, goalX, goalY), nullptr));
+    // limit a max iter for safety
     const int MAX_ITER = 10000;
     int iter           = 0;
     bool found         = false;
+    // expand the grid to c-space
     expandGrid();
 
     while (!openSet.empty() and iter++ < MAX_ITER)
     {
+        if (iter % 1000 == 0)
+        {
+            // debug print to make sure things are running and not
+            // stuck/infinite
+            RCLCPP_INFO(rclcpp::get_logger("GridMap::aStar"),
+                        "iter %d, openSet size %ld",
+                        iter,
+                        openSet.size());
+        }
         Node current = openSet.top();
         openSet.pop();
 
@@ -185,6 +216,7 @@ std::vector<std::pair<int, int>> GridMap::aStar(const int &startX,
             break;
         }
         closedSet[current.x][current.y] = true;
+        // for all neighbors
         for (int i = -1; i <= 1; i++)
         {
             for (int j = -1; j <= 1; j++)
@@ -230,6 +262,7 @@ std::vector<std::pair<int, int>> GridMap::aStar(const int &startX,
     {
         Node *current = nodes[goalX][goalY];
         int cnt       = 0;
+        // trace back the path
         while (current != nullptr and cnt++ < 1000)  // sanity check
         {
             path.push_back(std::make_pair(current->x, current->y));
@@ -244,6 +277,7 @@ std::vector<std::pair<int, int>> GridMap::aStar(const int &startX,
         RCLCPP_INFO(rclcpp::get_logger("GridMap::aStar"), "path not found");
     }
 
+    // free the memory
     for (int i = 0; i < sizeX; i++)
     {
         for (int j = 0; j < sizeY; j++)
@@ -262,6 +296,7 @@ nav_msgs::msg::Path GridMap::planPath(const double &startX,
                                       const double &goalX,
                                       const double &goalY)
 {
+    // just wrap the A* basically
     nav_msgs::msg::Path path;
     path.header.frame_id = "map";
     path.header.stamp    = rclcpp::Clock().now();
@@ -298,10 +333,10 @@ nav_msgs::msg::Path GridMap::planPath(const double &startX,
     return path;
 }
 
-void GridMap::expandGrid()
+void GridMap::expandGrid(const float &radius)
 {
     expandedGrid.setZero();
-    const int EXPAND_RADIUS = 0.1 / gridSize;
+    const int EXPAND_RADIUS = radius / gridSize;
     for (int i = 0; i < sizeX; i++)
     {
         for (int j = 0; j < sizeY; j++)

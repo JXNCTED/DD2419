@@ -25,4 +25,5 @@ __pycache__/
 # C extensions
 *.so
 
+COLCON_IGNORE
 AMENT_IGNORE
