@@ -110,6 +110,7 @@ class PursuitActionServer(Node):
         self._publish_vel.publish(twist)
 
         if np.hypot(goal_point.x - self.odom_x, goal_point.y - self.odom_y) < 0.1:
+            self.get_logger().info('Reached goal')
             goal_handle.succeed()
             result.success = True
         else:
@@ -118,7 +119,7 @@ class PursuitActionServer(Node):
 
         return result
 
-    def velocity(self, target):
+    def velocity(self, target, lin_v=0.5):
         """
         Calculate the angular velocity from the constant linear velocity,
         the position of the robot and the waypoint using a circle.
@@ -134,15 +135,15 @@ class PursuitActionServer(Node):
         ty = -dx * y_sin + dy * y_cos
         dist = np.hypot(tx, ty)
         alpha = np.arctan2(ty, tx)
-        radius = dist / (2 * np.sin(alpha))
-        # TODO: Make lin_v a parameter
-        lin_v = 0.5  # the constant linear velocity
-        arc_length = 2.0 * alpha * radius
-        t = arc_length / lin_v  # time to move to the waypoint, not used atm
-        if radius < 1000:
-            ang_v = lin_v / radius
-        else:
+        if abs(np.sin(alpha)) < 0.01:
+            radius = 10000.0
             ang_v = 0.0
+            arc_length = dist
+        else:
+            radius = dist / (2 * np.sin(alpha))
+            arc_length = 2.0 * alpha * radius
+            ang_v = lin_v / radius
+        t = arc_length / lin_v  # time to move to the waypoint, not used atm
         return lin_v, ang_v, t
 
     def odom_callback(self, msg):
@@ -150,7 +151,6 @@ class PursuitActionServer(Node):
         Extract the x, y and yaw from the odometry.
         https://robotics.stackexchange.com/questions/16471/get-yaw-from-quaternion
         """
-        self.get_logger().info('Received odometry')
         self.odom_x = msg.pose.pose.position.x
         self.odom_y = msg.pose.pose.position.y
         x = msg.pose.pose.orientation.x

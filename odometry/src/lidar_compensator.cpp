@@ -90,7 +90,8 @@ class LidarCompensator : public rclcpp::Node
             double t     = scanStartTime + i * scan.time_increment;
 
             int imuIndex = (t - scanStartTime) / scan.time_increment;
-            double rot   = 0.5 * (rotZ[imuIndex] + rotZ[imuIndex + 1]);
+            // double rot   = 0.5 * (rotZ[imuIndex] + rotZ[imuIndex + 1]);
+            double rot = rotZ[imuIndex];
             if (rot < 0.0001)
             {
                 rot = 0;

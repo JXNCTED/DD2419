@@ -1,4 +1,5 @@
 #include "mapping/Mapper.hpp"
+
 #include "rcpputils/asserts.hpp"
 
 Mapper::Mapper(GridMap *map) : map(map) {}
