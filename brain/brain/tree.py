@@ -14,7 +14,7 @@ from std_msgs.msg import Float32MultiArray
 
 class Counter(pt.behaviour.Behaviour):
     def __init__(self, count):
-        super().__init__("countér")
+        super().__init__("counter")
         self.count = count
         self.current_count = 0
 
@@ -87,6 +87,8 @@ def main():
     root = pt.composites.Sequence("Root", True)
     root.add_children(sequence_list)
     tree = pt.trees.BehaviourTree(root)
+
+    print(pt.display.unicode_tree(root))
 
     final_status, details = tree.tick_tock(
         period_ms=3000,
