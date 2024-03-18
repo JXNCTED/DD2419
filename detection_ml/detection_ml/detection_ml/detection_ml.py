@@ -58,31 +58,39 @@ class DetectionMLNode(Node):
 
         self.image_sub = self.create_subscription(
             Image, "/camera/color/image_raw", self.img_callback, 10)
+
+        # this is the aligned depth camera info and image
         self.cam_info_sub = self.create_subscription(
             CameraInfo, "/camera/aligned_depth_to_color/camera_info", self.cam_info_callback, 10)
         self.depth_sub = self.create_subscription(
             Image, "/camera/aligned_depth_to_color/image_raw", self.depth_callback, 10)
+
+        # see the detection_interfaces package for the message definition
         self.detected_obj_pub = self.create_publisher(
             DetectedObj, "/detection_ml/detected_obj", 10)
 
+        # publish the bounding box just as an multiarray
         self.bounding_box_pub = self.create_publisher(
             Float32MultiArray, "/detection_ml/bounding_box", 10)
-        # self.pose_pub = self.create_publisher(
-        #     PointStamped, "/detection_ml/pose", 10)
+
+        # publish the pose of each category. For visualization only, could not handle multiple objects of the same category
         NUM_CLASSES = 15
         self.pose_pubs = [self.create_publisher(
             PointStamped, f"/detection_ml/pose{i}", 10) for i in range(NUM_CLASSES)]
 
         self.get_logger().info("Node initialized")
 
+    # store the camera intrinsics
     def cam_info_callback(self, msg: CameraInfo):
         self.K = np.array(msg.k).reshape(3, 3)
 
+    # store the depth image
     def depth_callback(self, msg: Image):
         bridge = cv_bridge.CvBridge()
         img = bridge.imgmsg_to_cv2(msg, "passthrough")
         self.np_depth = img
 
+    # project the bounding box to depth and get the position from camera_optical_frame
     def get_position(self, bb):
         x, y, w, h = bb[0], bb[1], bb[2], bb[3]
         u = x + w/2
@@ -99,6 +107,7 @@ class DetectionMLNode(Node):
             self.get_logger().info("No camera info received yet")
             return
 
+        # convert the image to tensor and run the model
         bridge = cv_bridge.CvBridge()
         img = bridge.imgmsg_to_cv2(msg, "rgb8")
         input_img = torch.stack([self.val_input_transforms(img)]).to(
@@ -110,6 +119,7 @@ class DetectionMLNode(Node):
 
         show_img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
         IOU_THRESHOLD = 0.5
+        # apply non-maximum suppression
         bbs_nms = non_max_suppression(bbs[0], IOU_THRESHOLD)
         length = len(bbs_nms)
         detected_obj = DetectedObj()
@@ -131,6 +141,8 @@ class DetectionMLNode(Node):
             detected_obj.confidence.append(score)
 
             cata_str = f"{category} scr:{score}"
+            # draw the bounding box and the category. For visualization only
+            # when running, comment out if no valid display is available
             cv2.rectangle(show_img, (x, y), (x+w, y+h),
                           color=(0, 255, 0), thickness=2)
             cv2.putText(show_img, cata_str, (x, y),
