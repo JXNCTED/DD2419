@@ -7,6 +7,12 @@ from sensor_msgs.msg import Image
 from cv_bridge import CvBridgeError
 import cv2
 from std_msgs.msg import Float32MultiArray
+from geometry_msgs.msg import Twist
+from std_msgs.msg import String
+from cv_bridge import CvBridge, CvBridgeError
+
+from std_msgs.msg import Bool, Float32, String, Float32MultiArray
+
 
 # https://medium.com/@nullbyte.in/behavior-trees-for-ros2-part-1-unlocking-advanced-robotic-decision-making-and-control-7856582fb812
 # Need to create cpp file of behavior tree
@@ -31,6 +37,44 @@ class Counter(pt.behaviour.Behaviour):
         else:
             self.reset_count()  # Reset the counter when the count is completed
             return pt.common.Status.SUCCESS
+
+
+# This is just to move the robot from getting a coordinate.
+# We do not need to have this node. Add it to the bringup instead.
+
+# This node should check if the object in the arm camera is centered via a topic from arm_detect node (ran separately)
+class CheckForObjects(pt.behaviour.Behaviour, Node):
+    def __init__(self):
+        pt.behaviour.Behaviour.__init__(self, "CheckForObjects")
+        Node.__init__(self, "CheckForObjects")
+        # Have random topic here. THis topic will have true or false values for if the object is in the middle.
+        self.is_object_centered_sub = self.create_subscription(
+            Bool, "/is_object_centered", self.is_object_centered_callback, 10)
+        self.is_object_centered = False
+
+    def update(self):
+        # Manually read from the topic
+        msg = self.is_object_centered_sub.take_message()  # Non-blocking read
+        msg = True
+        if msg:
+            self.is_object_centered_callback(msg)
+
+        print(self.is_object_centered)
+
+        if self.is_object_centered:
+            print("Object is centered")
+            return pt.common.Status.SUCCESS
+        else:
+            print("Object is not centered")
+            return pt.common.Status.RUNNING
+
+    def is_object_centered_callback(self, msg):
+        try:
+            print(msg.data)
+            self.is_object_centered = msg.data
+            print("Received message:", msg.data)
+        except Exception as e:
+            print("Error in callback:", e)
 
 
 class ReconfigureArm(pt.behaviour.Behaviour, Node):
@@ -76,13 +120,17 @@ class ReconfigureArm(pt.behaviour.Behaviour, Node):
 def main():
     rclpy.init()
     node = rclpy.create_node("behaviour_tree_example")
-
     sequence_list = [
         Counter(1), ReconfigureArm("detect", "open"),
+        Counter(1), CheckForObjects(),  # Works?!
         Counter(1), ReconfigureArm("pickup", "open"),
         Counter(1), ReconfigureArm("pickup", "close"),
         Counter(1), ReconfigureArm(None, "close"),  # None is neutral
     ]
+
+    # Implement the same logic that we used before in this tree
+    # Create a node for handling the detecting and moving?
+    # Run the arm_detect_move node
 
     root = pt.composites.Sequence("Root", True)
     root.add_children(sequence_list)

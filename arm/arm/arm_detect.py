@@ -39,6 +39,9 @@ class ArmDetect(Node):
         # Wait does this even make sense since we created a node to handle these kind of things?
         self.control_arm_pub = self.create_publisher(String, '/arm_conf', 10)
 
+        self.is_object_centered_pub = self.create_publisher(
+            Bool, "/is_object_centered", 10)
+
         self.theta_linear_pub = self.create_publisher(
             Float32MultiArray,
             '/arm/camera/object/theta_linear',
@@ -81,7 +84,7 @@ class ArmDetect(Node):
 
     def filter_image_callback(self, msg: Image) -> Image:
         """
-        Filters the inputted image to only display certain colours.
+        Filters the inputted image to only display certain std_msgscolours.
         """
 
         if self.can_detect == False:
@@ -168,7 +171,7 @@ class ArmDetect(Node):
                     self.get_logger().info("PICK UP! !! ")
                     self.pick_up = True
                     # tell arm to shtap
-                    self.timer.reset()
+                    # self.timer.reset()
 
                     # tell wheels to sthap
                     theta_linear.data[0] = 0.0  # this is linear
@@ -177,6 +180,10 @@ class ArmDetect(Node):
                     # Here the robot should then check whether or not it has the cube in its grip
                     # Which is easy, but everything else is hard.
                     # And then go into neutral mode. Or some kind of structured manouver.
+                    create_message = Bool()
+                    create_message.data = True
+                    self.is_object_centered_pub.publish(create_message)
+
                     self.can_detect = False
 
                 else:
@@ -209,6 +216,9 @@ class ArmDetect(Node):
                         theta_linear.data[1] = 0  # this is theta
         self.get_logger().info(f"twist pub: {theta_linear.data}")
         self.theta_linear_pub.publish(theta_linear)
+        # create_message = Bool()
+        # create_message.data = False
+        # self.is_object_centered_pub.publish(create_message)
 
         # Use cv_bridge() to convert the ROS image to OpenCV format
         try:
