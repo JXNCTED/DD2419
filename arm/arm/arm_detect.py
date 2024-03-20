@@ -40,7 +40,7 @@ class ArmDetect(Node):
         self.control_arm_pub = self.create_publisher(String, '/arm_conf', 10)
 
         self.is_object_centered_pub = self.create_publisher(
-            Bool, "/is_object_centered", 10)
+            String, "/is_object_centered", 10)
 
         self.theta_linear_pub = self.create_publisher(
             Float32MultiArray,
@@ -182,6 +182,8 @@ class ArmDetect(Node):
                     # And then go into neutral mode. Or some kind of structured manouver.
                     create_message = Bool()
                     create_message.data = True
+                    # create_message = String()
+                    # create_message.data = middle_coordinates
                     self.is_object_centered_pub.publish(create_message)
 
                     self.can_detect = False

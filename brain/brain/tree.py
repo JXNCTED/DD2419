@@ -50,14 +50,16 @@ class CheckForObjects(pt.behaviour.Behaviour, Node):
         # Have random topic here. THis topic will have true or false values for if the object is in the middle.
         self.is_object_centered_sub = self.create_subscription(
             Bool, "/is_object_centered", self.is_object_centered_callback, 10)
+        # self.is_object_centered = False
         self.is_object_centered = False
+        self.latest_message = None
 
     def update(self):
         # Manually read from the topic
-        msg = self.is_object_centered_sub.take_message()  # Non-blocking read
-        msg = True
-        if msg:
-            self.is_object_centered_callback(msg)
+        # Non-blocking read. Doesn't work...
+
+        if self.latest_message:
+            self.is_object_centered_callback(self.latest_message)
 
         print(self.is_object_centered)
 
@@ -72,6 +74,7 @@ class CheckForObjects(pt.behaviour.Behaviour, Node):
         try:
             print(msg.data)
             self.is_object_centered = msg.data
+            self.latest_message = msg
             print("Received message:", msg.data)
         except Exception as e:
             print("Error in callback:", e)
