@@ -20,7 +20,10 @@ setup(
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
-            'tree = brain.tree:main'
+            'tree = brain.tree:main',
+            'tutorial1 = brain.tutorial1:main',
+            'tree7 = brain.tree7:main',
+            'tree69 = brain.tree69:main',
         ],
     },
 )

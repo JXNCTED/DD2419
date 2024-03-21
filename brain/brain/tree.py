@@ -1,5 +1,6 @@
 import numpy as np
 import py_trees as pt
+import py_trees_ros as ptr
 import rclpy
 from rclpy.node import Node
 from std_msgs.msg import Int16MultiArray
@@ -43,7 +44,7 @@ class Counter(pt.behaviour.Behaviour):
 # We do not need to have this node. Add it to the bringup instead.
 
 # This node should check if the object in the arm camera is centered via a topic from arm_detect node (ran separately)
-class CheckForObjects(pt.behaviour.Behaviour, Node):
+class CheckForObjects(ptr.behaviour.Behaviour, Node):
     def __init__(self):
         pt.behaviour.Behaviour.__init__(self, "CheckForObjects")
         Node.__init__(self, "CheckForObjects")

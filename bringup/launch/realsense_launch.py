@@ -8,7 +8,7 @@ from launch.substitutions import LaunchConfiguration
 
 
 configurable_parameters = [{'name': 'camera_name',                  'default': 'camera', 'description': 'camera unique name'},
-                           {'name': 'camera_namespace',             'default': 'camera',
+                           {'name': 'camera_namespace',             'default': '',
                                'description': 'namespace for camera'},
                            {'name': 'serial_no',                    'default': "''",
                                'description': 'choose device by serial number'},

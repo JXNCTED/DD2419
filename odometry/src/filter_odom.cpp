@@ -24,7 +24,7 @@ class FilterOdom : public rclcpp::Node
                 std::bind(
                     &FilterOdom::wheel_callback, this, std::placeholders::_1));
         realsense_gyro_sub_ = this->create_subscription<sensor_msgs::msg::Imu>(
-            "/camera/gyro/sample",
+            "/imu/data_raw",
             sensorQos,
             std::bind(
                 &FilterOdom::realsense_callback, this, std::placeholders::_1));
@@ -123,11 +123,11 @@ class FilterOdom : public rclcpp::Node
         realsense_odom[0] =
             (msg->linear_acceleration.z + _realsense_old[0]) / 2.0;
         realsense_odom[1] =
-            (-msg->angular_velocity.y + _realsense_old[1]) / 2.0;  // rad/s
+            (-msg->angular_velocity.z + _realsense_old[1]) / 2.0;  // rad/s
         if (std::abs(realsense_odom[1]) < 0.01)
             realsense_odom[1] = 0.0;
         _realsense_old[0] = msg->linear_acceleration.z;
-        _realsense_old[1] = -msg->angular_velocity.y;
+        _realsense_old[1] = -msg->angular_velocity.z;
         realsense_stamp_  = msg->header.stamp;
     }
     void phidget_callback(const sensor_msgs::msg::Imu::SharedPtr msg)

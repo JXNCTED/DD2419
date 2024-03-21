@@ -36,18 +36,20 @@ class MappingNode : public rclcpp::Node
         occu_pub_ = this->create_publisher<nav_msgs::msg::OccupancyGrid>(
             "/occupancy", 10);
         // save the map per 10s, not used now
-        timer_ = this->create_wall_timer(
-            std::chrono::milliseconds(10000),
-            std::bind(&MappingNode::timerCallback, this));
+        // timer_ = this->create_wall_timer(
+        //     std::chrono::milliseconds(10000),
+        //     std::bind(&MappingNode::timerCallback, this));
 
         // workspace shit, hard coded for now
-        // std::vector<std::pair<double, double>> lineSegments;
-        // lineSegments.push_back(std::make_pair(0.0, 0.0));
-        // lineSegments.push_back(std::make_pair(5.0, 0.0));
-        // lineSegments.push_back(std::make_pair(1.0, 1.0));
-        // lineSegments.push_back(std::make_pair(0.0, 1.0));
+        std::vector<std::pair<double, double>> lineSegments;
+        lineSegments.push_back(std::make_pair(1.35, -2.02));
+        lineSegments.push_back(std::make_pair(-1.35, -2.02));
+        lineSegments.push_back(std::make_pair(-1.35, 5.08));
+        lineSegments.push_back(std::make_pair(-3.75, 5.08));
+        lineSegments.push_back(std::make_pair(-3.75, 6.40));
+        lineSegments.push_back(std::make_pair(1.35, 6.40));
 
-        // map.setLineSegmentOccupied(lineSegments);
+        map.setLineSegmentOccupied(lineSegments);
     }
 
     // timer call back to save the map, not used for now
