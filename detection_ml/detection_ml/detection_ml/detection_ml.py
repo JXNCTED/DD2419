@@ -123,6 +123,7 @@ class DetectionMLNode(Node):
         bbs_nms = non_max_suppression(bbs[0], IOU_THRESHOLD)
         length = len(bbs_nms)
         detected_obj = DetectedObj()
+        detected_obj.header = msg.header
 
         for bb in bbs_nms:
             x, y, w, h, score, category = int(bb[0]), int(bb[1]), int(
