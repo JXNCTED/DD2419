@@ -422,6 +422,7 @@ def tutorial_create_root() -> py_trees.behaviour.Behaviour:
     )
 
     topics2bb = py_trees.composites.Sequence("Topics2BB", False)
+    
     scan2bb = py_trees_ros.subscribers.EventToBlackboard(
         name="Scan2BB",
         topic_name="/dashboard/scan",

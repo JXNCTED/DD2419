@@ -1,8 +1,9 @@
 #include "mapping/GridMap.hpp"
 
+#include <assert.h>
+
 #include <fstream>
 #include <vector>
-#include <assert.h>
 
 GridMap::GridMap(const double &gridSize,
                  const int &sizeX,
