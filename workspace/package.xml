@@ -7,7 +7,7 @@
   <maintainer email="rosuser@todo.todo">rosuser</maintainer>
   <license>MIT</license>
 
-  <depend>robp_robot</depend>
+  <depend>robp_interfaces</depend>
 
   <test_depend>ament_copyright</test_depend>
   <test_depend>ament_flake8</test_depend>

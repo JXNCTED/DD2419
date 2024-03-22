@@ -17,31 +17,43 @@ class Workspace(Node):
     def __init__(self):
         super().__init__('open_loop_controller')
 
+        # CHANGE TO FALSE IF FILE NOT AVAILABLE
+        self.workspace_file_available = True
+
         # Define the vertices of the workspace
         self.WORKSPACE = PolygonStamped()
-        # self.WORKSPACE.polygon.points = [
-        #     Point32(x=0.0, y=0.0, z=0.0),
-        #     Point32(x=5.0, y=0.0, z=0.0),
-        #     Point32(x=1.0, y=1.0, z=0.0),
-        #     Point32(x=0.0, y=1.0, z=0.0)
-        # ]
-        self.read_workspace_points()
+        
+        if(self.workspace_file_available):
+            self.read_workspace_points()
+        else:
+            self.WORKSPACE.polygon.points = [
+            Point32(x=0.0, y=0.0, z=0.0),
+            Point32(x=5.0, y=0.0, z=0.0),
+            Point32(x=1.0, y=1.0, z=0.0),
+            Point32(x=0.0, y=1.0, z=0.0)
+            ]
 
+        # Publisher for displaying workspace in RVIZ
         self.workspace_publisher_marker = self.create_publisher(Marker, 'workspace/boundary', 10)
         self.timer_workspace = self.create_timer(1, self.publish_workspace_boundary)
 
+        # Topic where points are published to check if within workspace
         self.listener = self.create_subscription(
             Point32,
             'workspace/boundary_check/request',
             self.handle_boundary_check,
             10)
+        # Publish if point is within workspace
         self.check_publisher = self.create_publisher(Bool, 'workspace/boundary_check/response', 10)
 
+        # Service where request of specific point is answered with True or False
+        # SERVICE IS THE WAY TO GO!!
         self.srv = self.create_service(IsInWorkspace, 'is_in_workspace', self.is_point_inside_workspace_service)
 
     def read_workspace_points(self):
         # Specify the file path
-        file_path = "workspace_points.tsv"
+        #file_path = "workspace_points.tsv"
+        file_path = "workspace_2_tsv.tsv"
 
         # Create variable to store points
         points_list = []
@@ -113,6 +125,10 @@ class Workspace(Node):
         r = Bool()
         r.data = inside
         return r
+    
+    def handle_boundary_check(self, msg):
+        inside = self.is_point_inside_workspace(msg)
+        self.check_publisher.publish(inside)
 
 
     def is_point_inside_workspace_service(self, point, response):
@@ -144,13 +160,8 @@ class Workspace(Node):
                     ray_start.x < (p2.x - p1.x) * (ray_start.y - p1.y) / (p2.y - p1.y) + p1.x):
                 inside = not inside
         response = inside
-        return 
+        return
     
-
-    def handle_boundary_check(self, msg):
-        inside = self.is_point_inside_workspace(msg)
-        self.check_publisher.publish(inside)
-
 
 def main():
     rclpy.init()

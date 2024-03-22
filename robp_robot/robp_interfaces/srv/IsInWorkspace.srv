@@ -1,4 +1,4 @@
 # IsInWorkspace.srv
 geometry_msgs/Point a
 ---
-Bool is_in_workspace
+std_msgs/Bool is_in_workspace
