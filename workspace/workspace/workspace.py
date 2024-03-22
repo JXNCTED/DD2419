@@ -176,15 +176,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-
-### Not used anymore:
-
-# self.workspace_publisher = self.create_publisher(PolygonStamped, 'polygon', 10)
-# self.timer_workspace = self.create_timer(1, self.publish_workspace)
-
-# def publish_workspace(self):
-#     polygon = PolygonStamped()
-#     #polygon.header.stamp = self.Time.now()
-#     polygon.header.frame_id = "map"
-#     polygon.polygon.points = self.WORKSPACE.polygon.points
-#     self.workspace_publisher.publish(polygon)
