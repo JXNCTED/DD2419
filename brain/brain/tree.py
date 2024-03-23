@@ -7,11 +7,14 @@ from .bahaviors import *
 
 
 class BehaviorTree(ptr.trees.BehaviourTree):
-    def __init__(self):
-        self.root = pt.composites.Sequence("sequence", memory=True)
-        self.root.add_children([SimpleBehavior(), SimpleBehavior2()])
+    def __init__(self, unicode_tree_debug=False):
+        self.root = pt.composites.Sequence("MainTree", memory=True)
+        self.root.add_children([
+            ExploreBehavior(),
+            PickAndPlaceSelector(),
+        ])
         super(BehaviorTree, self).__init__(
-            root=self.root, unicode_tree_debug=True)
+            root=self.root, unicode_tree_debug=unicode_tree_debug)
 
         self.setup(timeout=15.0)
 
@@ -19,7 +22,7 @@ class BehaviorTree(ptr.trees.BehaviourTree):
 def main(argv=None):
     rclpy.init(args=argv)
 
-    bt = BehaviorTree()
+    bt = BehaviorTree(unicode_tree_debug=True)
     bt.tick_tock(100)
 
     try:
