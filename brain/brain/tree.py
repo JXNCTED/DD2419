@@ -1,5 +1,9 @@
 #!/usr/bin/env python
+"""
+This is the main behavior tree for the robot. 
 
+For behaviors, see `behaviors.py`.
+"""
 import py_trees as pt
 import py_trees_ros as ptr
 import rclpy
@@ -21,8 +25,9 @@ class BehaviorTree(ptr.trees.BehaviourTree):
 
 def main(argv=None):
     rclpy.init(args=argv)
-
     bt = BehaviorTree(unicode_tree_debug=True)
+    pt.display.render_dot_tree(bt.root)
+
     bt.tick_tock(100)
 
     try:

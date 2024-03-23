@@ -1,3 +1,9 @@
+"""
+This file defines the behaviors for the robot.
+
+Used in `tree.py`.
+"""
+
 import py_trees as pt
 import py_trees_ros as ptr
 
