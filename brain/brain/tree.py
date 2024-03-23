@@ -3,24 +3,7 @@
 import py_trees as pt
 import py_trees_ros as ptr
 import rclpy
-
-
-class SimpleBehavior(pt.behaviour.Behaviour):
-    def __init__(self, name="SimpleBehavior"):
-        super(SimpleBehavior, self).__init__(name=name)
-
-    def update(self):
-        print("SimpleBehavior: Running")
-        return pt.common.Status.RUNNING
-
-
-class SimpleBehavior2(pt.behaviour.Behaviour):
-    def __init__(self, name="SimpleBehavior2"):
-        super(SimpleBehavior2, self).__init__(name=name)
-
-    def update(self):
-        print("SimpleBehavior2: Running")
-        return pt.common.Status.RUNNING
+from .bahaviors import *
 
 
 class BehaviorTree(ptr.trees.BehaviourTree):
@@ -37,10 +20,14 @@ def main(argv=None):
     rclpy.init(args=argv)
 
     bt = BehaviorTree()
-    bt.tick_tock(500)
+    bt.tick_tock(100)
 
-    rclpy.spin(bt.node)
+    try:
+        rclpy.spin(bt.node)
+    except KeyboardInterrupt:
+        pass
 
+    bt.shutdown()
     rclpy.shutdown()
 
 
