@@ -25,6 +25,7 @@ setup(
             'aruco_detect_move = chassis_controller.aruco_detect_move:main',
             'arm_detect_object_pick_up = chassis_controller.arm_detect_object_pick_up:main',
             'nav_goal_move = chassis_controller.nav_goal_move:main',
+            'I_want_to_test_the_deep_learning_object_detection_and_the_workspace = chassis_controller.I_want_to_test_the_deep_learning_object_detection_and_the_workspace:main',
         ],
     },
 )

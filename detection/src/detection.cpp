@@ -4,131 +4,104 @@
 #include "pcl/filters/statistical_outlier_removal.h"
 #include "pcl/filters/voxel_grid.h"
 // #include "pcl/common/io.h"
-#include "std_msgs/msg/float32.hpp"
 #include "cmath"
+#include "std_msgs/msg/float32_multi_array.hpp"
 
 class Dectection : public rclcpp::Node
 {
+  struct BoundingBox
+  {
+    int x, y, w, h;
+    float score;
+    int class_id;
+  };
+
 public:
   Dectection() : Node("detection")
   {
-    sub_ = this->create_subscription<sensor_msgs::msg::PointCloud2>(
+    pc_sub_ = this->create_subscription<sensor_msgs::msg::PointCloud2>(
         "/camera/depth/color/points", 10, std::bind(&Dectection::cloud_callback, this, std::placeholders::_1));
-    pub_ = this->create_publisher<sensor_msgs::msg::PointCloud2>("/camera/depth/color/ds_points", 10);
-    theta_pub_ = this->create_publisher<std_msgs::msg::Float32>("/camera/depth/color/target_theta", 10);
+    bbs_sub_ = this->create_subscription<std_msgs::msg::Float32MultiArray>(
+        "/detection_ml/bounding_box", 10, std::bind(&Dectection::bbs_callback, this, std::placeholders::_1));
+
+    downsampled_pub_ = this->create_publisher<sensor_msgs::msg::PointCloud2>("/camera/depth/color/ds_points", 10);
     detected_pub_ = this->create_publisher<sensor_msgs::msg::PointCloud2>("/camera/depth/color/detected_points", 10);
   }
 
 private:
+  void bbs_callback(const std_msgs::msg::Float32MultiArray::SharedPtr msg)
+  {
+    bbs.clear();
+    for (size_t i = 0; i < msg->data.size(); i += 6)
+    {
+      BoundingBox bb;
+      bb.x = msg->data[i];
+      bb.y = msg->data[i + 1];
+      bb.w = msg->data[i + 2];
+      bb.h = msg->data[i + 3];
+      bb.score = msg->data[i + 4];
+      bb.class_id = msg->data[i + 5];
+      bbs.push_back(bb);
+    }
+  }
   void cloud_callback(const sensor_msgs::msg::PointCloud2::SharedPtr msg)
   {
+
+    // convert to pcl point cloud
     pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud(new pcl::PointCloud<pcl::PointXYZRGB>);
     pcl::fromROSMsg(*msg, *cloud);
 
+    cloud->width = msg->width;
+    cloud->height = msg->height;
+    cloud->is_dense = false;
+    cloud->points.resize(cloud->width * cloud->height);
+
+    // downsampling filter and publish
     pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud_filtered(new pcl::PointCloud<pcl::PointXYZRGB>);
     pcl::VoxelGrid<pcl::PointXYZRGB> sor;
     sor.setInputCloud(cloud);
-    sor.setLeafSize(0.01f, 0.01f, 0.01f);
-
+    sor.setLeafSize(0.05f, 0.05f, 0.05f);
     sor.filter(*cloud_filtered);
-
     sensor_msgs::msg::PointCloud2 output;
     pcl::toROSMsg(*cloud_filtered, output);
     output.header.frame_id = "camera_depth_optical_frame";
-    pub_->publish(output);
+    downsampled_pub_->publish(output);
 
-    const float DIST_THRES = 1.5f;
-    // filter  points
-    const float R_CENTER[] = {150, 40, 20};
-    const float R_THRES = 45.0f;
-    pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud_filtered_red(new pcl::PointCloud<pcl::PointXYZRGB>);
-
-    const float G_CENTER[] = {0, 70, 60};
-    const float G_THRES = 40.0f;
-    pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud_filtered_green(new pcl::PointCloud<pcl::PointXYZRGB>);
-
-    for (size_t i = 0; i < cloud_filtered->points.size(); i++)
+    // if no bounding boxes, return
+    if (bbs.size() == 0)
     {
-      pcl::PointXYZRGB point = cloud_filtered->points[i];
-      float dist = sqrt(point.x * point.x + point.y * point.y + point.z * point.z);
-      if ((pow(point.r - R_CENTER[0], 2) + pow(point.g - R_CENTER[1], 2) + pow(point.b - R_CENTER[2], 2)) < pow(R_THRES, 2) && dist < DIST_THRES)
-      {
-        cloud_filtered_red->points.push_back(point);
-        // cloud_detected->points.push_back(point);
-      }
-
-      if ((pow(point.r - G_CENTER[0], 2) + pow(point.g - G_CENTER[1], 2) + pow(point.b - G_CENTER[2], 2)) < pow(G_THRES, 2) && dist < DIST_THRES)
-      {
-        cloud_filtered_green->points.push_back(point);
-        // cloud_detected->points.push_back(point);
-      }
+      return;
     }
 
-    pcl::PointCloud<pcl::PointXYZRGB>::Ptr sor_filtered_red(new pcl::PointCloud<pcl::PointXYZRGB>);
-    pcl::StatisticalOutlierRemoval<pcl::PointXYZRGB> sor_red;
-    sor_red.setInputCloud(cloud_filtered_red);
-    sor_red.setMeanK(5);
-    sor_red.setStddevMulThresh(0.5);
-    sor_red.filter(*sor_filtered_red);
-
-    pcl::PointCloud<pcl::PointXYZRGB>::Ptr sor_filtered_green(new pcl::PointCloud<pcl::PointXYZRGB>);
-    pcl::StatisticalOutlierRemoval<pcl::PointXYZRGB> sor_green;
-    sor_red.setInputCloud(cloud_filtered_green);
-    sor_red.setMeanK(5);
-    sor_red.setStddevMulThresh(1.0);
-    sor_red.filter(*sor_filtered_green);
-
-    if (sor_filtered_red->points.size() > 0)
-    {
-      float avgCoord[3] = {0};
-      for (size_t i = 0; i < sor_filtered_red->points.size(); i++)
-      {
-        pcl::PointXYZRGB point = sor_filtered_red->points[i];
-        avgCoord[0] += point.x;
-        avgCoord[1] += point.y;
-        avgCoord[2] += point.z;
-      }
-      avgCoord[0] /= sor_filtered_red->points.size();
-      avgCoord[1] /= sor_filtered_red->points.size();
-      avgCoord[2] /= sor_filtered_red->points.size();
-
-      float theta = std::atan(avgCoord[0] / avgCoord[2]);
-
-      std_msgs::msg::Float32 thetaMsg;
-      thetaMsg.data = theta;
-
-      theta_pub_->publish(thetaMsg);
-    }
-
-    if (sor_filtered_green->points.size() > 0)
-    {
-      float avgCoord[3] = {0};
-      for (size_t i = 0; i < sor_filtered_green->points.size(); i++)
-      {
-        pcl::PointXYZRGB point = sor_filtered_green->points[i];
-        avgCoord[0] += point.x;
-        avgCoord[1] += point.y;
-        avgCoord[2] += point.z;
-      }
-      avgCoord[0] /= sor_filtered_green->points.size();
-      avgCoord[1] /= sor_filtered_green->points.size();
-      avgCoord[2] /= sor_filtered_green->points.size();
-    }
-
-    sensor_msgs::msg::PointCloud2 detected_output;
+    // filter the points inside the bounding boxes
     pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud_detected(new pcl::PointCloud<pcl::PointXYZRGB>);
-    *cloud_detected = *sor_filtered_red + *sor_filtered_green;
-
-    pcl::toROSMsg(*cloud_detected, detected_output);
-    detected_output.header.frame_id = "camera_depth_optical_frame";
-    detected_pub_->publish(detected_output);
+    for (const auto &bb : bbs)
+    {
+      for (int i = bb.x; i < bb.x + bb.w; i++)
+      {
+        for (int j = bb.y; j < bb.y + bb.h; j++)
+        {
+          if (i < 0 || i >= (int)cloud->width || j < 0 || j >= (int)cloud->height)
+          {
+            continue;
+          }
+          cloud_detected->push_back(cloud->at(i, j));
+        }
+      }
+    }
+    sensor_msgs::msg::PointCloud2 detected_msg;
+    pcl::toROSMsg(*cloud_detected, detected_msg);
+    detected_msg.header.frame_id = "camera_depth_optical_frame";
+    detected_pub_->publish(detected_msg);
   }
 
-  rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr sub_;
-  rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pub_;
-  rclcpp::Publisher<std_msgs::msg::Float32>::SharedPtr theta_pub_;
+  rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr pc_sub_;
+  rclcpp::Subscription<std_msgs::msg::Float32MultiArray>::SharedPtr bbs_sub_;
 
+  rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr downsampled_pub_;
   rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr detected_pub_;
+
+  std::vector<BoundingBox> bbs;
 };
 
 int main(int argc, char **argv)
