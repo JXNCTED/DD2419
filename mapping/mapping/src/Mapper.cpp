@@ -1,5 +1,6 @@
 #include "mapping/Mapper.hpp"
 
+#include "pcl/filters/voxel_grid.h"
 #include "pcl_conversions/pcl_conversions.h"
 #include "rcpputils/asserts.hpp"
 
@@ -83,24 +84,65 @@ void Mapper::updateMapLiDAR(
             // get laser inverse model probability
             const double occuProb = laserInvModel(r, R, gridSize);
             // update with the inverse model
-            updateGridLiDAR(pW, occuProb);
+            updateGrid(pW, occuProb, GridMap::GridType::LiDAR);
             lastPw = pW;
         }
     }
 }
 
-void Mapper::updateMapRGBD(
+sensor_msgs::msg::PointCloud2 Mapper::updateMapRGBD(
     const sensor_msgs::msg::PointCloud2::SharedPtr rgbdPtr, const Pose &pose)
 {
-    ;
-    ;
+    // convert the point cloud to pcl point cloud
+    pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud(
+        new pcl::PointCloud<pcl::PointXYZRGB>);
+    pcl::fromROSMsg(*rgbdPtr, *cloud);
+
+    // downsample the point cloud
+    pcl::VoxelGrid<pcl::PointXYZRGB> sor;
+    sor.setInputCloud(cloud);
+    sor.setLeafSize(0.01f, 0.01f, 0.01f);
+    sor.filter(*cloud);
+
+    // filter the point only at height -3.5 cm
+    const double HEIGHT = 0.035;
+    const double THRESH = 0.001;
+    pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloudFiltered(
+        new pcl::PointCloud<pcl::PointXYZRGB>);
+    for (size_t i = 0; i < cloud->points.size(); i++)
+    {
+        const double R = sqrt(cloud->points[i].x * cloud->points[i].x +
+                              cloud->points[i].z * cloud->points[i].z);
+        if (cloud->points[i].y > HEIGHT - THRESH and
+            cloud->points[i].y < HEIGHT + THRESH and R > 0.15 and R < 1.0)
+        {
+            cloudFiltered->points.push_back(cloud->points[i]);
+            const double x = cloud->points[i].z;
+            const double y = -cloud->points[i].x;
+            Eigen::Vector2d pW(x, y);
+            Eigen::Matrix2d rot;
+            rot << cos(pose.theta), -sin(pose.theta), sin(pose.theta),
+                cos(pose.theta);
+            Eigen::Vector2d t(pose.x, pose.y);
+            pW = rot * pW + t;
+            updateGrid(pW, P_OCC, GridMap::GridType::RGBD);
+        }
+    }
+
+    // return the filtered point cloud
+    sensor_msgs::msg::PointCloud2 cloudMsg;
+    pcl::toROSMsg(*cloudFiltered, cloudMsg);
+    cloudMsg.header = rgbdPtr->header;
+
+    return cloudMsg;
 }
 
-void Mapper::updateGridLiDAR(const Eigen::Vector2d coor, const double &pOcc)
+void Mapper::updateGrid(const Eigen::Vector2d coor,
+                        const double &pOcc,
+                        const GridMap::GridType &type)
 {
     // get the log belief of the grid
-    double logBelief =
-        map->getGridLogBelief(coor(0), coor(1), GridMap::GridType::LiDAR);
+    double logBelief = map->getGridLogBelief(coor(0), coor(1), type);
     if (logBelief < 0)
     {
         return;  // error
@@ -108,6 +150,5 @@ void Mapper::updateGridLiDAR(const Eigen::Vector2d coor, const double &pOcc)
     // update the log belief
     logBelief += log(pOcc / (1 - pOcc));
     // set belief back
-    map->setGridLogBelief(
-        coor(0), coor(1), logBelief, GridMap::GridType::LiDAR);
+    map->setGridLogBelief(coor(0), coor(1), logBelief, type);
 }

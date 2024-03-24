@@ -38,6 +38,10 @@ ament_target_dependencies(
   "pcl_conversions"
   "PCL"
 )
+target_link_libraries(
+  Mapper
+  ${PCL_LIBRARIES}
+)
 
   
 add_library(GridMap src/GridMap.cpp)
