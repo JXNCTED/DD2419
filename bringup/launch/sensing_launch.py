@@ -11,7 +11,8 @@ def generate_launch_description():
         Node(
             package='odometry', executable='filter_odom', name='filter_odom'),
         Node(
-            package='detection', executable='detection', name='detection'),
+            package='mapping', executable='mapping', name='mapping',
+        ),
         Node(
             package='display_markers', executable='display_markers', name='display_markers'),
         Node(executable='static_transform_publisher', package='tf2_ros', arguments=[

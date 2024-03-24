@@ -37,9 +37,6 @@ class Mapper
      * @param laserPtr Ptr to the laser scan message
      * @param pose current pose of the robot in map frame
      */
-    // void updateMapLaser(const sensor_msgs::msg::LaserScan::SharedPtr
-    // laserPtr,
-    //                     const Pose &pose);
     void updateMapLidar(const sensor_msgs::msg::PointCloud2::SharedPtr laserPtr,
                         const Pose &pose);
 
