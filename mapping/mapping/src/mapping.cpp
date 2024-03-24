@@ -37,10 +37,6 @@ class MappingNode : public rclcpp::Node
 
         occu_pub_ = this->create_publisher<nav_msgs::msg::OccupancyGrid>(
             "/occupancy", 10);
-        // save the map per 10s, not used now
-        timer_ = this->create_wall_timer(
-            std::chrono::milliseconds(10000),
-            std::bind(&MappingNode::timerCallback, this));
 
         // read from /home/group7/workspace_2_tsv.tsv
         std::ifstream file("/home/group7/workspace_2_tsv.tsv", std::ios::in);
@@ -59,23 +55,6 @@ class MappingNode : public rclcpp::Node
         }
         map.setLineSegmentOccupied(lineSegments);
         file.close();
-        // workspace shit, hard coded for now
-        // std::vector<std::pair<double, double>> lineSegments;
-        // lineSegments.push_back(std::make_pair(0.0, 0.0));
-        // lineSegments.push_back(std::make_pair(5.0, 0.0));
-        // lineSegments.push_back(std::make_pair(1.0, 1.0));
-        // lineSegments.push_back(std::make_pair(0.0, 1.0));
-
-        // map.setLineSegmentOccupied(lineSegments);
-    }
-
-    // timer call back to save the map, not used for now
-    void timerCallback()
-    {
-        assert(false);  // not used
-        static int count = 0;
-        map.saveMap("/home/group7/maps/" + std::to_string(count) + "_map.txt");
-        count++;
     }
 
     void odomCallback(const nav_msgs::msg::Odometry::SharedPtr msg)
@@ -95,7 +74,7 @@ class MappingNode : public rclcpp::Node
     // get LIDAR measurement and call the updateMapLaser function
     void lidarCallback(const sensor_msgs::msg::PointCloud2::SharedPtr msg)
     {
-        mapper.updateMapLidar(msg, pose);
+        mapper.updateMapLiDAR(msg, pose);
         nav_msgs::msg::OccupancyGrid occu;
         occu = map.toRosOccGrid();
         occu_pub_->publish(occu);

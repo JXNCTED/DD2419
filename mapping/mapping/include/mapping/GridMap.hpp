@@ -23,6 +23,11 @@
 class GridMap
 {
    public:
+    enum class GridType
+    {
+        LiDAR,
+        RGBD
+    };
     // constructors
     GridMap() = delete;
     /**
@@ -39,13 +44,6 @@ class GridMap
             const int &sizeY,
             const int &startX,
             const int &startY);
-    // constructor from file
-    /**
-     * @brief Construct a new Grid Map object based on the given file
-     *
-     * @param dir directory of the file
-     */
-    GridMap(const std::string &dir);
 
     // getter and setter
     /**
@@ -54,18 +52,24 @@ class GridMap
      * @param x x coordinate
      * @param y y coordinate
      * @param belief probability of occupancy
+     * @param type type of the grid, LiDAR or RGBD
      */
-    void setGridBelief(const double &x, const double &y, const double &belief);
+    void setGridBelief(const double &x,
+                       const double &y,
+                       const double &belief,
+                       const GridType &type);
     /**
      * @brief Set log belief in the grid
      *
      * @param x x coordinate
      * @param y y coordinate
      * @param logBelief log probability of occupancy
+     * @param type type of the grid, LiDAR or RGBD
      */
     void setGridLogBelief(const double &x,
                           const double &y,
-                          const double &logBelief);
+                          const double &logBelief,
+                          const GridType &type);
 
     /**
      * @brief Get the Grid Size object
@@ -78,9 +82,12 @@ class GridMap
      *
      * @param x x coordinate
      * @param y y coordinate
+     * @param type type of the grid, LiDAR or RGBD
      * @return double log probability of occupancy
      */
-    double getGridLogBelief(const double &x, const double &y);
+    double getGridLogBelief(const double &x,
+                            const double &y,
+                            const GridType &type);
     // APIs
     /**
      * @brief get the ros message of the occupancy grid
@@ -88,12 +95,7 @@ class GridMap
      * @return nav_msgs::msg::OccupancyGrid ros message of the occupancy grid
      */
     nav_msgs::msg::OccupancyGrid toRosOccGrid();
-    /**
-     * @brief save the map to the given directory
-     *
-     * @param dir directory to save the map
-     */
-    void saveMap(const std::string &dir);
+
 
     // plan path in map coordinate
     /**
@@ -155,14 +157,14 @@ class GridMap
     int sizeX = 0, sizeY = 0;
     int startX = 0, startY = 0;
     // belief of the grid, occupancy grid, lidar only for now
-    Eigen::MatrixXd gridBelief;
+    // Eigen::MatrixXd gridBelief;
     // expanded grid
     Eigen::MatrixXi expandedGrid;
     // known obstacles
     Eigen::MatrixXi knownGrid;
     // not implemented yet, for RGBD and expanded grid
     //     cv::Mat expandedGridCV;
-    //     Eigen::MatrixXd gridBeliefLiDAR;
-    //     Eigen::MatrixXd gridBeliefRGBD;
+    Eigen::MatrixXd gridBeliefLiDAR;
+    Eigen::MatrixXd gridBeliefRGBD;
     rclcpp::Time lastUpdated;
 };

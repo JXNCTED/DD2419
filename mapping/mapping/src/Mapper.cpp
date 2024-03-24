@@ -40,10 +40,7 @@ static double laserInvModel(const double &r,
     return P_OCC;
 }
 
-// void Mapper::updateMapLaser(
-//     const sensor_msgs::msg::LaserScan::SharedPtr laserPtr,
-//     const Pose &robotPose)
-void Mapper::updateMapLidar(
+void Mapper::updateMapLiDAR(
     const sensor_msgs::msg::PointCloud2::SharedPtr laserPtr,
     const Pose &robotPose)
 {
@@ -86,16 +83,24 @@ void Mapper::updateMapLidar(
             // get laser inverse model probability
             const double occuProb = laserInvModel(r, R, gridSize);
             // update with the inverse model
-            updateGrid(pW, occuProb);
+            updateGridLiDAR(pW, occuProb);
             lastPw = pW;
         }
     }
 }
 
-void Mapper::updateGrid(const Eigen::Vector2d coor, const double &pOcc)
+void Mapper::updateMapRGBD(
+    const sensor_msgs::msg::PointCloud2::SharedPtr rgbdPtr, const Pose &pose)
+{
+    ;
+    ;
+}
+
+void Mapper::updateGridLiDAR(const Eigen::Vector2d coor, const double &pOcc)
 {
     // get the log belief of the grid
-    double logBelief = map->getGridLogBelief(coor(0), coor(1));
+    double logBelief =
+        map->getGridLogBelief(coor(0), coor(1), GridMap::GridType::LiDAR);
     if (logBelief < 0)
     {
         return;  // error
@@ -103,5 +108,6 @@ void Mapper::updateGrid(const Eigen::Vector2d coor, const double &pOcc)
     // update the log belief
     logBelief += log(pOcc / (1 - pOcc));
     // set belief back
-    map->setGridLogBelief(coor(0), coor(1), logBelief);
+    map->setGridLogBelief(
+        coor(0), coor(1), logBelief, GridMap::GridType::LiDAR);
 }

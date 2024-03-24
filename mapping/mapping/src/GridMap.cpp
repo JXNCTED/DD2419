@@ -1,8 +1,9 @@
 #include "mapping/GridMap.hpp"
 
+#include <assert.h>
+
 #include <fstream>
 #include <vector>
-#include <assert.h>
 
 GridMap::GridMap(const double &gridSize,
                  const int &sizeX,
@@ -15,14 +16,12 @@ GridMap::GridMap(const double &gridSize,
       startX(startX),
       startY(startY)
 {
-    gridBelief.resize(sizeX, sizeY);
-    gridBelief.setOnes() *= 0.5;
     knownGrid.resize(sizeX, sizeY);
     knownGrid.setZero();
-    // gridBeliefLiDAR.resize(sizeX, sizeY);
-    // gridBeliefLiDAR.setOnes() *= 0.5;
-    // gridBeliefRGBD.resize(sizeX, sizeY);
-    // gridBeliefRGBD.setOnes() *= 0.5;
+    gridBeliefLiDAR.resize(sizeX, sizeY);
+    gridBeliefLiDAR.setOnes() *= 0.5;
+    gridBeliefRGBD.resize(sizeX, sizeY);
+    gridBeliefRGBD.setOnes() *= 0.5;
 
     rosOccGrid.header.frame_id        = "map";
     rosOccGrid.info.width             = sizeX;
@@ -35,38 +34,31 @@ GridMap::GridMap(const double &gridSize,
     expandedGrid.resize(sizeX, sizeY);
 }
 
-GridMap::GridMap(const std::string &dir)
-{
-    assert(false);  // not tested
-    std::ifstream ifs(dir, std::ifstream::in);
-    if (!ifs)
-    {
-        std::cerr << "Failed to open file: " << dir << std::endl;
-        return;
-    }
-    ifs >> sizeX >> sizeY >> startX >> startY >> gridSize;
-    gridBelief.resize(sizeX, sizeY);
-    for (int i = 0; i < sizeX; i++)
-    {
-        for (int j = 0; j < sizeY; j++)
-        {
-            ifs >> gridBelief(i, j);
-        }
-    }
-    ifs.close();
-}
 nav_msgs::msg::OccupancyGrid GridMap::toRosOccGrid()
 {
+    const double OCC_THRESHOLD = 0.7;
     for (int i = 0; i < sizeX; i++)
     {
         for (int j = 0; j < sizeY; j++)
         {
-            // bad practice, the lidar occ grid is set in the callback already
+            // set known grid, i.e. workspace
             if (knownGrid(i, j) == 1)
             {
-                // ros message is 0-100 for occupancy probability, and -1 for
-                // unknown
                 rosOccGrid.data[i + j * sizeX] = 100;
+            }
+            if (gridBeliefLiDAR(i, j) >= OCC_THRESHOLD or
+                gridBeliefRGBD(i, j) >= OCC_THRESHOLD)
+            {
+                rosOccGrid.data[i + j * sizeX] = 100;
+            }
+            else if (gridBeliefLiDAR(i, j) == 0.5 and
+                     gridBeliefRGBD(i, j) == 0.5)
+            {
+                rosOccGrid.data[i + j * sizeX] = -1;
+            }
+            else
+            {
+                rosOccGrid.data[i + j * sizeX] = 0;
             }
         }
     }
@@ -75,7 +67,8 @@ nav_msgs::msg::OccupancyGrid GridMap::toRosOccGrid()
 
 void GridMap::setGridBelief(const double &x,
                             const double &y,
-                            const double &belief)
+                            const double &belief,
+                            const GridType &type)
 {
     // convert from coordinate to grid index
     int xOnGrid = cvFloor(x / gridSize) + startX;
@@ -86,30 +79,43 @@ void GridMap::setGridBelief(const double &x,
     }
 
     // set the belief
-    gridBelief(xOnGrid, yOnGrid) = belief;
+    switch (type)
+    {
+    case GridType::LiDAR:
+        gridBeliefLiDAR(xOnGrid, yOnGrid) = belief;
+        break;
+    case GridType::RGBD:
+        gridBeliefRGBD(xOnGrid, yOnGrid) = belief;
+        break;
+    default:
+        assert(false);
+    }
     // update the ros message also
     rosOccGrid.header.stamp = rclcpp::Clock().now();
     // belief = 0.5 means not updated yet, set ros message to -1 to indicate
     // unknown
-    if (belief == 0.5f)
-    {
-        rosOccGrid.data[xOnGrid + yOnGrid * sizeX] = -1;
-    }
-    else
-    {
-        rosOccGrid.data[xOnGrid + yOnGrid * sizeX] = belief * 100;
-    }
+    // if (belief == 0.5f)
+    // {
+    //     rosOccGrid.data[xOnGrid + yOnGrid * sizeX] = -1;
+    // }
+    // else
+    // {
+    //     rosOccGrid.data[xOnGrid + yOnGrid * sizeX] = belief * 100;
+    // }
 }
 
 void GridMap::setGridLogBelief(const double &x,
                                const double &y,
-                               const double &logBelief)
+                               const double &logBelief,
+                               const GridType &type)
 {
     const double belief = 1.0f - 1.0f / (1 + exp(logBelief));
-    setGridBelief(x, y, belief);
+    setGridBelief(x, y, belief, type);
 }
 
-double GridMap::getGridLogBelief(const double &x, const double &y)
+double GridMap::getGridLogBelief(const double &x,
+                                 const double &y,
+                                 const GridType &type)
 {
     int xOnGrid = cvFloor(x / gridSize) + startX;
     int yOnGrid = cvFloor(y / gridSize) + startY;
@@ -117,26 +123,20 @@ double GridMap::getGridLogBelief(const double &x, const double &y)
     {
         return -1.0;
     }
-    double belief = gridBelief(xOnGrid, yOnGrid);
-    return log(belief / (1.0 - belief));
-}
-
-void GridMap::saveMap(const std::string &dir)
-{
-    std::ofstream ofs;
-    ofs.open(dir);
-
-    ofs << sizeX << " " << sizeY << " " << startX << " " << startY << " "
-        << gridSize << std::endl;
-    for (int i = 0; i < sizeX; i++)
+    // double belief = gridBelief(xOnGrid, yOnGrid);
+    double belief = 0.0;
+    switch (type)
     {
-        for (int j = 0; j < sizeY; j++)
-        {
-            ofs << gridBelief(i, j) << " ";
-        }
-        ofs << std::endl;
+    case GridType::LiDAR:
+        belief = gridBeliefLiDAR(xOnGrid, yOnGrid);
+        break;
+    case GridType::RGBD:
+        belief = gridBeliefRGBD(xOnGrid, yOnGrid);
+        break;
+    default:
+        assert(false);
     }
-    ofs.close();
+    return log(belief / (1.0 - belief));
 }
 
 /**
@@ -350,7 +350,8 @@ void GridMap::expandGrid(const float &radius)
 
 void GridMap::setOnesAroundPoint(const int &x, const int &y, const int &radius)
 {
-    if (gridBelief(x, y) == 0.5)
+    const double EXPAND_THRESHOLD = 0.7;
+    if (gridBeliefLiDAR(x, y) == 0.5 or gridBeliefRGBD(x, y) == 0.5)
     {
         expandedGrid(x, y) = 1;
         return;
@@ -368,7 +369,9 @@ void GridMap::setOnesAroundPoint(const int &x, const int &y, const int &radius)
                 continue;
             }
             if (pow(i, 2) + pow(j, 2) <= pow(radius, 2) and
-                (gridBelief(x, y) >= 0.7 or knownGrid(x, y) == 1))
+                (gridBeliefLiDAR(x, y) >= EXPAND_THRESHOLD or
+                 gridBeliefRGBD(x, y) >= EXPAND_THRESHOLD or
+                 knownGrid(x, y) == 1))
             {
                 expandedGrid(xOnGrid, yOnGrid) = 1;
                 // expandedGridCV.at<uchar>(xOnGrid, yOnGrid) = 255;

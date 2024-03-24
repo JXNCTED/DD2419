@@ -37,8 +37,17 @@ class Mapper
      * @param laserPtr Ptr to the laser scan message
      * @param pose current pose of the robot in map frame
      */
-    void updateMapLidar(const sensor_msgs::msg::PointCloud2::SharedPtr laserPtr,
+    void updateMapLiDAR(const sensor_msgs::msg::PointCloud2::SharedPtr laserPtr,
                         const Pose &pose);
+
+    /**
+     * @brief Update the map with the RGBD data
+     *
+     * @param rgbdPtr Ptr to the RGBD message
+     * @param pose current pose of the robot in map frame
+     */
+    void updateMapRGBD(const sensor_msgs::msg::PointCloud2::SharedPtr rgbdPtr,
+                       const Pose &pose);
 
    private:
     /**
@@ -47,7 +56,7 @@ class Mapper
      * @param coor coordinate to be updated
      * @param pOcc occupancy probability
      */
-    void updateGrid(const Eigen::Vector2d coor, const double &pOcc);
+    void updateGridLiDAR(const Eigen::Vector2d coor, const double &pOcc);
 
     // pointer to the grid map, initialized in the constructor
     GridMap *map;
