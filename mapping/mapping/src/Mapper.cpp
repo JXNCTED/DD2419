@@ -1,5 +1,6 @@
 #include "mapping/Mapper.hpp"
 
+#include "pcl_conversions/pcl_conversions.h"
 #include "rcpputils/asserts.hpp"
 
 Mapper::Mapper(GridMap *map) : map(map) {}
@@ -39,25 +40,29 @@ static double laserInvModel(const double &r,
     return P_OCC;
 }
 
-void Mapper::updateMapLaser(
-    const sensor_msgs::msg::LaserScan::SharedPtr laserPtr,
+// void Mapper::updateMapLaser(
+//     const sensor_msgs::msg::LaserScan::SharedPtr laserPtr,
+//     const Pose &robotPose)
+void Mapper::updateMapLidar(
+    const sensor_msgs::msg::PointCloud2::SharedPtr laserPtr,
     const Pose &robotPose)
 {
     const double &gridSize = map->getGridSize();
 
-    // for all LiDAR measurements
-    for (size_t i = 0; i < laserPtr->ranges.size(); i++)
-    {
-        const double R = laserPtr->ranges.at(i);
-        // remove invalid measurement of INF
-        if (R > laserPtr->range_max or R < laserPtr->range_min)
-        {
-            continue;
-        }
+    // convert the point cloud to pcl point cloud
+    pcl::PointCloud<pcl::PointXYZ>::Ptr cloud(
+        new pcl::PointCloud<pcl::PointXYZ>);
+    pcl::fromROSMsg(*laserPtr, *cloud);
 
-        // calculate the angle of the laser
-        const double angle =
-            laserPtr->angle_increment * i + laserPtr->angle_min;
+    // for all points in the point cloud
+    for (size_t i = 0; i < cloud->points.size(); i++)
+    {
+        const double x = cloud->points[i].x;
+        const double y = cloud->points[i].y;
+
+        // get the distance of the point
+        const double R      = sqrt(x * x + y * y);
+        const double angle  = atan2(y, x);
         const double cosAng = cos(angle);
         const double sinAng = sin(angle);
 
@@ -85,6 +90,47 @@ void Mapper::updateMapLaser(
             lastPw = pW;
         }
     }
+
+    // // for all LiDAR measurements
+    // for (size_t i = 0; i < laserPtr->ranges.size(); i++)
+    // {
+    //     const double R = laserPtr->ranges.at(i);
+    //     // remove invalid measurement of INF
+    //     if (R > laserPtr->range_max or R < laserPtr->range_min)
+    //     {
+    //         continue;
+    //     }
+
+    //     // calculate the angle of the laser
+    //     const double angle =
+    //         laserPtr->angle_increment * i + laserPtr->angle_min;
+    //     const double cosAng = cos(angle);
+    //     const double sinAng = sin(angle);
+
+    //     // store the point last updated
+    //     Eigen::Vector2d lastPw(Eigen::Infinity, Eigen::Infinity);
+    //     for (double r = 0; r < R + gridSize; r += gridSize)
+    //     {
+    //         // calculate the point in the LiDAR frame
+    //         Eigen::Vector2d pL(r * cosAng, r * sinAng);
+    //         Eigen::Matrix2d rot;
+    //         rot << cos(robotPose.theta), -sin(robotPose.theta),
+    //             sin(robotPose.theta), cos(robotPose.theta);
+    //         Eigen::Vector2d t(robotPose.x, robotPose.y);
+
+    //         Eigen::Vector2d pW = rot * pL + t;
+
+    //         if (pW == lastPw)
+    //         {
+    //             continue;
+    //         }
+    //         // get laser inverse model probability
+    //         const double occuProb = laserInvModel(r, R, gridSize);
+    //         // update with the inverse model
+    //         updateGrid(pW, occuProb);
+    //         lastPw = pW;
+    //     }
+    // }
 }
 
 void Mapper::updateGrid(const Eigen::Vector2d coor, const double &pOcc)

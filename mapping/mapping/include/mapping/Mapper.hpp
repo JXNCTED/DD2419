@@ -10,7 +10,7 @@
  */
 #pragma once
 #include "mapping/GridMap.hpp"
-#include "sensor_msgs/msg/laser_scan.hpp"
+#include "sensor_msgs/msg/point_cloud2.hpp"
 
 // pose struct
 struct Pose
@@ -37,7 +37,10 @@ class Mapper
      * @param laserPtr Ptr to the laser scan message
      * @param pose current pose of the robot in map frame
      */
-    void updateMapLaser(const sensor_msgs::msg::LaserScan::SharedPtr laserPtr,
+    // void updateMapLaser(const sensor_msgs::msg::LaserScan::SharedPtr
+    // laserPtr,
+    //                     const Pose &pose);
+    void updateMapLidar(const sensor_msgs::msg::PointCloud2::SharedPtr laserPtr,
                         const Pose &pose);
 
    private:

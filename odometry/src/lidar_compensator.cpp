@@ -180,6 +180,13 @@ class LidarCompensator : public rclcpp::Node
                                rotZ.back());
             }
         }
+
+        // rotZ = rotZ * 2;
+        std::transform(
+            rotZ.begin(),
+            rotZ.end(),
+            rotZ.begin(),
+            std::bind(std::multiplies<double>(), std::placeholders::_1, 2));
         return true;
     }
     rclcpp::CallbackGroup::SharedPtr callback_group;

@@ -27,11 +27,16 @@ class MappingNode : public rclcpp::Node
             10,
             std::bind(&MappingNode::odomCallback, this, std::placeholders::_1));
 
-        laser_sub_ = this->create_subscription<sensor_msgs::msg::LaserScan>(
-            "/scan",
+        // laser_sub_ = this->create_subscription<sensor_msgs::msg::LaserScan>(
+        //     "/scan",
+        //     10,
+        //     std::bind(
+        //         &MappingNode::laserCallback, this, std::placeholders::_1));
+        lidar_sub_ = this->create_subscription<sensor_msgs::msg::PointCloud2>(
+            "/compensated_scan_pc",
             10,
             std::bind(
-                &MappingNode::laserCallback, this, std::placeholders::_1));
+                &MappingNode::lidarCallback, this, std::placeholders::_1));
 
         occu_pub_ = this->create_publisher<nav_msgs::msg::OccupancyGrid>(
             "/occupancy", 10);
@@ -74,9 +79,9 @@ class MappingNode : public rclcpp::Node
     }
 
     // get LIDAR measurement and call the updateMapLaser function
-    void laserCallback(const sensor_msgs::msg::LaserScan::SharedPtr msg)
+    void lidarCallback(const sensor_msgs::msg::PointCloud2::SharedPtr msg)
     {
-        mapper.updateMapLaser(msg, pose);
+        mapper.updateMapLidar(msg, pose);
         nav_msgs::msg::OccupancyGrid occu;
         occu = map.toRosOccGrid();
         occu_pub_->publish(occu);
@@ -89,7 +94,8 @@ class MappingNode : public rclcpp::Node
     Mapper mapper;
     Pose pose;
     rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr odom_sub_;
-    rclcpp::Subscription<sensor_msgs::msg::LaserScan>::SharedPtr laser_sub_;
+    // rclcpp::Subscription<sensor_msgs::msg::LaserScan>::SharedPtr laser_sub_;
+    rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr lidar_sub_;
     rclcpp::Publisher<nav_msgs::msg::OccupancyGrid>::SharedPtr occu_pub_;
     rclcpp::TimerBase::SharedPtr timer_;
 };
