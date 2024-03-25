@@ -7,13 +7,25 @@ For behaviors, see `behaviors.py`.
 import py_trees as pt
 import py_trees_ros as ptr
 import rclpy
-from .bahaviors import *
+from std_msgs.msg import Bool, String
+from .behaviors import *
 
 
 class BehaviorTree(ptr.trees.BehaviourTree):
     def __init__(self, unicode_tree_debug=False):
         self.root = pt.composites.Sequence("MainTree", memory=True)
+
+        getDist = ptr.subscribers.CheckData(
+            name="getDist?",
+            topic_name="/dist_bool",
+            topic_type=Bool,
+            variable_name="data",
+            qos_profile=ptr.utilities.qos_profile_unlatched(),
+            expected_value=False,
+        )
+
         self.root.add_children([
+            getDist,
             ExploreBehavior(),
             PickAndPlaceSelector(),
         ])
@@ -28,7 +40,7 @@ def main(argv=None):
     bt = BehaviorTree(unicode_tree_debug=True)
     pt.display.render_dot_tree(bt.root)
 
-    bt.tick_tock(100)
+    bt.tick_tock(1000)
 
     try:
         rclpy.spin(bt.node)
