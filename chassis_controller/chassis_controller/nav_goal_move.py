@@ -66,8 +66,10 @@ class NavGoalMove(Node):
                         for pose in response.path.poses:
                             waypoints.insert(0, Point(
                                 x=pose.pose.position.x, y=pose.pose.position.y))
-                            # waypoints.append(
-                            #     Point(x=pose.pose.position.x, y=pose.pose.position.y))
+                        self.get_logger().info(
+                            f"waypoints number: {len(waypoints)}")
+                        # waypoints.append(
+                        #     Point(x=pose.pose.position.x, y=pose.pose.position.y))
 
                         self.send_persuit_goal(waypoints)
                         self.get_logger().info('Persuit goal action sent...')

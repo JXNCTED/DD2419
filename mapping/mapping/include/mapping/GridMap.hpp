@@ -140,7 +140,7 @@ class GridMap
      * @brief Expand the grid to c-space
      *
      */
-    void expandGrid(const float &radius = 0.3f);
+    void expandGrid(const float &radius = 0.15f);
     // helper function for expandGrid, set obstacles around a point
     /**
      * @brief Set every points within the radius of the given point as occupied

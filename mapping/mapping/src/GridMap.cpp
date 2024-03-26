@@ -92,16 +92,6 @@ void GridMap::setGridBelief(const double &x,
     }
     // update the ros message also
     rosOccGrid.header.stamp = rclcpp::Clock().now();
-    // belief = 0.5 means not updated yet, set ros message to -1 to indicate
-    // unknown
-    // if (belief == 0.5f)
-    // {
-    //     rosOccGrid.data[xOnGrid + yOnGrid * sizeX] = -1;
-    // }
-    // else
-    // {
-    //     rosOccGrid.data[xOnGrid + yOnGrid * sizeX] = belief * 100;
-    // }
 }
 
 void GridMap::setGridLogBelief(const double &x,
@@ -374,7 +364,6 @@ void GridMap::setOnesAroundPoint(const int &x, const int &y, const int &radius)
                  knownGrid(x, y) == 1))
             {
                 expandedGrid(xOnGrid, yOnGrid) = 1;
-                // expandedGridCV.at<uchar>(xOnGrid, yOnGrid) = 255;
             }
         }
     }
