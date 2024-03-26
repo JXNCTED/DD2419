@@ -14,15 +14,29 @@ from .behaviors import *
 class BehaviorTree(ptr.trees.BehaviourTree):
     def __init__(self, unicode_tree_debug=False):
         self.root = pt.composites.Sequence("MainTree", memory=True)
-
+        
+        #Checking to see if object is within 25cm
         getDist = ptr.subscribers.CheckData(
             name="getDist?",
             topic_name="/dist_bool",
             topic_type=Bool,
             variable_name="data",
             qos_profile=ptr.utilities.qos_profile_unlatched(),
-            expected_value=False,
+            expected_value=True,
         )
+        
+        #Checking if object is in the middle of the frame.
+        getMiddlePos = ptr.subscribers.CheckData(
+            name="isInMiddleOfFrame?",
+            topic_name="/is_in_middle",
+            topic_type=Bool,
+            variable_name="data",
+            qos_profile=ptr.utilities.qos_profile_unlatched(),
+            expected_value=True,
+        )
+        self.pickupSequence = pt.composites.Sequence("MainTree", memory=True)
+        self.pickupSequence.add_children([])
+
 
         self.root.add_children([
             getDist,
