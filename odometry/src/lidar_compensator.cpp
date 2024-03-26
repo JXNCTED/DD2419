@@ -3,6 +3,7 @@
 #include <vector>
 
 #include "pcl_conversions/pcl_conversions.h"
+#include "pcl/filters/statistical_outlier_removal.h"
 #include "rclcpp/rclcpp.hpp"
 #include "sensor_msgs/msg/imu.hpp"
 #include "sensor_msgs/msg/laser_scan.hpp"
@@ -113,6 +114,12 @@ class LidarCompensator : public rclcpp::Node
             point.z = 0;
             compensated_scan_pc_pcl.push_back(point);
         }
+
+        pcl::StatisticalOutlierRemoval<pcl::PointXYZ> sor;
+        sor.setInputCloud(compensated_scan_pc_pcl.makeShared());
+        sor.setMeanK(5);
+        sor.setStddevMulThresh(1.0);
+        sor.filter(compensated_scan_pc_pcl);
 
         sensor_msgs::msg::PointCloud2 compensated_scan_pc;
         pcl::toROSMsg(compensated_scan_pc_pcl, compensated_scan_pc);
