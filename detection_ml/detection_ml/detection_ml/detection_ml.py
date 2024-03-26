@@ -129,6 +129,9 @@ class DetectionMLNode(Node):
             x, y, w, h, score, category = int(bb[0]), int(bb[1]), int(
                 bb[2]), int(bb[3]), round(bb[4], 2), int(bb[5])
             position = self.get_position(bb)
+            # handle obviously wrong position
+            if (position == np.array([0.0, 0.0, 0.0])).all():
+                continue
             pose = PointStamped()
             pose.header.frame_id = "camera_color_optical_frame"
             pose.header.stamp = msg.header.stamp

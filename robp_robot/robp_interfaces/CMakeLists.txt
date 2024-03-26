@@ -24,7 +24,6 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   ${msg_files}
   ${action_files}
   "srv/IsInWorkspace.srv"
-  DEPENDENCIES geometry_msgs std_msgs
   DEPENDENCIES std_msgs geometry_msgs
 )
 
