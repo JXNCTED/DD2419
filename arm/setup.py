@@ -24,6 +24,7 @@ setup(
             'arm_detect = arm.arm_detect:main',
             'arm_detect_move = arm.arm_detect_move:main',
             'arm_listen_control = arm.arm_listen_control:main',
+            'arm_test_detect = arm.arm_test_detect:main',
         ],
     },
 )
