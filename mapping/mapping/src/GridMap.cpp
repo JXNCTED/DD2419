@@ -65,6 +65,8 @@ nav_msgs::msg::OccupancyGrid GridMap::toRosOccGrid()
     return rosOccGrid;
 }
 
+inline double max(const double &a, const double &b) { return a > b ? a : b; }
+inline double min(const double &a, const double &b) { return a < b ? a : b; }
 void GridMap::setGridBelief(const double &x,
                             const double &y,
                             const double &belief,
@@ -82,10 +84,10 @@ void GridMap::setGridBelief(const double &x,
     switch (type)
     {
     case GridType::LiDAR:
-        gridBeliefLiDAR(xOnGrid, yOnGrid) = belief;
+        gridBeliefLiDAR(xOnGrid, yOnGrid) = min(0.8, max(0.2, belief));
         break;
     case GridType::RGBD:
-        gridBeliefRGBD(xOnGrid, yOnGrid) = belief;
+        gridBeliefRGBD(xOnGrid, yOnGrid) = min(0.8, max(0.2, belief));
         break;
     default:
         assert(false);
@@ -341,7 +343,7 @@ void GridMap::expandGrid(const float &radius)
 void GridMap::setOnesAroundPoint(const int &x, const int &y, const int &radius)
 {
     const double EXPAND_THRESHOLD = 0.7;
-    if (gridBeliefLiDAR(x, y) == 0.5 or gridBeliefRGBD(x, y) == 0.5)
+    if (gridBeliefLiDAR(x, y) == 0.5 and gridBeliefRGBD(x, y) == 0.5)
     {
         expandedGrid(x, y) = 1;
         return;
@@ -358,6 +360,7 @@ void GridMap::setOnesAroundPoint(const int &x, const int &y, const int &radius)
             {
                 continue;
             }
+
             if (pow(i, 2) + pow(j, 2) <= pow(radius, 2) and
                 (gridBeliefLiDAR(x, y) >= EXPAND_THRESHOLD or
                  gridBeliefRGBD(x, y) >= EXPAND_THRESHOLD or

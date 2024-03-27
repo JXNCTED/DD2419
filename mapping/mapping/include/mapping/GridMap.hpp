@@ -96,7 +96,6 @@ class GridMap
      */
     nav_msgs::msg::OccupancyGrid toRosOccGrid();
 
-
     // plan path in map coordinate
     /**
      * @brief Plan a path from start to goal in the map
@@ -140,7 +139,7 @@ class GridMap
      * @brief Expand the grid to c-space
      *
      */
-    void expandGrid(const float &radius = 0.15f);
+    void expandGrid(const float &radius = 0.18f);
     // helper function for expandGrid, set obstacles around a point
     /**
      * @brief Set every points within the radius of the given point as occupied
