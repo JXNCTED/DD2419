@@ -36,25 +36,49 @@ class BehaviorTree(ptr.trees.BehaviourTree):
         )
 
         # -------------------Counter to slow down the loop-------------------
-        counter_fivethousand = pt.behaviours.TickCounter(
-            name="TickCounter", duration=10, completion_status=pt.common.Status.SUCCESS)
+        c1 = pt.behaviours.TickCounter(
+            name="TickCounter", duration=5, completion_status=pt.common.Status.SUCCESS)
+        c2 = pt.behaviours.TickCounter(
+            name="TickCounter", duration=5, completion_status=pt.common.Status.SUCCESS)
+        c3 = pt.behaviours.TickCounter(
+            name="TickCounter", duration=5, completion_status=pt.common.Status.SUCCESS)
+        c4 = pt.behaviours.TickCounter(
+            name="TickCounter", duration=5, completion_status=pt.common.Status.SUCCESS)
+        c5 = pt.behaviours.TickCounter(
+            name="TickCounter", duration=5, completion_status=pt.common.Status.SUCCESS)
+        c6 = pt.behaviours.TickCounter(
+            name="TickCounter", duration=5, completion_status=pt.common.Status.SUCCESS)
         # -------------------Counter to slow down the loop-------------------
 
-        self.pickupSequence = pt.composites.Sequence("MainTree", memory=True)
+        self.pickupSequence = pt.composites.Sequence(
+            "PickUpSequence", memory=True)
 
         self.pickupSequence.add_children([  # Pickup sequence
             MoveArmIntoPickUp(),  # moving into pickup
-            counter_fivethousand,  # counter to slow down the loop
-            CloseGripperObjectBehavior(),
-            counter_fivethousand,  # counter to slow down the loop
+            c1,  # counter to slow down the loop
+            OpenCloseGripper(action="close"),
+            c2,  # counter to slow down the loop
             MoveArmIntoNeutral(),  # moving into neutral
         ])
+
+        self.placeSequence = pt.composites.Sequence(
+            "PlaceSequence", memory=True)
+        self.placeSequence.add_children([
+            MoveArmIntoDetect(),
+            c3,
+            OpenCloseGripper(action="open"),
+            c4,
+        ])  # Place sequence
 
         self.root.add_children([
             getDist,
             MoveArmIntoDetect(),  # Something off here?
             getMiddlePos,
             self.pickupSequence,
+            c5,
+            self.placeSequence,
+            MoveArmIntoNeutral(),
+            c6,
             ExploreBehavior(),
             PickAndPlaceSelector(),
         ])

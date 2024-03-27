@@ -53,17 +53,18 @@ class GraspObjectBehavior(pt.behaviour.Behaviour, Node):
         return pt.common.Status.SUCCESS
 
 
-class CloseGripperObjectBehavior(pt.behaviour.Behaviour, Node):
-    def __init__(self, name="CloseGripperObjectBehavior"):
+class OpenCloseGripper(pt.behaviour.Behaviour, Node):
+    def __init__(self, name="CloseGripperObjectBehavior", action="open"):
         # super(GraspObjectBehavior, self).__init__(name=name)
         pt.behaviour.Behaviour.__init__(self, name=name)
         Node.__init__(self, node_name=name)
         self.publisher_ = self.create_publisher(String, '/arm_conf', 10)
+        self.action = action
         # pubclisher
 
     def update(self):
         # place holder for the grasp object behavior
-        self.publisher_.publish(String(data="close"))
+        self.publisher_.publish(String(data=self.action))
         return pt.common.Status.SUCCESS
   # This is the new class based on the code from above?
 
