@@ -102,8 +102,10 @@ def generate_launch_description():
                 'angle_compensate': True,
             }],
         ),
+        # Node(executable='static_transform_publisher', package='tf2_ros', arguments=[
+        #     '--child-frame-id', 'lidar_link', '--frame-id', 'base_link']),
         Node(executable='static_transform_publisher', package='tf2_ros', arguments=[
-            '--child-frame-id', 'lidar_link', '--frame-id', 'base_link']),
+            '--child-frame-id', 'lidar_link', '--frame-id', 'base_link', '--x', '0.01987', '--y', '0.0925', '--z', '0.14956']),
 
 
         # camera on arm
