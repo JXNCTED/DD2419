@@ -65,8 +65,6 @@ nav_msgs::msg::OccupancyGrid GridMap::toRosOccGrid()
     return rosOccGrid;
 }
 
-inline double max(const double &a, const double &b) { return a > b ? a : b; }
-inline double min(const double &a, const double &b) { return a < b ? a : b; }
 void GridMap::setGridBelief(const double &x,
                             const double &y,
                             const double &belief,
@@ -84,10 +82,10 @@ void GridMap::setGridBelief(const double &x,
     switch (type)
     {
     case GridType::LiDAR:
-        gridBeliefLiDAR(xOnGrid, yOnGrid) = min(0.8, max(0.2, belief));
+        gridBeliefLiDAR(xOnGrid, yOnGrid) = belief;
         break;
     case GridType::RGBD:
-        gridBeliefRGBD(xOnGrid, yOnGrid) = min(0.8, max(0.2, belief));
+        gridBeliefRGBD(xOnGrid, yOnGrid) = belief;
         break;
     default:
         assert(false);
@@ -101,8 +99,9 @@ void GridMap::setGridLogBelief(const double &x,
                                const double &logBelief,
                                const GridType &type)
 {
-    const double belief = 1.0f - 1.0f / (1 + exp(logBelief));
-    setGridBelief(x, y, belief, type);
+    const double belief        = 1.0f - 1.0f / (1 + exp(logBelief));
+    const double beliefClamped = std::clamp(belief, 0.6, 0.9);
+    setGridBelief(x, y, beliefClamped, type);
 }
 
 double GridMap::getGridLogBelief(const double &x,

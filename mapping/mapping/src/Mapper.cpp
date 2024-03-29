@@ -42,6 +42,54 @@ static double laserInvModel(const double &r,
 }
 
 void Mapper::updateMapLiDAR(
+    const sensor_msgs::msg::LaserScan::SharedPtr laserPtr,
+    const Pose &robotPose)
+{
+    const double &gridSize = map->getGridSize();
+
+    // for all LiDAR measurements
+    for (size_t i = 0; i < laserPtr->ranges.size(); i++)
+    {
+        double R = laserPtr->ranges.at(i);
+        // remove invalid measurement of INF
+        if (R > laserPtr->range_max or R < laserPtr->range_min)
+        {
+            R = laserPtr->range_max;
+        }
+
+        // calculate the angle of the laser
+        const double angle =
+            laserPtr->angle_increment * i + laserPtr->angle_min;
+        const double cosAng = cos(angle);
+        const double sinAng = sin(angle);
+
+        // store the point last updated
+        Eigen::Vector2d lastPw(Eigen::Infinity, Eigen::Infinity);
+        for (double r = 0; r < R + gridSize; r += gridSize)
+        {
+            // calculate the point in the LiDAR frame
+            Eigen::Vector2d pL(r * cosAng, r * sinAng);
+            Eigen::Matrix2d rot;
+            rot << cos(robotPose.theta), -sin(robotPose.theta),
+                sin(robotPose.theta), cos(robotPose.theta);
+            Eigen::Vector2d t(robotPose.x, robotPose.y);
+
+            Eigen::Vector2d pW = rot * pL + t;
+
+            if (pW == lastPw)
+            {
+                continue;
+            }
+            // get laser inverse model probability
+            const double occuProb = laserInvModel(r, R, gridSize);
+            // update with the inverse model
+            updateGrid(pW, occuProb, GridMap::GridType::LiDAR);
+            lastPw = pW;
+        }
+    }
+}
+
+void Mapper::updateMapLiDAR(
     const sensor_msgs::msg::PointCloud2::SharedPtr laserPtr,
     const Pose &robotPose)
 {
@@ -109,6 +157,7 @@ sensor_msgs::msg::PointCloud2 Mapper::updateMapRGBD(
     const double THRESH = 0.001;
     pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloudFiltered(
         new pcl::PointCloud<pcl::PointXYZRGB>);
+    const double &gridSize = map->getGridSize();
     for (size_t i = 0; i < cloud->points.size(); i++)
     {
         const double R = sqrt(cloud->points[i].x * cloud->points[i].x +
@@ -117,15 +166,30 @@ sensor_msgs::msg::PointCloud2 Mapper::updateMapRGBD(
             cloud->points[i].y < HEIGHT + THRESH and R > 0.15 and R < 1.0)
         {
             cloudFiltered->points.push_back(cloud->points[i]);
-            const double x = cloud->points[i].z;
-            const double y = -cloud->points[i].x;
-            Eigen::Vector2d pW(x, y);
-            Eigen::Matrix2d rot;
-            rot << cos(pose.theta), -sin(pose.theta), sin(pose.theta),
-                cos(pose.theta);
-            Eigen::Vector2d t(pose.x, pose.y);
-            pW = rot * pW + t;
-            updateGrid(pW, P_OCC, GridMap::GridType::RGBD);
+            const double x      = cloud->points[i].z;
+            const double y      = -cloud->points[i].x;
+            const double angle  = atan2(y, x);
+            const double cosAng = cos(angle);
+            const double sinAng = sin(angle);
+
+            Eigen::Vector2d lastPw(Eigen::Infinity, Eigen::Infinity);
+            for (double r = 0; r < R + gridSize; r += gridSize)
+            {
+                Eigen::Vector2d pL(r * cosAng, r * sinAng);
+                Eigen::Matrix2d rot;
+                rot << cos(pose.theta), -sin(pose.theta), sin(pose.theta),
+                    cos(pose.theta);
+                Eigen::Vector2d t(pose.x, pose.y);
+                Eigen::Vector2d pW = rot * pL + t;
+
+                if (pW == lastPw)
+                {
+                    continue;
+                }
+                const double occuProb = laserInvModel(r, R, gridSize);
+                updateGrid(pW, occuProb, GridMap::GridType::RGBD);
+                lastPw = pW;
+            }
         }
     }
 

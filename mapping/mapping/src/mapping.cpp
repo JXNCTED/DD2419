@@ -10,6 +10,7 @@
  */
 #include <fstream>
 
+#include "geometry_msgs/msg/transform_stamped.hpp"
 #include "mapping/GridMap.hpp"
 #include "mapping/Mapper.hpp"
 #include "mapping_interfaces/srv/path_plan.hpp"
@@ -17,6 +18,8 @@
 #include "rclcpp/rclcpp.hpp"
 #include "tf2/LinearMath/Matrix3x3.h"
 #include "tf2/LinearMath/Quaternion.h"
+#include "tf2_ros/buffer.h"
+#include "tf2_ros/transform_listener.h"
 
 class MappingNode : public rclcpp::Node
 {
@@ -29,8 +32,14 @@ class MappingNode : public rclcpp::Node
             10,
             std::bind(&MappingNode::odomCallback, this, std::placeholders::_1));
 
-        lidar_sub_ = this->create_subscription<sensor_msgs::msg::PointCloud2>(
-            "/compensated_scan_pc",
+        // lidar_sub_ =
+        // this->create_subscription<sensor_msgs::msg::PointCloud2>(
+        //     "/compensated_scan_pc",
+        //     10,
+        //     std::bind(
+        //         &MappingNode::lidarCallback, this, std::placeholders::_1));
+        lidar_sub_ = this->create_subscription<sensor_msgs::msg::LaserScan>(
+            "/scan",
             10,
             std::bind(
                 &MappingNode::lidarCallback, this, std::placeholders::_1));
@@ -67,6 +76,19 @@ class MappingNode : public rclcpp::Node
         }
         map.setLineSegmentOccupied(lineSegments);
         file.close();
+        // tf2
+        tfBuffer   = std::make_unique<tf2_ros::Buffer>(this->get_clock());
+        tfListener = std::make_shared<tf2_ros::TransformListener>(*tfBuffer);
+
+        try
+        {
+            transformStamped = tfBuffer->lookupTransform(
+                "base_link", "lidar_link", tf2::TimePointZero);
+        }
+        catch (tf2::TransformException &ex)
+        {
+            RCLCPP_ERROR(this->get_logger(), "%s", ex.what());
+        }
     }
     void pointCloudCallback(const sensor_msgs::msg::PointCloud2::SharedPtr msg)
     {
@@ -90,7 +112,15 @@ class MappingNode : public rclcpp::Node
     }
 
     // get LIDAR measurement and call the updateMapLaser function
-    void lidarCallback(const sensor_msgs::msg::PointCloud2::SharedPtr msg)
+    // void lidarCallback(const sensor_msgs::msg::PointCloud2::SharedPtr msg)
+    // {
+    //     mapper.updateMapLiDAR(msg, pose);
+    //     nav_msgs::msg::OccupancyGrid occu;
+    //     occu = map.toRosOccGrid();
+    //     occu_pub_->publish(occu);
+    // }
+
+    void lidarCallback(const sensor_msgs::msg::LaserScan::SharedPtr msg)
     {
         mapper.updateMapLiDAR(msg, pose);
         nav_msgs::msg::OccupancyGrid occu;
@@ -105,13 +135,20 @@ class MappingNode : public rclcpp::Node
     Mapper mapper;
     Pose pose;
     rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr odom_sub_;
-    rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr lidar_sub_;
+    // rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr
+    // lidar_sub_;
+    rclcpp::Subscription<sensor_msgs::msg::LaserScan>::SharedPtr lidar_sub_;
     rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr
         point_cloud_sub_;
     rclcpp::Publisher<nav_msgs::msg::OccupancyGrid>::SharedPtr occu_pub_;
     rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr
         filtered_pc_pub_;
     rclcpp::TimerBase::SharedPtr timer_;
+
+    geometry_msgs::msg::TransformStamped transformStamped;
+
+    std::unique_ptr<tf2_ros::Buffer> tfBuffer;
+    std::shared_ptr<tf2_ros::TransformListener> tfListener;
 };
 
 std::shared_ptr<MappingNode> node;
