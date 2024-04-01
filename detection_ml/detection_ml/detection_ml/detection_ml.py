@@ -15,6 +15,24 @@ from PIL import Image as PILImage
 from geometry_msgs.msg import PointStamped
 from detection_interfaces.msg import DetectedObj
 
+cls_dict = {
+    0: "none",
+    1: "bc",
+    2: "binky",
+    3: "box",
+    4: "bs",
+    5: "gc",
+    6: "gs",
+    7: "hugo",
+    8: "kiki",
+    9: "muddles",
+    10: "oakie",
+    11: "rc",
+    12: "rs",
+    13: "slush",
+    14: "wc"
+}
+
 
 class DetectionMLNode(Node):
     def __init__(self):
@@ -92,6 +110,8 @@ class DetectionMLNode(Node):
 
     # project the bounding box to depth and get the position from camera_optical_frame
     def get_position(self, bb):
+        if self.K is None or self.np_depth is None:
+            return np.array([0.0, 0.0, 0.0])
         x, y, w, h = bb[0], bb[1], bb[2], bb[3]
         u = x + w/2
         v = y + h/2
@@ -114,7 +134,7 @@ class DetectionMLNode(Node):
             "cuda")
         with torch.no_grad():
             out = self.trt_model(input_img)
-        DETECT_THRESHOLD = 0.9
+        DETECT_THRESHOLD = 0.95
         bbs = self.model.out_to_bbs(out, DETECT_THRESHOLD)
 
         show_img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
@@ -144,7 +164,7 @@ class DetectionMLNode(Node):
             detected_obj.category.append(category)
             detected_obj.confidence.append(score)
 
-            cata_str = f"{category} scr:{score}"
+            cata_str = f"{cls_dict[category]} scr:{score}"
             # draw the bounding box and the category. For visualization only
             # when running, comment out if no valid display is available
             cv2.rectangle(show_img, (x, y), (x+w, y+h),
