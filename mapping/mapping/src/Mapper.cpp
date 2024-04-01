@@ -159,9 +159,12 @@ sensor_msgs::msg::PointCloud2 Mapper::updateMapRGBD(
     // filter the point only at height -3.5 cm
     const double HEIGHT = 0.035;
     const double THRESH = 0.001;
+    const double H_FOV  = 69.0 * M_PI / 180;
     pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloudFiltered(
         new pcl::PointCloud<pcl::PointXYZRGB>);
     const double &gridSize = map->getGridSize();
+    double maxAngle        = -H_FOV / 2;
+    double minAngle        = H_FOV / 2;
     for (size_t i = 0; i < cloud->points.size(); i++)
     {
         const double R = sqrt(cloud->points[i].x * cloud->points[i].x +
@@ -175,6 +178,15 @@ sensor_msgs::msg::PointCloud2 Mapper::updateMapRGBD(
             const double angle  = atan2(y, x);
             const double cosAng = cos(angle);
             const double sinAng = sin(angle);
+
+            if (angle > maxAngle)
+            {
+                maxAngle = angle;
+            }
+            if (angle < minAngle)
+            {
+                minAngle = angle;
+            }
 
             Eigen::Vector2d lastPw(Eigen::Infinity, Eigen::Infinity);
             for (double r = 0; r < R + gridSize; r += gridSize)

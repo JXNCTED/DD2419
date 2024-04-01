@@ -24,7 +24,8 @@
 class MappingNode : public rclcpp::Node
 {
    public:
-    MappingNode() : Node("mapping"), map(0.025, 250, 500, 75, 200), mapper(&map)
+    MappingNode()
+        : Node("mapping"), map(0.025, 250, 500, 180, 200), mapper(&map)
     {
         // bunch of pubs and subs
         odom_sub_ = this->create_subscription<nav_msgs::msg::Odometry>(
