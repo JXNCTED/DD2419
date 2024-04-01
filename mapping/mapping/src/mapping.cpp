@@ -24,7 +24,7 @@
 class MappingNode : public rclcpp::Node
 {
    public:
-    MappingNode() : Node("mapping"), map(0.05, 500, 500, 250, 250), mapper(&map)
+    MappingNode() : Node("mapping"), map(0.025, 250, 500, 75, 200), mapper(&map)
     {
         // bunch of pubs and subs
         odom_sub_ = this->create_subscription<nav_msgs::msg::Odometry>(
@@ -80,21 +80,42 @@ class MappingNode : public rclcpp::Node
         tfBuffer   = std::make_unique<tf2_ros::Buffer>(this->get_clock());
         tfListener = std::make_shared<tf2_ros::TransformListener>(*tfBuffer);
 
+        while (!tfBuffer->canTransform(
+                   "base_link", "lidar_link", tf2::TimePointZero) ||
+               !tfBuffer->canTransform(
+                   "base_link", "camera_link", tf2::TimePointZero))
+        {
+            RCLCPP_INFO(this->get_logger(), "Waiting for transform");
+        }
         try
         {
-            transformStamped = tfBuffer->lookupTransform(
+            transform_stamped_base_lidar = tfBuffer->lookupTransform(
                 "base_link", "lidar_link", tf2::TimePointZero);
+            transform_stamped_base_camera = tfBuffer->lookupTransform(
+                "base_link", "camera_link", tf2::TimePointZero);
         }
         catch (tf2::TransformException &ex)
         {
             RCLCPP_ERROR(this->get_logger(), "%s", ex.what());
         }
+
+        RCLCPP_INFO(this->get_logger(),
+                    "lidar-base_link: %f %f %f",
+                    transform_stamped_base_lidar.transform.translation.x,
+                    transform_stamped_base_lidar.transform.translation.y,
+                    transform_stamped_base_lidar.transform.translation.z);
+        RCLCPP_INFO(this->get_logger(),
+                    "camera-base_link: %f %f %f",
+                    transform_stamped_base_camera.transform.translation.x,
+                    transform_stamped_base_camera.transform.translation.y,
+                    transform_stamped_base_camera.transform.translation.z);
+        RCLCPP_INFO(this->get_logger(), "Mapping node initialized");
     }
     void pointCloudCallback(const sensor_msgs::msg::PointCloud2::SharedPtr msg)
     {
         // mapper.updateMapRGBD(msg, pose);
         sensor_msgs::msg::PointCloud2 filtered_pc =
-            mapper.updateMapRGBD(msg, pose);
+            mapper.updateMapRGBD(msg, pose_camera);
         filtered_pc_pub_->publish(filtered_pc);
     }
     void odomCallback(const nav_msgs::msg::Odometry::SharedPtr msg)
@@ -109,6 +130,18 @@ class MappingNode : public rclcpp::Node
         double roll, pitch, yaw;
         m.getRPY(roll, pitch, yaw);
         pose.theta = yaw;
+
+        pose_lidar.x =
+            transform_stamped_base_lidar.transform.translation.x + pose.x;
+        pose_lidar.y =
+            transform_stamped_base_lidar.transform.translation.y + pose.y;
+        pose_lidar.theta = yaw;
+
+        pose_camera.x =
+            transform_stamped_base_camera.transform.translation.x + pose.x;
+        pose_camera.y =
+            transform_stamped_base_camera.transform.translation.y + pose.y;
+        pose_camera.theta = yaw;
     }
 
     // get LIDAR measurement and call the updateMapLaser function
@@ -122,7 +155,7 @@ class MappingNode : public rclcpp::Node
 
     void lidarCallback(const sensor_msgs::msg::LaserScan::SharedPtr msg)
     {
-        mapper.updateMapLiDAR(msg, pose);
+        mapper.updateMapLiDAR(msg, pose_lidar);
         nav_msgs::msg::OccupancyGrid occu;
         occu = map.toRosOccGrid();
         occu_pub_->publish(occu);
@@ -133,7 +166,9 @@ class MappingNode : public rclcpp::Node
    private:
     GridMap map;
     Mapper mapper;
-    Pose pose;
+    Pose pose;         // pose base link in odom
+    Pose pose_lidar;   // pose lidar in odom
+    Pose pose_camera;  // pose camera in odom
     rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr odom_sub_;
     // rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr
     // lidar_sub_;
@@ -145,7 +180,8 @@ class MappingNode : public rclcpp::Node
         filtered_pc_pub_;
     rclcpp::TimerBase::SharedPtr timer_;
 
-    geometry_msgs::msg::TransformStamped transformStamped;
+    geometry_msgs::msg::TransformStamped transform_stamped_base_lidar;
+    geometry_msgs::msg::TransformStamped transform_stamped_base_camera;
 
     std::unique_ptr<tf2_ros::Buffer> tfBuffer;
     std::shared_ptr<tf2_ros::TransformListener> tfListener;

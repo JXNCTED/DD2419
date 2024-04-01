@@ -52,9 +52,13 @@ void Mapper::updateMapLiDAR(
     {
         double R = laserPtr->ranges.at(i);
         // remove invalid measurement of INF
-        if (R > laserPtr->range_max or R < laserPtr->range_min)
+        if (R > laserPtr->range_max)
         {
             R = laserPtr->range_max;
+        }
+        else if (R < laserPtr->range_min)
+        {
+            continue;
         }
 
         // calculate the angle of the laser
