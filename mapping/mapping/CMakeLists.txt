@@ -87,6 +87,8 @@ target_link_libraries(
   mapping
   GridMap
   Mapper
+  tf2::tf2
+  tf2_ros::tf2_ros
 )
 
 

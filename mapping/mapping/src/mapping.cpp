@@ -9,6 +9,8 @@
  *
  */
 #include <fstream>
+#include <geometry_msgs/msg/detail/pose_stamped__struct.hpp>
+#include <geometry_msgs/msg/detail/transform_stamped__struct.hpp>
 
 #include "geometry_msgs/msg/transform_stamped.hpp"
 #include "mapping/GridMap.hpp"
@@ -18,6 +20,7 @@
 #include "rclcpp/rclcpp.hpp"
 #include "tf2/LinearMath/Matrix3x3.h"
 #include "tf2/LinearMath/Quaternion.h"
+#include "tf2_geometry_msgs/tf2_geometry_msgs.hpp"
 #include "tf2_ros/buffer.h"
 #include "tf2_ros/transform_listener.h"
 
@@ -121,12 +124,28 @@ class MappingNode : public rclcpp::Node
     }
     void odomCallback(const nav_msgs::msg::Odometry::SharedPtr msg)
     {
-        pose.x = msg->pose.pose.position.x;
-        pose.y = msg->pose.pose.position.y;
-        tf2::Quaternion q(msg->pose.pose.orientation.x,
-                          msg->pose.pose.orientation.y,
-                          msg->pose.pose.orientation.z,
-                          msg->pose.pose.orientation.w);
+        try
+        {
+            transform_stamped_map_odom =
+                tfBuffer->lookupTransform("map", "odom", tf2::TimePointZero);
+        }
+        catch (tf2::TransformException &ex)
+        {
+            RCLCPP_ERROR(this->get_logger(), "%s", ex.what());
+        }
+        // conver to odom frame with do transform
+        geometry_msgs::msg::PoseStamped pose_odom;
+        pose_odom.pose.position.x  = msg->pose.pose.position.x;
+        pose_odom.pose.position.y  = msg->pose.pose.position.y;
+        pose_odom.pose.position.z  = msg->pose.pose.position.z;
+        pose_odom.pose.orientation = msg->pose.pose.orientation;
+        tf2::doTransform(pose_odom, pose_odom, transform_stamped_map_odom);
+        pose.x = pose_odom.pose.position.x;
+        pose.y = pose_odom.pose.position.y;
+        tf2::Quaternion q(pose_odom.pose.orientation.x,
+                          pose_odom.pose.orientation.y,
+                          pose_odom.pose.orientation.z,
+                          pose_odom.pose.orientation.w);
         tf2::Matrix3x3 m(q);
         double roll, pitch, yaw;
         m.getRPY(roll, pitch, yaw);
@@ -138,11 +157,28 @@ class MappingNode : public rclcpp::Node
             transform_stamped_base_lidar.transform.translation.y + pose.y;
         pose_lidar.theta = yaw;
 
-        pose_camera.x =
-            transform_stamped_base_camera.transform.translation.x + pose.x;
-        pose_camera.y =
-            transform_stamped_base_camera.transform.translation.y + pose.y;
-        pose_camera.theta = yaw;
+        // pose.x = msg->pose.pose.position.x;
+        // pose.y = msg->pose.pose.position.y;
+        // tf2::Quaternion q(msg->pose.pose.orientation.x,
+        //                   msg->pose.pose.orientation.y,
+        //                   msg->pose.pose.orientation.z,
+        //                   msg->pose.pose.orientation.w);
+        // tf2::Matrix3x3 m(q);
+        // double roll, pitch, yaw;
+        // m.getRPY(roll, pitch, yaw);
+        // pose.theta = yaw;
+
+        // pose_lidar.x =
+        //     transform_stamped_base_lidar.transform.translation.x + pose.x;
+        // pose_lidar.y =
+        //     transform_stamped_base_lidar.transform.translation.y + pose.y;
+        // pose_lidar.theta = yaw;
+
+        // pose_camera.x =
+        //     transform_stamped_base_camera.transform.translation.x + pose.x;
+        // pose_camera.y =
+        //     transform_stamped_base_camera.transform.translation.y + pose.y;
+        // pose_camera.theta = yaw;
     }
 
     // get LIDAR measurement and call the updateMapLaser function
@@ -183,6 +219,7 @@ class MappingNode : public rclcpp::Node
 
     geometry_msgs::msg::TransformStamped transform_stamped_base_lidar;
     geometry_msgs::msg::TransformStamped transform_stamped_base_camera;
+    geometry_msgs::msg::TransformStamped transform_stamped_map_odom;
 
     std::unique_ptr<tf2_ros::Buffer> tfBuffer;
     std::shared_ptr<tf2_ros::TransformListener> tfListener;
