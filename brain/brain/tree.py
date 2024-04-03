@@ -16,6 +16,7 @@ class BehaviorTree(ptr.trees.BehaviourTree):
         self.root = pt.composites.Sequence("MainTree", memory=True)
         self.root.add_children([
             Initializer(),
+            ExploreBehavior(),
         ])
 
         # Checking to see if object is within 25cm
@@ -96,7 +97,7 @@ def main(argv=None):
     bt = BehaviorTree(unicode_tree_debug=True)
     pt.display.render_dot_tree(bt.root)
 
-    bt.tick_tock(1000)
+    bt.tick_tock(100)
 
     try:
         rclpy.spin(bt.node)
