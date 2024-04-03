@@ -9,6 +9,54 @@ import py_trees_ros as ptr
 from rclpy.node import Node
 from std_msgs.msg import String
 from std_msgs.msg import Bool
+from std_msgs.msg import Int16MultiArray
+from sensor_msgs.msg import JointState
+
+
+class Initializer(pt.composites.Sequence):
+    def __init__(self, name="Initializer"):
+        super(Initializer, self).__init__(name=name)
+        timeout = pt.decorators.Timeout(
+            name="Timeout", duration=5, children=[ArmToHome()])
+        self.add_children([timeout])
+
+
+class ArmToHome(pt.behaviour.Behaviour, Node):
+    def __init__(self, name="ArmToHome"):
+        pt.behaviour.Behaviour.__init__(self, name=name)
+        Node.__init__(self, node_name=name)
+        self.publisher_ = self.create_publisher(
+            Int16MultiArray, '/multi_servo_cmd_sub', 10)
+        self.subscriber_ = self.create_subscription(
+            JointState, '/servo_pos_publisher', self.arm_pos_callback, 10)
+
+        self.current_joint_pos = [12000, 12000, 12000, 12000, 12000, 12000]
+        self.position_reached = False
+
+        self.HOME_POSITION = [12000 for i in range(12)]
+        for i in range(6):
+            self.HOME_POSITION[i+6] = 800
+        self.HOME_POSITION[0] = 5000
+        self.HOME_POSITION[1] = 12000
+        self.HOME_POSITION[2] = 2000
+        self.HOME_POSITION[3] = 18000
+        self.HOME_POSITION[4] = 10000
+
+    def initialise(self):
+        self.publisher_.publish(Int16MultiArray(data=self.HOME_POSITION))
+
+    def arm_pos_callback(self, msg: JointState):
+        self.current_joint_pos = msg.position
+        diff = 0
+        for i in range(6):
+            diff += abs(self.current_joint_pos[i] - self.HOME_POSITION[i])
+        self.position_reached = diff < 2000
+
+    def update(self):
+        if self.position_reached:
+            return pt.common.Status.SUCCESS
+        else:
+            return pt.common.Status.RUNNING
 
 
 class ExploreBehavior(pt.behaviour.Behaviour):
