@@ -36,6 +36,10 @@ class LidarLandmarker : public rclcpp::Node
    private:
     void timerCallback()
     {
+        if (keyframes.empty())
+        {
+            return;
+        }
         const auto &keyframeCloud = keyframes.back().getCloud();
         pcl::IterativeClosestPoint<pcl::PointXYZ, pcl::PointXYZ> icp;
         pcl::PointCloud<pcl::PointXYZ>::Ptr cloud(
@@ -48,7 +52,10 @@ class LidarLandmarker : public rclcpp::Node
         icp.setRANSACOutlierRejectionThreshold(0.1);
         pcl::PointCloud<pcl::PointXYZ> aligned;
         icp.align(aligned);
-
+        RCLCPP_INFO(this->get_logger(),
+                    "ICP converged: %d, fitness score: %f",
+                    icp.hasConverged(),
+                    icp.getFitnessScore());
         if (not icp.hasConverged() or icp.getFitnessScore() > 0.1)
         {
             RCLCPP_INFO(this->get_logger(), "ICP did not converge");
@@ -90,6 +97,12 @@ class LidarLandmarker : public rclcpp::Node
     }
     void lidarCallback(const sensor_msgs::msg::PointCloud2::SharedPtr msg)
     {
+        static bool first = false;
+        if (not first)
+        {
+            first = true;
+            return;
+        }
         pcl::PointCloud<pcl::PointXYZ>::Ptr cloud(
             new pcl::PointCloud<pcl::PointXYZ>);
         pcl::fromROSMsg(*msg, *cloud);
