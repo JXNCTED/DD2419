@@ -9,7 +9,10 @@
  *
  */
 #include <fstream>
+#include <geometry_msgs/msg/detail/pose_stamped__struct.hpp>
+#include <geometry_msgs/msg/detail/transform_stamped__struct.hpp>
 
+#include "geometry_msgs/msg/transform_stamped.hpp"
 #include "mapping/GridMap.hpp"
 #include "mapping/Mapper.hpp"
 #include "mapping_interfaces/srv/path_plan.hpp"
@@ -17,11 +20,15 @@
 #include "rclcpp/rclcpp.hpp"
 #include "tf2/LinearMath/Matrix3x3.h"
 #include "tf2/LinearMath/Quaternion.h"
+#include "tf2_geometry_msgs/tf2_geometry_msgs.hpp"
+#include "tf2_ros/buffer.h"
+#include "tf2_ros/transform_listener.h"
 
 class MappingNode : public rclcpp::Node
 {
    public:
-    MappingNode() : Node("mapping"), map(0.05, 500, 500, 250, 250), mapper(&map)
+    MappingNode()
+        : Node("mapping"), map(0.025, 250, 500, 180, 200), mapper(&map)
     {
         // bunch of pubs and subs
         odom_sub_ = this->create_subscription<nav_msgs::msg::Odometry>(
@@ -29,8 +36,14 @@ class MappingNode : public rclcpp::Node
             10,
             std::bind(&MappingNode::odomCallback, this, std::placeholders::_1));
 
-        lidar_sub_ = this->create_subscription<sensor_msgs::msg::PointCloud2>(
-            "/compensated_scan_pc",
+        // lidar_sub_ =
+        // this->create_subscription<sensor_msgs::msg::PointCloud2>(
+        //     "/compensated_scan_pc",
+        //     10,
+        //     std::bind(
+        //         &MappingNode::lidarCallback, this, std::placeholders::_1));
+        lidar_sub_ = this->create_subscription<sensor_msgs::msg::LaserScan>(
+            "/scan",
             10,
             std::bind(
                 &MappingNode::lidarCallback, this, std::placeholders::_1));
@@ -67,32 +80,119 @@ class MappingNode : public rclcpp::Node
         }
         map.setLineSegmentOccupied(lineSegments);
         file.close();
+        // tf2
+        tfBuffer   = std::make_unique<tf2_ros::Buffer>(this->get_clock());
+        tfListener = std::make_shared<tf2_ros::TransformListener>(*tfBuffer);
+
+        while (!tfBuffer->canTransform(
+                   "base_link", "lidar_link", tf2::TimePointZero) ||
+               !tfBuffer->canTransform(
+                   "base_link", "camera_link", tf2::TimePointZero))
+        {
+            RCLCPP_INFO(this->get_logger(), "Waiting for transform");
+        }
+        try
+        {
+            transform_stamped_base_lidar = tfBuffer->lookupTransform(
+                "base_link", "lidar_link", tf2::TimePointZero);
+            transform_stamped_base_camera = tfBuffer->lookupTransform(
+                "base_link", "camera_link", tf2::TimePointZero);
+        }
+        catch (tf2::TransformException &ex)
+        {
+            RCLCPP_ERROR(this->get_logger(), "%s", ex.what());
+        }
+
+        RCLCPP_INFO(this->get_logger(),
+                    "lidar-base_link: %f %f %f",
+                    transform_stamped_base_lidar.transform.translation.x,
+                    transform_stamped_base_lidar.transform.translation.y,
+                    transform_stamped_base_lidar.transform.translation.z);
+        RCLCPP_INFO(this->get_logger(),
+                    "camera-base_link: %f %f %f",
+                    transform_stamped_base_camera.transform.translation.x,
+                    transform_stamped_base_camera.transform.translation.y,
+                    transform_stamped_base_camera.transform.translation.z);
+        RCLCPP_INFO(this->get_logger(), "Mapping node initialized");
     }
     void pointCloudCallback(const sensor_msgs::msg::PointCloud2::SharedPtr msg)
     {
         // mapper.updateMapRGBD(msg, pose);
         sensor_msgs::msg::PointCloud2 filtered_pc =
-            mapper.updateMapRGBD(msg, pose);
+            mapper.updateMapRGBD(msg, pose_camera);
         filtered_pc_pub_->publish(filtered_pc);
     }
     void odomCallback(const nav_msgs::msg::Odometry::SharedPtr msg)
     {
-        pose.x = msg->pose.pose.position.x;
-        pose.y = msg->pose.pose.position.y;
-        tf2::Quaternion q(msg->pose.pose.orientation.x,
-                          msg->pose.pose.orientation.y,
-                          msg->pose.pose.orientation.z,
-                          msg->pose.pose.orientation.w);
+        try
+        {
+            transform_stamped_map_odom =
+                tfBuffer->lookupTransform("map", "odom", tf2::TimePointZero);
+        }
+        catch (tf2::TransformException &ex)
+        {
+            RCLCPP_ERROR(this->get_logger(), "%s", ex.what());
+        }
+        // conver to odom frame with do transform
+        geometry_msgs::msg::PoseStamped pose_odom;
+        pose_odom.pose.position.x  = msg->pose.pose.position.x;
+        pose_odom.pose.position.y  = msg->pose.pose.position.y;
+        pose_odom.pose.position.z  = msg->pose.pose.position.z;
+        pose_odom.pose.orientation = msg->pose.pose.orientation;
+        tf2::doTransform(pose_odom, pose_odom, transform_stamped_map_odom);
+        pose.x = pose_odom.pose.position.x;
+        pose.y = pose_odom.pose.position.y;
+        tf2::Quaternion q(pose_odom.pose.orientation.x,
+                          pose_odom.pose.orientation.y,
+                          pose_odom.pose.orientation.z,
+                          pose_odom.pose.orientation.w);
         tf2::Matrix3x3 m(q);
         double roll, pitch, yaw;
         m.getRPY(roll, pitch, yaw);
         pose.theta = yaw;
+
+        pose_lidar.x =
+            transform_stamped_base_lidar.transform.translation.x + pose.x;
+        pose_lidar.y =
+            transform_stamped_base_lidar.transform.translation.y + pose.y;
+        pose_lidar.theta = yaw;
+
+        // pose.x = msg->pose.pose.position.x;
+        // pose.y = msg->pose.pose.position.y;
+        // tf2::Quaternion q(msg->pose.pose.orientation.x,
+        //                   msg->pose.pose.orientation.y,
+        //                   msg->pose.pose.orientation.z,
+        //                   msg->pose.pose.orientation.w);
+        // tf2::Matrix3x3 m(q);
+        // double roll, pitch, yaw;
+        // m.getRPY(roll, pitch, yaw);
+        // pose.theta = yaw;
+
+        // pose_lidar.x =
+        //     transform_stamped_base_lidar.transform.translation.x + pose.x;
+        // pose_lidar.y =
+        //     transform_stamped_base_lidar.transform.translation.y + pose.y;
+        // pose_lidar.theta = yaw;
+
+        // pose_camera.x =
+        //     transform_stamped_base_camera.transform.translation.x + pose.x;
+        // pose_camera.y =
+        //     transform_stamped_base_camera.transform.translation.y + pose.y;
+        // pose_camera.theta = yaw;
     }
 
     // get LIDAR measurement and call the updateMapLaser function
-    void lidarCallback(const sensor_msgs::msg::PointCloud2::SharedPtr msg)
+    // void lidarCallback(const sensor_msgs::msg::PointCloud2::SharedPtr msg)
+    // {
+    //     mapper.updateMapLiDAR(msg, pose);
+    //     nav_msgs::msg::OccupancyGrid occu;
+    //     occu = map.toRosOccGrid();
+    //     occu_pub_->publish(occu);
+    // }
+
+    void lidarCallback(const sensor_msgs::msg::LaserScan::SharedPtr msg)
     {
-        mapper.updateMapLiDAR(msg, pose);
+        mapper.updateMapLiDAR(msg, pose_lidar);
         nav_msgs::msg::OccupancyGrid occu;
         occu = map.toRosOccGrid();
         occu_pub_->publish(occu);
@@ -103,15 +203,26 @@ class MappingNode : public rclcpp::Node
    private:
     GridMap map;
     Mapper mapper;
-    Pose pose;
+    Pose pose;         // pose base link in odom
+    Pose pose_lidar;   // pose lidar in odom
+    Pose pose_camera;  // pose camera in odom
     rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr odom_sub_;
-    rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr lidar_sub_;
+    // rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr
+    // lidar_sub_;
+    rclcpp::Subscription<sensor_msgs::msg::LaserScan>::SharedPtr lidar_sub_;
     rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr
         point_cloud_sub_;
     rclcpp::Publisher<nav_msgs::msg::OccupancyGrid>::SharedPtr occu_pub_;
     rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr
         filtered_pc_pub_;
     rclcpp::TimerBase::SharedPtr timer_;
+
+    geometry_msgs::msg::TransformStamped transform_stamped_base_lidar;
+    geometry_msgs::msg::TransformStamped transform_stamped_base_camera;
+    geometry_msgs::msg::TransformStamped transform_stamped_map_odom;
+
+    std::unique_ptr<tf2_ros::Buffer> tfBuffer;
+    std::shared_ptr<tf2_ros::TransformListener> tfListener;
 };
 
 std::shared_ptr<MappingNode> node;

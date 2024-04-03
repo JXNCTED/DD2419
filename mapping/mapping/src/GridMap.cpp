@@ -99,8 +99,9 @@ void GridMap::setGridLogBelief(const double &x,
                                const double &logBelief,
                                const GridType &type)
 {
-    const double belief = 1.0f - 1.0f / (1 + exp(logBelief));
-    setGridBelief(x, y, belief, type);
+    const double belief        = 1.0f - 1.0f / (1 + exp(logBelief));
+    const double beliefClamped = std::clamp(belief, 0.6, 0.9);
+    setGridBelief(x, y, beliefClamped, type);
 }
 
 double GridMap::getGridLogBelief(const double &x,
@@ -341,7 +342,7 @@ void GridMap::expandGrid(const float &radius)
 void GridMap::setOnesAroundPoint(const int &x, const int &y, const int &radius)
 {
     const double EXPAND_THRESHOLD = 0.7;
-    if (gridBeliefLiDAR(x, y) == 0.5 or gridBeliefRGBD(x, y) == 0.5)
+    if (gridBeliefLiDAR(x, y) == 0.5 and gridBeliefRGBD(x, y) == 0.5)
     {
         expandedGrid(x, y) = 1;
         return;
@@ -358,6 +359,7 @@ void GridMap::setOnesAroundPoint(const int &x, const int &y, const int &radius)
             {
                 continue;
             }
+
             if (pow(i, 2) + pow(j, 2) <= pow(radius, 2) and
                 (gridBeliefLiDAR(x, y) >= EXPAND_THRESHOLD or
                  gridBeliefRGBD(x, y) >= EXPAND_THRESHOLD or

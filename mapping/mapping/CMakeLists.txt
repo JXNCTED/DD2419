@@ -11,10 +11,13 @@ find_package(rclcpp REQUIRED)
 find_package(nav_msgs REQUIRED)
 find_package(sensor_msgs REQUIRED)
 find_package(OpenCV REQUIRED)
+find_package(tf2 REQUIRED)
 find_package(tf2_ros REQUIRED)
+find_package(tf2_geometry_msgs REQUIRED)
 find_package(mapping_interfaces REQUIRED)
 find_package(pcl_conversions REQUIRED)
 find_package(PCL REQUIRED)
+find_package(geometry_msgs REQUIRED)
 
 
 # uncomment the following section in order to fill in
@@ -32,11 +35,15 @@ ament_target_dependencies(
   Mapper
   "OpenCV"
   "nav_msgs"
+  "tf2"
   "sensor_msgs"
+  "tf2"
+  "tf2_geometry_msgs"
   "tf2_ros"
   "rclcpp"
   "pcl_conversions"
   "PCL"
+  "geometry_msgs"
 )
 target_link_libraries(
   Mapper
@@ -70,13 +77,18 @@ ament_target_dependencies(
   "rclcpp"
   "nav_msgs"
   "sensor_msgs"
+  "tf2"
   "tf2_ros"
+  "tf2_geometry_msgs"
   "mapping_interfaces"
+  "geometry_msgs"
 )
 target_link_libraries(
   mapping
   GridMap
   Mapper
+  tf2::tf2
+  tf2_ros::tf2_ros
 )
 
 
