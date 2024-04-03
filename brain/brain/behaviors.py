@@ -25,24 +25,42 @@ class Initializer(pt.composites.Sequence):
         self.add_children([failure_is_success])
 
 
-class ApproachObject(pt.composites.Sequence):
-    def __init__(self, name="ApproachObjectBehavior"):
-        super(ApproachObject, self).__init__(name=name, memory=True)
-        self.add_children([
-        ])
-
-
-class Exploratoin(pt.composites.Sequence):
+class Exploration(pt.composites.Sequence):
     def __init__(self, name="Exploration"):
-        super(Exploratoin, self).__init__(name=name, memory=True)
+        super(Exploration, self).__init__(name=name, memory=True)
         self.add_children([
+            ExplorePointBehavior(),
+            CheckExplorationCompletion(),
         ])
 
 
-class PickAndPlaceSelector(pt.composites.Sequence):
-    def __init__(self, name="PickAndPlaceBehavior"):
-        super(PickAndPlaceSelector, self).__init__(name=name, memory=True)
+class Pick(pt.composites.Sequence):
+    """
+    for select object, go to object, fine tune object position, and pick up
+    """
+
+    def __init__(self, name="Pick"):
+        super(Pick, self).__init__(name=name, memory=True)
         self.add_children([
+            GetObjectPositionBehavior(),
+            PlanToObjectBehavior(),
+            FineTuneObjectPositionBehavior(),
+            PickObjectBehavior(),
+        ])
+
+
+class Place(pt.composites.Sequence):
+    """
+    for get box position, plan to box, fine tune box position, and place
+    """
+
+    def __init__(self, name="Place"):
+        super(Place, self).__init__(name=name, memory=True)
+        self.add_children([
+            GetBoxPositionBehavior(),
+            PlanToBoxBehavior(),
+            FineTuneBoxPositionBehavior(),
+            PlaceBehavior(),
         ])
 
 
@@ -85,6 +103,10 @@ class ArmToHome(pt.behaviour.Behaviour, Node):
 
 
 class GetObjectPositionBehavior(pt.behaviour.Behaviour):
+    """
+    select one object from the object list and get the position of the object
+    """
+
     def __init__(self, name="GetObjectPositionBehavior"):
         super(GetObjectPositionBehavior, self).__init__(name=name)
 
@@ -94,6 +116,10 @@ class GetObjectPositionBehavior(pt.behaviour.Behaviour):
 
 
 class PlanToObjectBehavior(pt.behaviour.Behaviour):
+    """
+    use A star and pure pursuit to navigate to the object
+    """
+
     def __init__(self, name="PlanToObjectBehavior"):
         super(PlanToObjectBehavior, self).__init__(name=name)
 
@@ -102,21 +128,81 @@ class PlanToObjectBehavior(pt.behaviour.Behaviour):
         return pt.common.Status.SUCCESS
 
 
-class PlaceObjectBehavior(pt.behaviour.Behaviour):
-    def __init__(self, name="PlaceObjectBehavior"):
-        super(PlaceObjectBehavior, self).__init__(name=name)
+class FineTuneObjectPositionBehavior(pt.behaviour.Behaviour):
+    """
+    fine tune the object position with real sense detection
+    """
+
+    def __init__(self, name="FineTuneObjectPositionBehavior"):
+        super(FineTuneObjectPositionBehavior, self).__init__(name=name)
 
     def update(self):
-        # place holder for the place object behavior
+        # place holder for the fine tune object position behavior
         return pt.common.Status.SUCCESS
 
 
 class PickObjectBehavior(pt.behaviour.Behaviour):
+    """
+    pick up the object with the arm
+    """
+
     def __init__(self, name="PickObjectBehavior"):
         super(PickObjectBehavior, self).__init__(name=name)
 
     def update(self):
         # place holder for the pick object behavior
+        return pt.common.Status.SUCCESS
+
+
+class GetBoxPositionBehavior(pt.behaviour.Behaviour):
+    """
+    get the position of the box
+    """
+
+    def __init__(self, name="GetBoxPositionBehavior"):
+        super(GetBoxPositionBehavior, self).__init__(name=name)
+
+    def update(self):
+        # place holder for the get box behavior
+        return pt.common.Status.SUCCESS
+
+
+class PlanToBoxBehavior(pt.behaviour.Behaviour):
+    """
+    plan to the box with A star and pure pursuit
+    """
+
+    def __init__(self, name="PlanToBoxBehavior"):
+        super(PlanToBoxBehavior, self).__init__(name=name)
+
+    def update(self):
+        # place holder for the plan to box behavior
+        return pt.common.Status.SUCCESS
+
+
+class FineTuneBoxPositionBehavior(pt.behaviour.Behaviour):
+    """
+    fine tune the box position with real sense detection
+    """
+
+    def __init__(self, name="FineTuneBoxPositionBehavior"):
+        super(FineTuneBoxPositionBehavior, self).__init__(name=name)
+
+    def update(self):
+        # place holder for the fine tune box position behavior
+        return pt.common.Status.SUCCESS
+
+
+class PlaceBehavior(pt.behaviour.Behaviour):
+    """
+    place the object in the box
+    """
+
+    def __init__(self, name="PlaceBehavior"):
+        super(PlaceBehavior, self).__init__(name=name)
+
+    def update(self):
+        # place holder for the place behavior
         return pt.common.Status.SUCCESS
 
 
@@ -126,4 +212,31 @@ class PlaceObjectBehavior(pt.behaviour.Behaviour):
 
     def update(self):
         # place holder for the place box behavior
+        return pt.common.Status.SUCCESS
+
+
+class CheckTaskCompletion(pt.behaviour.Behaviour):
+    def __init__(self, name="CheckTaskCompletion"):
+        super(CheckTaskCompletion, self).__init__(name=name)
+
+    def update(self):
+        # place holder for the check task completion behavior
+        return pt.common.Status.RUNNING
+
+
+class ExplorePointBehavior(pt.behaviour.Behaviour):
+    def __init__(self, name="ExplorePointBehavior"):
+        super(ExplorePointBehavior, self).__init__(name=name)
+
+    def update(self):
+        # place holder for the explore point behavior
+        return pt.common.Status.SUCCESS
+
+
+class CheckExplorationCompletion(pt.behaviour.Behaviour):
+    def __init__(self, name="CheckExplorationCompletion"):
+        super(CheckExplorationCompletion, self).__init__(name=name)
+
+    def update(self):
+        # place holder for the check exploration completion behavior
         return pt.common.Status.SUCCESS
