@@ -157,6 +157,12 @@ class MappingNode : public rclcpp::Node
             transform_stamped_base_lidar.transform.translation.y + pose.y;
         pose_lidar.theta = yaw;
 
+        pose_camera.x =
+            transform_stamped_base_camera.transform.translation.x + pose.x;
+        pose_camera.y =
+            transform_stamped_base_camera.transform.translation.y + pose.y;
+        pose_camera.theta = yaw;
+
         // pose.x = msg->pose.pose.position.x;
         // pose.y = msg->pose.pose.position.y;
         // tf2::Quaternion q(msg->pose.pose.orientation.x,
