@@ -8,7 +8,10 @@
 #include "pcl_conversions/pcl_conversions.h"
 #include "rclcpp/rclcpp.hpp"
 #include "sensor_msgs/msg/point_cloud2.hpp"
+#include "tf2_geometry_msgs/tf2_geometry_msgs/tf2_geometry_msgs.hpp"
+#include "tf2_ros/buffer.h"
 #include "tf2_ros/transform_broadcaster.h"
+#include "tf2_ros/transform_listener.h"
 
 using namespace std::chrono_literals;
 class LidarLandmarker : public rclcpp::Node
@@ -21,13 +24,13 @@ class LidarLandmarker : public rclcpp::Node
             10,
             std::bind(
                 &LidarLandmarker::lidarCallback, this, std::placeholders::_1));
-        odom_sub_ = this->create_subscription<nav_msgs::msg::Odometry>(
-            "/odom",
-            10,
-            std::bind(
-                &LidarLandmarker::odomCallback, this, std::placeholders::_1));
+
         tf_broadcaster_ =
             std::make_unique<tf2_ros::TransformBroadcaster>(*this);
+
+        tf_buffer_ = std::make_unique<tf2_ros::Buffer>(this->get_clock());
+        tf_listener_ =
+            std::make_unique<tf2_ros::TransformListener>(*tf_buffer_);
 
         timer_ = this->create_wall_timer(
             3s, std::bind(&LidarLandmarker::timerCallback, this));
@@ -83,24 +86,22 @@ class LidarLandmarker : public rclcpp::Node
         odom.block<3, 1>(0, 3) << tf_odom.transform.translation.x,
             tf_odom.transform.translation.y, tf_odom.transform.translation.z;
 
+        Eigen::Matrix4d odomInv   = Eigen::Matrix4d::Identity();
+        odomInv.block<3, 3>(0, 0) = odom.block<3, 3>(0, 0).transpose();
+        odomInv.block<3, 1>(0, 3) =
+            -odom.block<3, 3>(0, 0).transpose() * odom.block<3, 1>(0, 3);
+
         Eigen::Matrix4d icpTF = icp.getFinalTransformation().cast<double>();
 
-        Eigen::Matrix4d diff = odom.inverse() * icpTF.inverse();
+        Eigen::Matrix4d diff = odomInv * icpTF;
 
         tf.transform.translation.x = diff(0, 3);
         tf.transform.translation.y = diff(1, 3);
         tf.transform.translation.z = diff(2, 3);
-        Eigen::Quaterniond q(diff.block<3, 3>(0, 0));
-        tf.transform.rotation.w = q.w();
-        tf.transform.rotation.x = q.x();
-        tf.transform.rotation.y = q.y();
-        tf.transform.rotation.z = q.z();
-
-        RCLCPP_INFO(this->get_logger(),
-                    "Published transform: %f %f %f",
-                    tf.transform.translation.x,
-                    tf.transform.translation.y,
-                    tf.transform.translation.z);
+        tf.transform.rotation.w    = 1;
+        tf.transform.rotation.x    = 0;
+        tf.transform.rotation.y    = 0;
+        tf.transform.rotation.z    = 0;
     }
     void lidarCallback(const sensor_msgs::msg::PointCloud2::SharedPtr msg)
     {
@@ -125,28 +126,30 @@ class LidarLandmarker : public rclcpp::Node
             RCLCPP_INFO(this->get_logger(), "Added first keyframe");
         }
 
+        try
+        {
+            tf_odom = tf_buffer_->lookupTransform(
+                "odom", "base_link", tf2::TimePointZero);
+        }
+        catch (tf2::TransformException &ex)
+        {
+            RCLCPP_ERROR(this->get_logger(), "%s", ex.what());
+            return;
+        }
+
         tf.header.stamp = msg->header.stamp;
         tf_broadcaster_->sendTransform(tf);
     }
 
-    void odomCallback(const nav_msgs::msg::Odometry::SharedPtr msg)
-    {
-        tf_odom.header.stamp            = msg->header.stamp;
-        tf_odom.header.frame_id         = "odom";
-        tf_odom.child_frame_id          = "base_link";
-        tf_odom.transform.translation.x = msg->pose.pose.position.x;
-        tf_odom.transform.translation.y = msg->pose.pose.position.y;
-        tf_odom.transform.translation.z = msg->pose.pose.position.z;
-        tf_odom.transform.rotation      = msg->pose.pose.orientation;
-    }
-
     rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr lidar_sub_;
-    rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr odom_sub_;
     rclcpp::TimerBase::SharedPtr timer_;
 
     geometry_msgs::msg::TransformStamped tf_odom;
     geometry_msgs::msg::TransformStamped tf;
     std::unique_ptr<tf2_ros::TransformBroadcaster> tf_broadcaster_;
+
+    std::unique_ptr<tf2_ros::Buffer> tf_buffer_;
+    std::unique_ptr<tf2_ros::TransformListener> tf_listener_;
 
     sensor_msgs::msg::PointCloud2 lastCloudMsg;
     std::vector<Keyframe<pcl::PointXYZ>> keyframes;
