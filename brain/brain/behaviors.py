@@ -109,9 +109,11 @@ class GetObjectPositionBehavior(pt.behaviour.Behaviour):
 
     def __init__(self, name="GetObjectPositionBehavior"):
         super(GetObjectPositionBehavior, self).__init__(name=name)
+        # Initalize the subscriber
 
     def update(self):
         # place holder for the get object behavior
+        # Get the information from the topic.
         return pt.common.Status.SUCCESS
 
 
@@ -193,16 +195,41 @@ class FineTuneBoxPositionBehavior(pt.behaviour.Behaviour):
         return pt.common.Status.SUCCESS
 
 
-class PlaceBehavior(pt.behaviour.Behaviour):
+class PlaceBehavior(pt.behaviour.Behaviour, Node):
     """
     place the object in the box
     """
 
     def __init__(self, name="PlaceBehavior"):
         super(PlaceBehavior, self).__init__(name=name)
+        # Send info to move arm into correct position
+        # Pause
+        # Send info to open gripper
+        # Pause
+        pt.behaviour.Behaviour.__init__(self, name=name)
+        Node.__init__(self, node_name=name)
+        self.publisher_ = self.create_publisher(
+            Int16MultiArray, '/multi_servo_cmd_sub', 10)
+        self.subscriber_ = self.create_subscription(
+            JointState, '/servo_pos_publisher', self.arm_pos_callback, 10)
+
+        self.current_joint_pos = [12000, 12000, 12000, 12000, 12000, 12000]
+        self.position_reached = False
+        # Use the callback here??
+        self.PLACE_POSITION = [12000 for i in range(12)]
+        for i in range(6):
+            self.PLACE_POSITION[i+6] = 800
+
+        # Replace these values with the correct place-arm-values. :)
+        self.PLACE_POSITION[0] = 5000
+        self.PLACE_POSITION[1] = 12000
+        self.PLACE_POSITION[2] = 2000
+        self.PLACE_POSITION[3] = 18000
+        self.PLACE_POSITION[4] = 10000
 
     def update(self):
         # place holder for the place behavior
+
         return pt.common.Status.SUCCESS
 
 
@@ -212,6 +239,7 @@ class PlaceObjectBehavior(pt.behaviour.Behaviour):
 
     def update(self):
         # place holder for the place box behavior
+
         return pt.common.Status.SUCCESS
 
 
