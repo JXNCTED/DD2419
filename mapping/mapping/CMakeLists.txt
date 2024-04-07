@@ -13,6 +13,8 @@ find_package(sensor_msgs REQUIRED)
 find_package(OpenCV REQUIRED)
 find_package(tf2_ros REQUIRED)
 find_package(mapping_interfaces REQUIRED)
+find_package(pcl_conversions REQUIRED)
+find_package(PCL REQUIRED)
 
 
 # uncomment the following section in order to fill in
@@ -33,7 +35,10 @@ ament_target_dependencies(
   "sensor_msgs"
   "tf2_ros"
   "rclcpp"
+  "pcl_conversions"
+  "PCL"
 )
+
   
 add_library(GridMap src/GridMap.cpp)
 target_include_directories(GridMap PUBLIC
@@ -69,6 +74,7 @@ target_link_libraries(
   GridMap
   Mapper
 )
+
 
 install(TARGETS mapping
   DESTINATION lib/${PROJECT_NAME})

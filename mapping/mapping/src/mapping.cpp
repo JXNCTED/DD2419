@@ -8,6 +8,8 @@
  * @copyright Copyright (c) 2024
  *
  */
+#include <fstream>
+
 #include "mapping/GridMap.hpp"
 #include "mapping/Mapper.hpp"
 #include "mapping_interfaces/srv/path_plan.hpp"
@@ -27,11 +29,11 @@ class MappingNode : public rclcpp::Node
             10,
             std::bind(&MappingNode::odomCallback, this, std::placeholders::_1));
 
-        laser_sub_ = this->create_subscription<sensor_msgs::msg::LaserScan>(
-            "/scan",
+        lidar_sub_ = this->create_subscription<sensor_msgs::msg::PointCloud2>(
+            "/compensated_scan_pc",
             10,
             std::bind(
-                &MappingNode::laserCallback, this, std::placeholders::_1));
+                &MappingNode::lidarCallback, this, std::placeholders::_1));
 
         occu_pub_ = this->create_publisher<nav_msgs::msg::OccupancyGrid>(
             "/occupancy", 10);
@@ -40,6 +42,23 @@ class MappingNode : public rclcpp::Node
             std::chrono::milliseconds(10000),
             std::bind(&MappingNode::timerCallback, this));
 
+        // read from /home/group7/workspace_2_tsv.tsv
+        std::ifstream file("/home/group7/workspace_2_tsv.tsv", std::ios::in);
+        std::string line;
+        std::vector<std::pair<double, double>> lineSegments;
+        std::getline(file, line);  // skip the first line
+        while (std::getline(file, line))
+        {
+            std::istringstream iss(line);
+            double x, y;
+            if (!(iss >> x >> y))
+            {
+                break;
+            }
+            lineSegments.push_back(std::make_pair(x, y));
+        }
+        map.setLineSegmentOccupied(lineSegments);
+        file.close();
         // workspace shit, hard coded for now
         // std::vector<std::pair<double, double>> lineSegments;
         // lineSegments.push_back(std::make_pair(0.0, 0.0));
@@ -54,9 +73,9 @@ class MappingNode : public rclcpp::Node
     void timerCallback()
     {
         assert(false);  // not used
-        // static int count = 0;
-        // map.saveMap("/home/group7/maps/" + std::to_string(count) +
-        // "_map.txt"); count++;
+        static int count = 0;
+        map.saveMap("/home/group7/maps/" + std::to_string(count) + "_map.txt");
+        count++;
     }
 
     void odomCallback(const nav_msgs::msg::Odometry::SharedPtr msg)
@@ -74,9 +93,9 @@ class MappingNode : public rclcpp::Node
     }
 
     // get LIDAR measurement and call the updateMapLaser function
-    void laserCallback(const sensor_msgs::msg::LaserScan::SharedPtr msg)
+    void lidarCallback(const sensor_msgs::msg::PointCloud2::SharedPtr msg)
     {
-        mapper.updateMapLaser(msg, pose);
+        mapper.updateMapLidar(msg, pose);
         nav_msgs::msg::OccupancyGrid occu;
         occu = map.toRosOccGrid();
         occu_pub_->publish(occu);
@@ -89,7 +108,7 @@ class MappingNode : public rclcpp::Node
     Mapper mapper;
     Pose pose;
     rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr odom_sub_;
-    rclcpp::Subscription<sensor_msgs::msg::LaserScan>::SharedPtr laser_sub_;
+    rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr lidar_sub_;
     rclcpp::Publisher<nav_msgs::msg::OccupancyGrid>::SharedPtr occu_pub_;
     rclcpp::TimerBase::SharedPtr timer_;
 };

@@ -17,12 +17,14 @@ find_package(tf2_ros REQUIRED)
 find_package(cv_bridge REQUIRED)
 find_package(tf2_geometry_msgs REQUIRED)
 find_package(OpenCV REQUIRED)
+find_package(PCL REQUIRED)
 
 
 
 add_executable(vi_odom src/vi_odom.cpp)
 add_executable(wheel_odom src/wheel_odom.cpp)
 add_executable(filter_odom src/filter_odom.cpp)
+add_executable(lidar_compensator src/lidar_compensator.cpp)
 
 add_library(ekf src/ekf.cpp)
 target_include_directories(ekf PUBLIC
@@ -36,6 +38,15 @@ target_include_directories(vi_odom PUBLIC
 target_include_directories(wheel_odom PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
   $<INSTALL_INTERFACE:include>)
+
+
+target_include_directories(lidar_compensator PUBLIC
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+  $<INSTALL_INTERFACE:include>)
+
+target_link_libraries(lidar_compensator ${PCL_LIBRARIES})
+
+
 target_compile_features(vi_odom PUBLIC c_std_99 cxx_std_17)  # Require C99 and C++17
 ament_target_dependencies(
   vi_odom
@@ -73,11 +84,22 @@ ament_target_dependencies(
   "tf2_geometry_msgs"
 )
 
+ament_target_dependencies(
+  lidar_compensator
+  "pcl_conversions"
+  "PCL"
+  "sensor_msgs"
+  "rclcpp"
+  "geometry_msgs"
+  "nav_msgs"
+)
+
 
 install(TARGETS 
   vi_odom 
   wheel_odom 
   filter_odom
+  lidar_compensator
   DESTINATION lib/${PROJECT_NAME})
 
 if(BUILD_TESTING)

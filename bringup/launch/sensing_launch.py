@@ -9,9 +9,16 @@ def generate_launch_description():
         Node(
             package='odometry', executable='wheel_odom', name='wheel_odom'),
         Node(
+            package='odometry', executable='lidar_compensator', name='lidar_compensator',
+        ),
+        Node(
             package='odometry', executable='filter_odom', name='filter_odom'),
         Node(
-            package='detection', executable='detection', name='detection'),
+            package='mapping', executable='mapping', name='mapping',
+        ),
+        Node(
+            package='workspace', executable='workspace', name='workspace',
+        ),
         Node(
             package='display_markers', executable='display_markers', name='display_markers'),
         Node(executable='static_transform_publisher', package='tf2_ros', arguments=[
