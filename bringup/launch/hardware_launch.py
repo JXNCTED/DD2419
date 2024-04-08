@@ -74,9 +74,9 @@ def generate_launch_description():
 
         # chassis controller
 
-        Node(package='controller',
-             executable='cartesian_controller',
-             ),
+        # Node(package='controller',
+        #      executable='cartesian_controller',
+        #      ),
 
         # servo arm
         Node(

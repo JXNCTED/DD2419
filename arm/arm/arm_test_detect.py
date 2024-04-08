@@ -4,7 +4,6 @@ from sensor_msgs.msg import Image
 import numpy as np
 import cv2 as cv
 from cv_bridge import CvBridge
-from setuptools import setup
 
 
 class ImageFilterNode(Node):
@@ -41,28 +40,29 @@ class ImageFilterNode(Node):
 
         img = CvBridge().imgmsg_to_cv2(msg, 'bgr8')
         img = cv.undistort(img, self.K, self.coeffs)
+        # img = cv.GaussianBlur(img, (3, 3), 0)
 
         cv.imshow('original', img)
 
-        img = cv.GaussianBlur(img, (5, 5), 0)
-        img = cv.bilateralFilter(img, 15, 100, 100)
-        img = cv.medianBlur(img, 5)
+        # img = cv.GaussianBlur(img, (3, 3), 0)
+        img = cv.bilateralFilter(img, 25, 90, 70)
 
         copy = img.copy()
 
         gray = cv.cvtColor(img, cv.COLOR_BGR2GRAY)
-        edges = cv.Canny(gray, 50, 150, apertureSize=3)
+        edges = cv.Canny(gray, 50, 150, apertureSize=3, L2gradient=True)
+        cv.imshow('edges', edges)
 
         contours, _ = cv.findContours(
             edges, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE)
         # combine all contours into one
         if len(contours) > 0:
-            area_mask = [cv.contourArea(c) > 35 for c in contours]
-            # contours = np.concatenate(contours)
-            # concatenate all contours with area > 5
             try:
+                # area_mask = [cv.contourArea(c) > 35 for c in contours]
+                length_mask = [cv.arcLength(c, True) > 100 for c in contours]
                 contours = np.concatenate(
-                    [c for c, a in zip(contours, area_mask) if a])
+                    [c for c, a in zip(contours, length_mask) if a])
+                # contours = np.concatenate(contours)
 
                 cv.drawContours(copy, contours, -1, (0, 255, 0), 3)
                 rect = cv.minAreaRect(contours)
@@ -72,6 +72,12 @@ class ImageFilterNode(Node):
                 cv.drawContours(copy, [box], 0, (0, 0, 255), 2)
                 cv.circle(copy, (int(centroid[0]), int(
                     centroid[1])), 10, (0, 0, 255), -1)
+
+                # ellipse = cv.fitEllipse(contours)
+                # cv.ellipse(copy, ellipse, (0, 0, 255), 2)
+                # centroid = ellipse[0]
+                # cv.circle(copy, (int(centroid[0]), int(
+                #     centroid[1])), 10, (0, 0, 255), -1)
             except:
                 pass
 
