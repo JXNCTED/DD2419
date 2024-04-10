@@ -17,6 +17,7 @@ set(msg_files
 
 set(action_files
   "action/Pursuit.action"
+  "action/Arm.action"
 )
 
 
