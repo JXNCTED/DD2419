@@ -14,9 +14,9 @@ def generate_launch_description():
         ),
         Node(
             package='odometry', executable='wheel_odom', name='wheel_odom'),
-        Node(
-            package='odometry', executable='lidar_compensator', name='lidar_compensator',
-        ),
+        # Node(
+        #     package='odometry', executable='lidar_compensator', name='lidar_compensator',
+        # ),
         Node(
             package='odometry', executable='filter_odom', name='filter_odom',
         ),
@@ -29,8 +29,8 @@ def generate_launch_description():
                 'transform_tolerance': 0.01,
                 'min_height': -0.05,
                 'max_height': 0.0,
-                'angle_min': -1.5708,  # -M_PI/2
-                'angle_max': 1.5708,  # M_PI/2
+                'angle_min': -0.5,  # POV of D435i
+                'angle_max': 0.5,
                 'angle_increment': 0.0087,  # M_PI/360.0
                 'scan_time': 0.3333,
                 'range_min': 0.20,

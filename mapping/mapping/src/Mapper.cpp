@@ -54,7 +54,8 @@ void Mapper::updateMapLiDAR(
         // remove invalid measurement of INF
         if (R > laserPtr->range_max)
         {
-            R = laserPtr->range_max;
+            // R = laserPtr->range_max;
+            continue;
         }
         else if (R < laserPtr->range_min)
         {
@@ -155,7 +156,8 @@ void Mapper::updateMapRGBD(
         // remove invalid measurement of INF
         if (R > laserPtr->range_max)
         {
-            R = 100;
+            continue;
+            // R = 100;
         }
         else if (R < laserPtr->range_min)
         {

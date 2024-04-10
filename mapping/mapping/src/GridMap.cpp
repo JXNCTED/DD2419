@@ -99,8 +99,9 @@ void GridMap::setGridLogBelief(const double &x,
                                const double &logBelief,
                                const GridType &type)
 {
-    const double belief        = 1.0f - 1.0f / (1 + exp(logBelief));
-    const double beliefClamped = std::clamp(belief, 0.6, 0.9);
+    const double belief = 1.0f - 1.0f / (1 + exp(logBelief));
+    // const double beliefClamped = std::clamp(belief, 0.6, 0.9);
+    const double beliefClamped = std::clamp(belief, 0.1, 0.9);
     setGridBelief(x, y, beliefClamped, type);
 }
 

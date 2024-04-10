@@ -1,7 +1,7 @@
-#include "geometry_msgs/msg/pose_stamped.hpp"  //path
-#include "geometry_msgs/msg/vector3.hpp"       //wheels
-#include "nav_msgs/msg/odometry.hpp"           //odometry
-#include "nav_msgs/msg/path.hpp"               //path
+#include "geometry_msgs/msg/pose_stamped.hpp"     //path
+#include "geometry_msgs/msg/vector3_stamped.hpp"  //wheel_odom
+#include "nav_msgs/msg/odometry.hpp"              //odometry
+#include "nav_msgs/msg/path.hpp"                  //path
 #include "rclcpp/qos.hpp"
 #include "rclcpp/rclcpp.hpp"                        //general
 #include "sensor_msgs/msg/imu.hpp"                  //imu
@@ -18,7 +18,7 @@ class FilterOdom : public rclcpp::Node
         rclcpp::SensorDataQoS sensorQos;
         // Subscriptions
         wheel_odom_sub_ =
-            this->create_subscription<geometry_msgs::msg::Vector3>(
+            this->create_subscription<geometry_msgs::msg::Vector3Stamped>(
                 "/wheel_odom",
                 10,
                 std::bind(
@@ -113,13 +113,23 @@ class FilterOdom : public rclcpp::Node
     }
 
     // Callbacks from wheel enconders, realsense IMU and phidget IMU.
-    void wheel_callback(const geometry_msgs::msg::Vector3::SharedPtr msg)
+    void wheel_callback(const geometry_msgs::msg::Vector3Stamped::SharedPtr msg)
     {
-        const double DT = 50.0 / 1000.0;
+        static double last_time = rclcpp::Time(msg->header.stamp).seconds();
+        double dt = rclcpp::Time(msg->header.stamp).seconds() - last_time;
+        last_time = rclcpp::Time(msg->header.stamp).seconds();
+        if (dt <= 0.0)
+            return;
+        double v = msg->vector.x;
+        // double w = msg->vector.y;
+        x_ += v * cos(yaw_) * dt;
+        y_ += v * sin(yaw_) * dt;
+        // const double DT = 50.0 / 1000.0;
+
         // wheel_odom[0]   = msg->x;
         // wheel_odom[1]   = msg->y;
-        x_ = x_ + msg->x * cos(yaw_) * DT;
-        y_ = y_ + msg->x * sin(yaw_) * DT;
+        // x_ = x_ + msg->x * cos(yaw_) * DT;
+        // y_ = y_ + msg->x * sin(yaw_) * DT;
     }
     void realsense_callback(const sensor_msgs::msg::Imu::SharedPtr msg)
     {
@@ -163,7 +173,7 @@ class FilterOdom : public rclcpp::Node
     rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr odom_pub_;
     rclcpp::Subscription<sensor_msgs::msg::Imu>::SharedPtr imu_sub_;
     // rclcpp::Subscription<sensor_msgs::msg::Imu>::SharedPtr phidget_gyro_sub_;
-    rclcpp::Subscription<geometry_msgs::msg::Vector3>::SharedPtr
+    rclcpp::Subscription<geometry_msgs::msg::Vector3Stamped>::SharedPtr
         wheel_odom_sub_;
     std::unique_ptr<tf2_ros::TransformBroadcaster> tf_broadcaster_;
     rclcpp::Publisher<nav_msgs::msg::Path>::SharedPtr path_pub_;
