@@ -74,11 +74,11 @@ class DetectionMLNode(Node):
 
         self.np_depth = None
 
-        # self.image_sub = self.create_subscription(
-        #     Image, "/camera/color/image_raw", self.img_callback, 10)
-
         self.image_sub = self.create_subscription(
-            Image, "/image_raw", self.img_callback, 10)
+            Image, "/camera/color/image_raw", self.img_callback, 10)
+
+        # self.image_sub = self.create_subscription(
+        #     Image, "/image_raw", self.img_callback, 10)
 
         # this is the aligned depth camera info and image
         self.cam_info_sub = self.create_subscription(
