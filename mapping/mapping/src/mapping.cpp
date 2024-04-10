@@ -17,6 +17,7 @@
 #include "mapping/Mapper.hpp"
 #include "mapping_interfaces/srv/path_plan.hpp"
 #include "nav_msgs/msg/odometry.hpp"
+#include "rclcpp/qos.hpp"
 #include "rclcpp/rclcpp.hpp"
 #include "tf2/LinearMath/Matrix3x3.h"
 #include "tf2/LinearMath/Quaternion.h"
@@ -48,20 +49,17 @@ class MappingNode : public rclcpp::Node
             std::bind(
                 &MappingNode::lidarCallback, this, std::placeholders::_1));
 
+        rclcpp::SensorDataQoS qos;
         point_cloud_sub_ =
-            this->create_subscription<sensor_msgs::msg::PointCloud2>(
-                "/camera/depth/color/points",
-                10,
+            this->create_subscription<sensor_msgs::msg::LaserScan>(
+                "/realsense_scan",
+                qos,
                 std::bind(&MappingNode::pointCloudCallback,
                           this,
                           std::placeholders::_1));
 
         occu_pub_ = this->create_publisher<nav_msgs::msg::OccupancyGrid>(
             "/occupancy", 10);
-
-        filtered_pc_pub_ =
-            this->create_publisher<sensor_msgs::msg::PointCloud2>(
-                "/filtered_pc", 10);
 
         // read from /home/group7/workspace_2_tsv.tsv
         std::ifstream file("/home/group7/workspace_2_tsv.tsv", std::ios::in);
@@ -115,12 +113,10 @@ class MappingNode : public rclcpp::Node
                     transform_stamped_base_camera.transform.translation.z);
         RCLCPP_INFO(this->get_logger(), "Mapping node initialized");
     }
-    void pointCloudCallback(const sensor_msgs::msg::PointCloud2::SharedPtr msg)
+    void pointCloudCallback(const sensor_msgs::msg::LaserScan::SharedPtr msg)
     {
         // mapper.updateMapRGBD(msg, pose);
-        sensor_msgs::msg::PointCloud2 filtered_pc =
-            mapper.updateMapRGBD(msg, pose_camera);
-        filtered_pc_pub_->publish(filtered_pc);
+        mapper.updateMapRGBD(msg, pose_camera);
     }
     void odomCallback(const nav_msgs::msg::Odometry::SharedPtr msg)
     {
@@ -216,11 +212,9 @@ class MappingNode : public rclcpp::Node
     // rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr
     // lidar_sub_;
     rclcpp::Subscription<sensor_msgs::msg::LaserScan>::SharedPtr lidar_sub_;
-    rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr
+    rclcpp::Subscription<sensor_msgs::msg::LaserScan>::SharedPtr
         point_cloud_sub_;
     rclcpp::Publisher<nav_msgs::msg::OccupancyGrid>::SharedPtr occu_pub_;
-    rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr
-        filtered_pc_pub_;
     rclcpp::TimerBase::SharedPtr timer_;
 
     geometry_msgs::msg::TransformStamped transform_stamped_base_lidar;

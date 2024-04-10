@@ -54,9 +54,8 @@ class Mapper
     // void updateMapRGBD(const sensor_msgs::msg::PointCloud2::SharedPtr
     // rgbdPtr,
     //                    const Pose &pose);
-    sensor_msgs::msg::PointCloud2 updateMapRGBD(
-        const sensor_msgs::msg::PointCloud2::SharedPtr rgbdPtr,
-        const Pose &pose);
+    void updateMapRGBD(const sensor_msgs::msg::LaserScan::SharedPtr rgbdPtr,
+                       const Pose &pose);
 
    private:
     /**
