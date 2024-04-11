@@ -50,7 +50,8 @@ class ArmController(Node):
         self.arm_pos_sub_ = self.create_subscription(
             JointState, '/servo_pos_publisher', self.arm_pos_callback, 10)
 
-        self.rate = self.create_rate(0.33)  # sleep for
+        self.rate = self.create_rate(1/3)
+        self.rate_place = self.create_rate(1/4)  # sleep
 
         self.action_server_ = ActionServer(
             self, Arm, 'arm', execute_callback=self.execute_callback, goal_callback=self.goal_callback, cancel_callback=self.cancel_callback
@@ -130,6 +131,70 @@ class ArmController(Node):
 
             for i in range(5):
                 self.command_list[i+1] = 12000
+
+            msg = Int16MultiArray()
+            msg.data.extend(self.command_list)
+            msg.data.extend(move_time)
+
+            self.arm_pub_.publish(msg)
+
+        elif self.current_command == "place":
+            self.rate_place.sleep()
+            z = 0.05
+
+            x, y = 0, 0.15
+            angle = 0
+            q1, q2, q3 = j12_ik(sqrt(x**2 + y**2), z)
+            if q1 == 0 and q2 == 0 and q3 == 0:
+                self.get_logger().warn("Invalid position")
+                result = Arm.Result()
+                result.success = False
+                goal_handle.abort()
+                return result
+
+            self.command_list[0] = -1
+            self.command_list[1] = 12000 - \
+                int((angle - atan2(x, y)) * 18000 / pi)
+            self.command_list[2] = 12000 - \
+                int(q3 * 18000 / pi) + int(pi / 2 * 18000 / pi)
+            self.command_list[3] = 12000 + int(q2 * 18000 / pi)
+            self.command_list[4] = 12000 - int(q1 * 18000 / pi)
+            self.command_list[5] = 12000 + int(atan2(x, y) * 18000 / pi)
+
+            for i in range(6):
+                if self.command_list[i] >= 24000:
+                    self.command_list[i] = 24000
+                elif self.command_list[i] <= -1:
+                    self.command_list[i] = -1
+
+            self.get_logger().info(f'command list: {self.command_list}')
+
+            move_time = [1000 for _ in range(6)]
+
+            msg = Int16MultiArray()
+            msg.data.extend(self.command_list)
+            msg.data.extend(move_time)
+
+            self.arm_pub_.publish(msg)
+
+            self.rate_place.sleep()
+
+            # now open the gripper
+            self.command_list[0] = 0
+
+            for i in range(5):
+                self.command_list[i+1] = -1
+
+            msg = Int16MultiArray()
+            msg.data.extend(self.command_list)
+            msg.data.extend(move_time)
+
+            self.arm_pub_.publish(msg)
+
+            self.rate_place.sleep()
+
+            for i in range(6):
+                self.command_list[i] = 12000
 
             msg = Int16MultiArray()
             msg.data.extend(self.command_list)
