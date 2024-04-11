@@ -1,0 +1,7 @@
+string object_id
+---
+bool success
+float32 angle
+float32[2] position
+---
+float32 distance
