@@ -23,6 +23,7 @@ setup(
             'cartesian_controller = controller.cartesian_controller:main',
             'arm_controller = controller.arm_controller:main',
             'pursuit_action_server = controller.pursuit_action_server:main',
+            'finetune_object_action_server = controller.finetune_object_action_server:main',
         ],
     },
 )

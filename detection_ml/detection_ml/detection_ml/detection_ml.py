@@ -9,7 +9,7 @@ import rclpy
 from dd2419_detector_baseline.detector import Detector
 import time
 import numpy as np
-from std_msgs.msg import String
+from std_msgs.msg import String, Float32MultiArray
 import torch_tensorrt
 from detection_interfaces.msg import DetectedObj
 from geometry_msgs.msg import PointStamped
@@ -102,6 +102,13 @@ class DetectionMLNode(Node):
 
         self.arm_detected_obj_pub = self.create_publisher(
             DetectedObj, "/detection_ml/arm_detected_obj", 10)
+        # publish the bounding box just as an multiarray
+
+        self.bounding_box_pub = self.create_publisher(
+            Float32MultiArray, "/detection_ml/bounding_box", 10)
+
+        self.arm_bounding_box_pub = self.create_publisher(
+            Float32MultiArray, "/detection_ml/arm_bounding_box", 10)
 
         # publish the pose of each category. For visualization only, could not handle multiple objects of the same category
         NUM_CLASSES = 15
@@ -175,7 +182,7 @@ class DetectionMLNode(Node):
             x, y, w, h, score, category = int(bb[0]), int(bb[1]), int(
                 bb[2]), int(bb[3]), round(bb[4], 2), int(bb[5])
 
-            cata_str = f"{cls_dict[category]} scr:{score}"
+            cata_str = f"{cls_dict[category]}/{category}"
             # draw the bounding box and the category. For visualization only
             # when running, comment out if no valid display is available
             cv2.rectangle(show_img, (x, y), (x+w, y+h),
@@ -185,6 +192,8 @@ class DetectionMLNode(Node):
 
         if length > 0:
             self.detected_obj_pub.publish(detected_obj)
+            bbs_np = np.array(bbs_nms).flatten()
+            self.bounding_box_pub.publish(Float32MultiArray(data=bbs_np))
 
         fps = round(1/(time.time()-self.last_time), 2)
         self.last_time = time.time()
@@ -240,7 +249,7 @@ class DetectionMLNode(Node):
             detected_obj.category.append(category)
             detected_obj.confidence.append(score)
 
-            cata_str = f"{cls_dict[category]} scr:{score}"
+            cata_str = f"{cls_dict[category]}/{category}"
             # draw the bounding box and the category. For visualization only
             # when running, comment out if no valid display is available
             cv2.rectangle(show_img, (x, y), (x+w, y+h),
@@ -250,6 +259,8 @@ class DetectionMLNode(Node):
 
         if length > 0:
             self.arm_detected_obj_pub.publish(detected_obj)
+            bbs_np = np.array(bbs_nms).flatten()
+            self.arm_bounding_box_pub.publish(Float32MultiArray(data=bbs_np))
 
         fps = round(1/(time.time()-self.last_time), 2)
         self.last_time = time.time()
