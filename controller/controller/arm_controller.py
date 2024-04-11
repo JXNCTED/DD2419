@@ -77,7 +77,7 @@ class ArmController(Node):
 
             self.rate.sleep()
 
-            z = 0.02  # compensate for the gravity
+            z = 0.01  # compensate for the gravity
 
             x, y = self.object_position
             angle = self.object_angle
