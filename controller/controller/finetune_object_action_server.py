@@ -7,6 +7,8 @@ from robp_interfaces.action import Finetune
 from geometry_msgs.msg import Twist
 from std_msgs.msg import Float32MultiArray
 from math import atan2, pi, sqrt
+import cv2
+import numpy as np
 
 
 class FinetuneObjectActionServer(Node):
@@ -15,6 +17,13 @@ class FinetuneObjectActionServer(Node):
 
         self.detected_obj = None
         self.target_obj_id = None
+
+        self.K_arm = np.array([[513.34301, 0., 307.89617],
+                               [0., 513.84807, 244.62007],
+                               [0., 0., 1.]])
+
+        self.coeffs_arm = np.array(
+            [-0.474424, 0.207336, -0.002361, 0.000427, 0.000000])
 
         self.arm_detected_obj_sub = self.create_subscription(
             Float32MultiArray, '/detection_ml/arm_bounding_box', self.arm_detected_obj_callback, 10
@@ -61,11 +70,10 @@ class FinetuneObjectActionServer(Node):
                 self.get_logger().info('reached')
                 break
             theta_normalized = atan2(
-                center_y - CENTER[1], center_x - CENTER[0]) / pi
+                CENTER[1] - center_y, CENTER[0] - center_x) / pi
 
             self.get_logger().info(
-                f'center_x: {center_x}, center_y: {center_y}')
-
+                f'theta_normalized: {theta_normalized}, center: {center_x, center_y}, target: {CENTER}')
             twist = Twist()
             KP = -2.0
             if (0 < theta_normalized <= 0.4):
@@ -90,8 +98,6 @@ class FinetuneObjectActionServer(Node):
             goal_handle.distance = sqrt(
                 (center_x - CENTER[0])**2 + (center_y - CENTER[1])**2)
 
-            self.get_logger().info(
-                f'linear: {twist.linear.x}, angular: {twist.angular.z}, theta: {theta_normalized}')
             self.twist_pub.publish(twist)
 
         twist = Twist()
@@ -99,8 +105,12 @@ class FinetuneObjectActionServer(Node):
         twist.angular.z = 0.0
         self.twist_pub.publish(twist)
 
+        # pnp to find the center_x, center_y
+        ret, rvec, tvec = cv2.solvePnP(
+            np.array([[0, 0, 0]], dtype=np.float32), np.array([[center_x, center_y, 1]], dtype=np.float32), self.K_arm, self.coeffs_arm)
+
         result.success = True
-        result.position = [0.0, 0.0]
+        result.position = []
         result.angle = 0.0
 
         goal_handle.succeed()
