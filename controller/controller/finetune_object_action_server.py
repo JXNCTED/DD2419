@@ -8,6 +8,8 @@ from geometry_msgs.msg import Twist
 from std_msgs.msg import Float32MultiArray
 from math import atan2, pi, sqrt
 import cv2
+from sensor_msgs.msg import Image
+from cv_bridge import CvBridge
 import numpy as np
 
 
@@ -22,12 +24,17 @@ class FinetuneObjectActionServer(Node):
                                [0., 513.84807, 244.62007],
                                [0., 0., 1.]])
 
+        self.img = None
+
         self.coeffs_arm = np.array(
             [-0.474424, 0.207336, -0.002361, 0.000427, 0.000000])
 
         self.arm_detected_obj_sub = self.create_subscription(
             Float32MultiArray, '/detection_ml/arm_bounding_box', self.arm_detected_obj_callback, 10
         )
+
+        self.arm_camera_image_sub = self.create_subscription(
+            Image, '/raw_img', self.arm_camera_image_callback, 10)
 
         self.twist_pub = self.create_publisher(
             Twist, '/motor_controller/twist', 10)
@@ -38,6 +45,10 @@ class FinetuneObjectActionServer(Node):
 
     def arm_detected_obj_callback(self, msg: Float32MultiArray):
         self.detected_obj = msg
+
+    def arm_camera_image_callback(self, msg: Image):
+        self.img = CvBridge().imgmsg_to_cv2(msg, 'bgr8')
+        self.img = cv2.undistort(self.img, self.K_arm, self.coeffs_arm)
 
     def execute_callback(self, goal_handle):
         self.get_logger().info('Executing goal...')
@@ -105,12 +116,13 @@ class FinetuneObjectActionServer(Node):
         twist.angular.z = 0.0
         self.twist_pub.publish(twist)
 
-        # pnp to find the center_x, center_y
-        ret, rvec, tvec = cv2.solvePnP(
-            np.array([[0, 0, 0]], dtype=np.float32), np.array([[center_x, center_y, 1]], dtype=np.float32), self.K_arm, self.coeffs_arm)
+        world_z = 0.2  # 20 cm camera above the ground
+
+        world_x = (center_x - self.K_arm[0, 2]) * world_z / self.K_arm[0, 0]
+        world_y = (center_y - self.K_arm[1, 2]) * world_z / self.K_arm[1, 1]
 
         result.success = True
-        result.position = []
+        result.position = [world_x, world_y]
         result.angle = 0.0
 
         goal_handle.succeed()
