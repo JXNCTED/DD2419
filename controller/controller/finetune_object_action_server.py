@@ -11,6 +11,8 @@ import cv2
 from sensor_msgs.msg import Image
 from cv_bridge import CvBridge
 import numpy as np
+from filterpy.kalman import KalmanFilter
+from filterpy.common import Q_discrete_white_noise
 
 
 class FinetuneObjectActionServer(Node):
@@ -25,6 +27,19 @@ class FinetuneObjectActionServer(Node):
                                [0., 0., 1.]])
 
         self.img = None
+
+        self.filter = KalmanFilter(dim_x=4, dim_z=2)
+        self.filter.x = np.array([0, 0, 0, 0])  # x, dx, y, dy
+        self.filter.F = np.array([[1, 1, 0, 0],
+                                  [0, 1, 0, 0],
+                                  [0, 0, 1, 1],
+                                  [0, 0, 0, 1]])
+        self.filter.H = np.array([[1, 0, 0, 0],
+                                  [0, 0, 1, 0]])
+        self.filter.P *= 1000
+        self.filter.R = np.array([[5, 0],
+                                  [0, 5]])
+        self.filter.Q = Q_discrete_white_noise(dim=2, dt=0.1, var=0.13)
 
         self.coeffs_arm = np.array(
             [-0.474424, 0.207336, -0.002361, 0.000427, 0.000000])
@@ -60,6 +75,7 @@ class FinetuneObjectActionServer(Node):
             return result
 
         # use chassis to move the robot to the target object
+        is_first = True
         while rclpy.ok():
             # find the object with the target id in field x, y, w, h, confidence, category
             index = None
@@ -74,17 +90,29 @@ class FinetuneObjectActionServer(Node):
             x, y, w, h = self.detected_obj.data[index:index+4]
             center_x = x + w / 2
             center_y = y + h / 2
+            if is_first:
+                self.filter.x = np.array([center_x, 0, center_y, 0])
+                is_first = False
+            else:
+                self.filter.predict()
+                self.filter.update([center_x, center_y])
+
+            # debug display
+            display_img = self.img.copy()
+            display_img = cv2.rectangle(
+                display_img, (int(x), int(y)), (int(x+w), int(y+h)), (0, 255, 0), 2)
+            display_img = cv2.circle(
+                display_img, (int(self.filter.x[0]), int(self.filter.x[2])), 5, (0, 0, 255), -1)
+            cv2.imshow('img', display_img)
 
             CENTER = (320, 240)  # center camera coordinate
-            # continue if the object is in the center of the camera
-            if abs(center_x - CENTER[0]) < 32 and abs(center_y - CENTER[1]) < 60:
+
+            if abs(self.filter.x[0] - CENTER[0]) < 32 and abs(self.filter.x[2] - CENTER[1]) < 60:
                 self.get_logger().info('reached')
                 break
             theta_normalized = atan2(
-                CENTER[1] - center_y, CENTER[0] - center_x) / pi
+                CENTER[1] - self.filter.x[2], CENTER[0] - self.filter.x[0]) / pi
 
-            self.get_logger().info(
-                f'theta_normalized: {theta_normalized}, center: {center_x, center_y}, target: {CENTER}')
             twist = Twist()
             KP = -2.0
             if (0 < theta_normalized <= 0.4):
@@ -107,7 +135,7 @@ class FinetuneObjectActionServer(Node):
                 twist.angular.z = 0.0
 
             goal_handle.distance = sqrt(
-                (center_x - CENTER[0])**2 + (center_y - CENTER[1])**2)
+                (self.filter.x[0] - CENTER[0])**2 + (self.filter.x[2] - CENTER[1])**2)
 
             self.twist_pub.publish(twist)
 
@@ -118,8 +146,8 @@ class FinetuneObjectActionServer(Node):
 
         world_z = 0.2  # 20 cm camera above the ground
 
-        world_x = (center_x - self.K_arm[0, 2]) * world_z / self.K_arm[0, 0]
-        world_y = (center_y - self.K_arm[1, 2]) * world_z / self.K_arm[1, 1]
+        world_x = self.filter.x[0] * world_z / self.K_arm[0, 0]
+        world_y = self.filter.x[2] * world_z / self.K_arm[1, 1]
 
         result.success = True
         result.position = [world_x, world_y]
