@@ -12,8 +12,8 @@ import numpy as np
 from std_msgs.msg import Float32MultiArray
 import torch_tensorrt
 from PIL import Image as PILImage
-from geometry_msgs.msg import PointStamped
-from detection_interfaces.msg import DetectedObj
+from geometry_msgs.msg import PointStamped, Point
+from detection_interfaces.msg import DetectedObj, Object
 
 cls_dict = {
     0: "none",
@@ -30,13 +30,13 @@ cls_dict = {
     11: "rc",
     12: "rs",
     13: "slush",
-    14: "wc"
+    14: "wc",
 }
 
 
 class DetectionMLNode(Node):
     def __init__(self):
-        super().__init__('detection_ml')
+        super().__init__("detection_ml")
         self.last_time = time.time()
 
         # This is to export the model to tensorrt
@@ -64,8 +64,7 @@ class DetectionMLNode(Node):
             [
                 v2.ToImage(),
                 v2.ToDtype(torch.float32, scale=True),
-                v2.Normalize(mean=[0.485, 0.456, 0.406],
-                             std=[0.229, 0.224, 0.225]),
+                v2.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
             ]
         )
         self.get_logger().info("Model loaded")
@@ -75,29 +74,39 @@ class DetectionMLNode(Node):
         self.np_depth = None
 
         self.image_sub = self.create_subscription(
-            Image, "/camera/color/image_raw", self.img_callback, 10)
+            Image, "/camera/color/image_raw", self.img_callback, 10
+        )
 
         # self.image_sub = self.create_subscription(
         #     Image, "/image_raw", self.img_callback, 10)
 
         # this is the aligned depth camera info and image
         self.cam_info_sub = self.create_subscription(
-            CameraInfo, "/camera/aligned_depth_to_color/camera_info", self.cam_info_callback, 10)
+            CameraInfo,
+            "/camera/aligned_depth_to_color/camera_info",
+            self.cam_info_callback,
+            10,
+        )
         self.depth_sub = self.create_subscription(
-            Image, "/camera/aligned_depth_to_color/image_raw", self.depth_callback, 10)
+            Image, "/camera/aligned_depth_to_color/image_raw", self.depth_callback, 10
+        )
 
         # see the detection_interfaces package for the message definition
         self.detected_obj_pub = self.create_publisher(
-            DetectedObj, "/detection_ml/detected_obj", 10)
+            DetectedObj, "/detection_ml/detected_obj", 10
+        )
 
         # publish the bounding box just as an multiarray
         self.bounding_box_pub = self.create_publisher(
-            Float32MultiArray, "/detection_ml/bounding_box", 10)
+            Float32MultiArray, "/detection_ml/bounding_box", 10
+        )
 
         # publish the pose of each category. For visualization only, could not handle multiple objects of the same category
         NUM_CLASSES = 15
-        self.pose_pubs = [self.create_publisher(
-            PointStamped, f"/detection_ml/pose{i}", 10) for i in range(NUM_CLASSES)]
+        self.pose_pubs = [
+            self.create_publisher(PointStamped, f"/detection_ml/pose{i}", 10)
+            for i in range(NUM_CLASSES)
+        ]
 
         self.get_logger().info("Node initialized")
 
@@ -116,8 +125,8 @@ class DetectionMLNode(Node):
         if self.K is None or self.np_depth is None:
             return np.array([0.0, 0.0, 0.0])
         x, y, w, h = bb[0], bb[1], bb[2], bb[3]
-        u = x + w/2
-        v = y + h/2
+        u = x + w / 2
+        v = y + h / 2
         world_z = self.np_depth[int(v), int(u)]
         if world_z == 0:
             return np.array([0.0, 0.0, 0.0])
@@ -133,8 +142,7 @@ class DetectionMLNode(Node):
         # convert the image to tensor and run the model
         bridge = cv_bridge.CvBridge()
         img = bridge.imgmsg_to_cv2(msg, "rgb8")
-        input_img = torch.stack([self.val_input_transforms(img)]).to(
-            "cuda")
+        input_img = torch.stack([self.val_input_transforms(img)]).to("cuda")
         with torch.no_grad():
             out = self.trt_model(input_img)
         DETECT_THRESHOLD = 0.95
@@ -149,8 +157,14 @@ class DetectionMLNode(Node):
         detected_obj.header = msg.header
 
         for bb in bbs_nms:
-            x, y, w, h, score, category = int(bb[0]), int(bb[1]), int(
-                bb[2]), int(bb[3]), round(bb[4], 2), int(bb[5])
+            x, y, w, h, score, category = (
+                int(bb[0]),
+                int(bb[1]),
+                int(bb[2]),
+                int(bb[3]),
+                round(bb[4], 2),
+                int(bb[5]),
+            )
             position = self.get_position(bb)
             # handle obviously wrong position
             if (position == np.array([0.0, 0.0, 0.0])).all():
@@ -161,35 +175,41 @@ class DetectionMLNode(Node):
             pose.point.x = position[0]
             pose.point.y = position[1]
             pose.point.z = position[2]
+            obj = Object()
+            obj.position.x = position[0]
+            obj.position.y = position[1]
+            obj.position.z = position[2]
+            obj.category = category
+            obj.confidence = score
             # self.pose_pub.publish(pose)
             self.pose_pubs[category].publish(pose)
-            detected_obj.position.append(pose)
-            detected_obj.category.append(category)
-            detected_obj.confidence.append(score)
+            detected_obj.obj.append(obj)
 
             cata_str = f"{cls_dict[category]} scr:{score}"
             # draw the bounding box and the category. For visualization only
             # when running, comment out if no valid display is available
-            cv2.rectangle(show_img, (x, y), (x+w, y+h),
-                          color=(0, 255, 0), thickness=2)
-            cv2.putText(show_img, cata_str, (x, y),
-                        cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
+            cv2.rectangle(
+                show_img, (x, y), (x + w, y + h), color=(0, 255, 0), thickness=2
+            )
+            cv2.putText(
+                show_img, cata_str, (x, y), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2
+            )
 
         if length > 0:
             self.detected_obj_pub.publish(detected_obj)
 
-        fps = round(1/(time.time()-self.last_time), 2)
+        fps = round(1 / (time.time() - self.last_time), 2)
         self.last_time = time.time()
         status_str = f"FPS: {fps}"
-        cv2.putText(show_img, status_str, (10, 30),
-                    cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
+        cv2.putText(
+            show_img, status_str, (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2
+        )
         cv2.imshow("detections", show_img)
         cv2.waitKey(1)
 
         if len(bbs_nms) > 0:
             bbs_nms = np.array(bbs_nms)
-            self.bounding_box_pub.publish(
-                Float32MultiArray(data=bbs_nms.flatten()))
+            self.bounding_box_pub.publish(Float32MultiArray(data=bbs_nms.flatten()))
 
 
 def non_max_suppression(boxes, threshold):
@@ -204,7 +224,18 @@ def non_max_suppression(boxes, threshold):
 
     # Convert the list of bounding box dictionaries to a NumPy array
     boxes_array = np.array(
-        [(box['x'], box['y'], box['width'], box['height'], box['score'], box['category']) for box in boxes])
+        [
+            (
+                box["x"],
+                box["y"],
+                box["width"],
+                box["height"],
+                box["score"],
+                box["category"],
+            )
+            for box in boxes
+        ]
+    )
 
     # Sort the boxes by their scores in descending order
     sorted_indices = np.argsort(boxes_array[:, 4])[::-1]
@@ -219,14 +250,16 @@ def non_max_suppression(boxes, threshold):
         # Calculate the coordinates of the intersection rectangle
         x1 = np.maximum(top_box[0], boxes_array[1:, 0])
         y1 = np.maximum(top_box[1], boxes_array[1:, 1])
-        x2 = np.minimum(top_box[0] + top_box[2],
-                        boxes_array[1:, 0] + boxes_array[1:, 2])
-        y2 = np.minimum(top_box[1] + top_box[3],
-                        boxes_array[1:, 1] + boxes_array[1:, 3])
+        x2 = np.minimum(
+            top_box[0] + top_box[2], boxes_array[1:, 0] + boxes_array[1:, 2]
+        )
+        y2 = np.minimum(
+            top_box[1] + top_box[3], boxes_array[1:, 1] + boxes_array[1:, 3]
+        )
 
         # Calculate the area of overlap
         intersection_area = np.maximum(0, x2 - x1) * np.maximum(0, y2 - y1)
-        box_area = (boxes_array[1:, 2] * boxes_array[1:, 3])
+        box_area = boxes_array[1:, 2] * boxes_array[1:, 3]
 
         # Calculate the overlap ratio
         overlap_ratio = intersection_area / box_area
@@ -248,5 +281,5 @@ def main():
     rclpy.shutdown()
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()
