@@ -213,7 +213,7 @@ class DetectionMLNode(Node):
         # convert the image to tensor and run the model
         bridge = cv_bridge.CvBridge()
         img = bridge.imgmsg_to_cv2(msg, "rgb8")
-        # img = cv2.undistort(img, self.K_arm, self.coeffs_arm)
+        img = cv2.undistort(img, self.K_arm, self.coeffs_arm)
 
         input_img = torch.stack([self.val_input_transforms(img)]).to(
             "cuda")

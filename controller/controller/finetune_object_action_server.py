@@ -107,6 +107,11 @@ class FinetuneObjectActionServer(Node):
                 twist.linear.x = 0.0
                 twist.angular.z = 0.0
                 self.twist_pub.publish(twist)
+                result.success = False
+                goal_handle.abort()
+                return result
+            if self.img is None:
+                self.get_logger().warn('No image received')
                 goal_handle.abort()
                 return result
             display_img = self.img.copy()
@@ -117,7 +122,6 @@ class FinetuneObjectActionServer(Node):
 
             cv2.circle(display_img, CENTER, 5, (0, 255, 255), -1)
             cv2.imshow('image', display_img)
-            cv2.waitKey(1)
 
             if abs(self.filter.x[0] - CENTER[0]) < 32 and abs(self.filter.x[2] - CENTER[1]) < 60:
                 self.get_logger().info('reached')
@@ -166,7 +170,48 @@ class FinetuneObjectActionServer(Node):
         result.success = True
         result.position = [world_x, world_y]
         result.angle = 0.0
-        cv2.destroyAllWindows()
+
+        img = cv2.bilateralFilter(self.img, 25, 90, 70)
+
+        gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+        edges = cv2.Canny(gray, 50, 150, apertureSize=3, L2gradient=True)
+
+        contours, _ = cv2.findContours(
+            edges, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+
+        # find contours only within 180 pixels from the center
+        valid_contours = []
+        if len(contours) > 0:
+            length_mask = [cv2.arcLength(c, True) > 100 for c in contours]
+            contours = np.concatenate(
+                [c for c, a in zip(contours, length_mask) if a])
+            # find the contour that within 180 pixels from the center of the image
+            for c in contours:
+                if (c[0, 0] - CENTER[0])**2 + (c[0, 1] - CENTER[1])**2 < 180**2:
+                    cv2.drawContours(img, [c], 0, (0, 255, 0), 3)
+                    valid_contours.append(c)
+
+        if (len)(valid_contours) == 0:
+            self.get_logger().warn('No valid contours found')
+            goal_handle.abort()
+            return result
+
+        rect = cv2.minAreaRect(valid_contours)
+        box = cv2.boxPoints(rect)
+        box = np.int0(box)
+        centroid = np.mean(box, axis=0)
+        cv2.drawContours(img, [box], 0, (0, 0, 255), 2)
+        cv2.circle(img, (int(centroid[0]), int(
+            centroid[1])), 10, (0, 0, 255), -1)
+
+        cv2.imshow('test', img)
+        # circle around self.filter.x[0], self.filter.x[2]
+        # circle_center = (int(self.filter.x[0]), int(self.filter.x[2]))
+
+        # cv2.circle(img, circle_center, 180, (255, 0, 0), 2)
+
+        # cv2.imshow('test', img)
+        cv2.waitKey(0)
 
         goal_handle.succeed()
         return result
