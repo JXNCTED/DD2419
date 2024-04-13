@@ -19,6 +19,7 @@ set(action_files
   "action/Pursuit.action"
   "action/Arm.action"
   "action/Finetune.action"
+  "action/Approach.action"
 )
 
 

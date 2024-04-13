@@ -12,7 +12,6 @@ from sensor_msgs.msg import Image
 from cv_bridge import CvBridge
 import numpy as np
 from filterpy.kalman import KalmanFilter
-from filterpy.common import Q_discrete_white_noise
 
 
 class FinetuneObjectActionServer(Node):
@@ -36,10 +35,15 @@ class FinetuneObjectActionServer(Node):
                                   [0, 0, 0, 1]])
         self.filter.H = np.array([[1, 0, 0, 0],
                                   [0, 0, 1, 0]])
-        self.filter.P *= 1000
-        self.filter.R = np.array([[5, 0],
-                                  [0, 5]])
-        self.filter.Q = Q_discrete_white_noise(dim=2, dt=0.1, var=0.13)
+        self.filter.P *= 500
+        self.filter.R = np.array([[0.5, 0],
+                                  [0, 0.5]])
+        self.filter.Q = np.array([[0.1, 0, 0, 0],
+                                  [0, 0.1, 0, 0],
+                                  [0, 0, 0.1, 0],
+                                  [0, 0, 0, 0.1]])
+        self.index = None
+        self.last_valid_measurement_stamp = None
 
         self.coeffs_arm = np.array(
             [-0.474424, 0.207336, -0.002361, 0.000427, 0.000000])
@@ -49,7 +53,7 @@ class FinetuneObjectActionServer(Node):
         )
 
         self.arm_camera_image_sub = self.create_subscription(
-            Image, '/raw_img', self.arm_camera_image_callback, 10)
+            Image, '/image_raw', self.arm_camera_image_callback, 10)
 
         self.twist_pub = self.create_publisher(
             Twist, '/motor_controller/twist', 10)
@@ -59,11 +63,26 @@ class FinetuneObjectActionServer(Node):
         )
 
     def arm_detected_obj_callback(self, msg: Float32MultiArray):
-        self.detected_obj = msg
+        if self.target_obj_id is None:
+            return
+        self.index = None
+        for i in range(0, len(msg.data), 6):
+            if int(msg.data[i+5]) == int(self.target_obj_id):
+                self.index = i
+                break
+        self.detected_obj = self.index if self.index is not None else None
+        if self.detected_obj is None:
+            return
+        x, y, w, h = msg.data[self.index:self.index+4]
+        center_x = x + w / 2
+        center_y = y + h / 2
+        self.last_valid_measurement_stamp = self.get_clock().now()
+        self.filter.predict()
+        self.filter.update([center_x, center_y])
 
     def arm_camera_image_callback(self, msg: Image):
-        self.img = CvBridge().imgmsg_to_cv2(msg, 'bgr8')
-        self.img = cv2.undistort(self.img, self.K_arm, self.coeffs_arm)
+        img = CvBridge().imgmsg_to_cv2(msg, 'bgr8')
+        self.img = cv2.undistort(img, self.K_arm, self.coeffs_arm)
 
     def execute_callback(self, goal_handle):
         self.get_logger().info('Executing goal...')
@@ -78,40 +97,35 @@ class FinetuneObjectActionServer(Node):
         is_first = True
         while rclpy.ok():
             # find the object with the target id in field x, y, w, h, confidence, category
-            index = None
-            for i in range(0, len(self.detected_obj.data), 6):
-                if int(self.detected_obj.data[i+5]) == int(self.target_obj_id):
-                    index = i
-                    break
-            if index is None:
-                continue
 
             # calculate the center point
-            x, y, w, h = self.detected_obj.data[index:index+4]
-            center_x = x + w / 2
-            center_y = y + h / 2
-            if is_first:
-                self.filter.x = np.array([center_x, 0, center_y, 0])
-                is_first = False
-            else:
-                self.filter.predict()
-                self.filter.update([center_x, center_y])
 
             # debug display
+            if self.get_clock().now().nanoseconds - self.last_valid_measurement_stamp.nanoseconds > 5e8:  # 0.5s
+                self.get_logger().warn('No valid measurement. timeout')
+                twist = Twist()
+                twist.linear.x = 0.0
+                twist.angular.z = 0.0
+                self.twist_pub.publish(twist)
+                goal_handle.abort()
+                return result
             display_img = self.img.copy()
-            display_img = cv2.rectangle(
-                display_img, (int(x), int(y)), (int(x+w), int(y+h)), (0, 255, 0), 2)
-            display_img = cv2.circle(
-                display_img, (int(self.filter.x[0]), int(self.filter.x[2])), 5, (0, 0, 255), -1)
-            cv2.imshow('img', display_img)
+            cv2.circle(display_img, (int(self.filter.x[0]), int(self.filter.x[2])),
+                       5, (255, 0, 0), -1)
 
             CENTER = (320, 240)  # center camera coordinate
+
+            cv2.circle(display_img, CENTER, 5, (0, 255, 255), -1)
+            cv2.imshow('image', display_img)
+            cv2.waitKey(1)
 
             if abs(self.filter.x[0] - CENTER[0]) < 32 and abs(self.filter.x[2] - CENTER[1]) < 60:
                 self.get_logger().info('reached')
                 break
             theta_normalized = atan2(
                 CENTER[1] - self.filter.x[2], CENTER[0] - self.filter.x[0]) / pi
+
+            self.get_logger().info(f'x{self.filter.x}')
 
             twist = Twist()
             KP = -2.0
@@ -152,6 +166,7 @@ class FinetuneObjectActionServer(Node):
         result.success = True
         result.position = [world_x, world_y]
         result.angle = 0.0
+        cv2.destroyAllWindows()
 
         goal_handle.succeed()
         return result
