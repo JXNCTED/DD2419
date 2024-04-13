@@ -59,6 +59,7 @@ class Place(pt.composites.Sequence):
         self.add_children([
             GetBoxPositionBehavior(),
             PlanToBoxBehavior(),
+            ApproachObjectBehavior(),
             FineTuneBoxPositionBehavior(),
             PlaceBehavior(),
         ])
@@ -127,6 +128,19 @@ class PlanToObjectBehavior(pt.behaviour.Behaviour):
 
     def update(self):
         # place holder for the plan to object behavior
+        return pt.common.Status.SUCCESS
+
+
+class ApproachObjectBehavior(pt.behaviour.Behaviour):
+    """
+    approach the object with the realsense detection
+    """
+
+    def __init__(self, name="ApproachObjectBehavior"):
+        super(ApproachObjectBehavior, self).__init__(name=name)
+
+    def update(self):
+        # place holder for the approach object behavior
         return pt.common.Status.SUCCESS
 
 
