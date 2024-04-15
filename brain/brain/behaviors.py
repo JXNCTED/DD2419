@@ -6,11 +6,21 @@ Used in `tree.py`.
 
 import py_trees as pt
 import py_trees_ros as ptr
+import rclpy.action
 from rclpy.node import Node
 from std_msgs.msg import String
 from std_msgs.msg import Bool
 from std_msgs.msg import Int16MultiArray
 from sensor_msgs.msg import JointState
+from robp_interfaces.action import Approach, Finetune
+import rclpy
+from rclpy.action import ActionClient
+
+# I know I should probably not use global variables, but not sure how to pass data
+# between behaviors, so here are every behavior's global variables
+
+# global variables
+current_object = '9'  # object id, or <aruco_id> for aruco markers
 
 
 class Initializer(pt.composites.Sequence):
@@ -60,6 +70,7 @@ class Place(pt.composites.Sequence):
         self.add_children([
             GetBoxPositionBehavior(),
             PlanToBoxBehavior(),
+            ApproachObjectBehavior(),
             FineTuneBoxPositionBehavior(),
             PlaceBehavior(),
         ])
@@ -131,30 +142,84 @@ class PlanToObjectBehavior(pt.behaviour.Behaviour):
         return pt.common.Status.SUCCESS
 
 
-class ApproachObjectBehavior(pt.behaviour.Behaviour):
+class ApproachObjectBehavior(pt.behaviour.Behaviour, Node):
     """
     use realsense to approach the object
     """
 
     def __init__(self, name="ApproachObjectBehavior"):
-        super(ApproachObjectBehavior, self).__init__(name=name)
+        pt.behaviour.Behaviour.__init__(self, name=name)
+        Node.__init__(self, node_name=name)
+
+        self.approach_target = None
+        self.action_client = ActionClient(self, Approach, 'approach')
+        self.future = None
+
+        self.change_camera_mode_pub = self.create_publisher(
+            String, '/detection_ml/change_mode', 10)
+
+        self.action_client.wait_for_server()
+
+    def initialise(self):
+        global current_object
+        self.approach_target = current_object
+        self.future = self.send_approach_goal()
+
+    def send_approach_goal(self):
+        goal_msg = Approach.Goal()
+        goal_msg.target = self.approach_target if not self.approach_target is None else "aruco_1"
+        return self.action_client.send_goal_async(goal_msg)
 
     def update(self):
-        # place holder for the approach object behavior
-        return pt.common.Status.SUCCESS
+        rclpy.spin_once(self)
+        return pt.common.Status.RUNNING
+        # if not self.future.done():
+        #     return pt.common.Status.RUNNING
+        # if self.future is None or self.future.result().status != 2:
+        #     return pt.common.Status.RUNNING
+        # return pt.common.Status.SUCCESS
 
 
-class FineTuneObjectPositionBehavior(pt.behaviour.Behaviour):
+class FineTuneObjectPositionBehavior(pt.behaviour.Behaviour, Node):
     """
     fine tune the object position with real sense detection
     """
 
     def __init__(self, name="FineTuneObjectPositionBehavior"):
-        super(FineTuneObjectPositionBehavior, self).__init__(name=name)
+        pt.behaviour.Behaviour.__init__(self, name=name)
+        Node.__init__(self, node_name=name)
+
+        self.ret_state = None
+        self.finetune_target = None
+        self.action_client = ActionClient(self, Finetune, 'finetune')
+        self.future = None
+
+    def initialise(self):
+        global current_object
+        self.finetune_target = current_object
+        self.future = self.send_finetune_goal()
+        self.future.add_done_callback(self.future_callback)
+
+    def send_finetune_goal(self):
+        goal_msg = Finetune.Goal()
+        goal_msg.object_id = self.finetune_target if not self.finetune_target is None else "aruco_1"
+        self.action_client.wait_for_server()
+        return self.action_client.send_goal_async(goal_msg)
+
+    def future_callback(self, future):
+        goal_handle = future.result()
+        if not goal_handle.accepted:
+            self.ret_state = pt.common.Status.FAILURE
+            return
+
+        self.ret_state = pt.common.Status.SUCCESS
 
     def update(self):
-        # place holder for the fine tune object position behavior
-        return pt.common.Status.SUCCESS
+        return pt.common.Status.RUNNING
+        if self.ret_state is None:
+            rclpy.spin_once(self)
+            return pt.common.Status.RUNNING
+        return self.ret_state
 
 
 class PickObjectBehavior(pt.behaviour.Behaviour):
@@ -167,7 +232,7 @@ class PickObjectBehavior(pt.behaviour.Behaviour):
 
     def update(self):
         # place holder for the pick object behavior
-        return pt.common.Status.SUCCESS
+        return pt.common.Status.RUNNING
 
 
 class GetBoxPositionBehavior(pt.behaviour.Behaviour):

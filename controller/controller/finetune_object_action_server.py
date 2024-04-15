@@ -95,7 +95,7 @@ class FinetuneObjectActionServer(Node):
             # calculate the center point
 
             # debug display
-            if self.get_clock().now().nanoseconds - self.last_valid_measurement_stamp.nanoseconds > 5e8:  # 0.5s
+            if self.get_clock().now().nanoseconds - rclpy.time.Time.from_msg(self.last_valid_measurement_stamp).nanoseconds > 5e8:
                 self.get_logger().warn('No valid measurement. timeout')
                 twist = Twist()
                 twist.linear.x = 0.0

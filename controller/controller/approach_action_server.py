@@ -174,7 +174,6 @@ class ApproachActionServer(Node):
             TIMEOUT = 50
             while (cnt < TIMEOUT):
                 for (point_det, category) in self.objects:
-                    self.get_logger().info(f'category: {category}')
                     if str(category) == self.target:
                         point = point_det
                         break
@@ -225,9 +224,10 @@ class ApproachActionServer(Node):
                 goal_handle.abort()
                 result.success = False
                 return result
-
+        self.get_logger().info('Goal succeeded')
         goal_handle.succeed()
         result.success = True
+        self.objects.clear()
 
         return result
 

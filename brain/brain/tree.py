@@ -37,6 +37,7 @@ def main(argv=None):
 
     try:
         rclpy.spin(bt.node)
+        print("ticking")
     except KeyboardInterrupt:
         pass
 
