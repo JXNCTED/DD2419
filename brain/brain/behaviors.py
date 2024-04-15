@@ -42,8 +42,9 @@ class Pick(pt.composites.Sequence):
     def __init__(self, name="Pick"):
         super(Pick, self).__init__(name=name, memory=True)
         self.add_children([
-            GetObjectPositionBehavior(),
-            PlanToObjectBehavior(),
+            # GetObjectPositionBehavior(),
+            # PlanToObjectBehavior(),
+            ApproachObjectBehavior(),
             FineTuneObjectPositionBehavior(),
             PickObjectBehavior(),
         ])
@@ -59,7 +60,6 @@ class Place(pt.composites.Sequence):
         self.add_children([
             GetBoxPositionBehavior(),
             PlanToBoxBehavior(),
-            ApproachObjectBehavior(),
             FineTuneBoxPositionBehavior(),
             PlaceBehavior(),
         ])
@@ -133,7 +133,7 @@ class PlanToObjectBehavior(pt.behaviour.Behaviour):
 
 class ApproachObjectBehavior(pt.behaviour.Behaviour):
     """
-    approach the object with the realsense detection
+    use realsense to approach the object
     """
 
     def __init__(self, name="ApproachObjectBehavior"):

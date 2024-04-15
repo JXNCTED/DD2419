@@ -100,8 +100,6 @@ class DetectionMLNode(Node):
         self.detected_obj_pub = self.create_publisher(
             DetectedObj, "/detection_ml/detected_obj", 10)
 
-        self.arm_detected_obj_pub = self.create_publisher(
-            DetectedObj, "/detection_ml/arm_detected_obj", 10)
         # publish the bounding box just as an multiarray
 
         self.bounding_box_pub = self.create_publisher(
@@ -189,6 +187,20 @@ class DetectionMLNode(Node):
                           color=(0, 255, 0), thickness=2)
             cv2.putText(show_img, cata_str, (x, y),
                         cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
+            position = self.get_position(bb)
+            if (position == np.array([0.0, 0.0, 0.0])).all():
+                continue
+            pose = PointStamped()
+            pose.header.frame_id = "camera_color_optical_frame"
+            pose.header.stamp = msg.header.stamp
+            pose.point.x = position[0]
+            pose.point.y = position[1]
+            pose.point.z = position[2]
+            # self.pose_pub.publish(pose)
+            self.pose_pubs[category].publish(pose)
+            detected_obj.position.append(pose)
+            detected_obj.category.append(category)
+            detected_obj.confidence.append(score)
 
         if length > 0:
             self.detected_obj_pub.publish(detected_obj)
@@ -233,21 +245,6 @@ class DetectionMLNode(Node):
         for bb in bbs_nms:
             x, y, w, h, score, category = int(bb[0]), int(bb[1]), int(
                 bb[2]), int(bb[3]), round(bb[4], 2), int(bb[5])
-            position = self.get_position(bb)
-            # handle obviously wrong position
-            if (position == np.array([0.0, 0.0, 0.0])).all():
-                continue
-            pose = PointStamped()
-            pose.header.frame_id = "camera_color_optical_frame"
-            pose.header.stamp = msg.header.stamp
-            pose.point.x = position[0]
-            pose.point.y = position[1]
-            pose.point.z = position[2]
-            # self.pose_pub.publish(pose)
-            self.pose_pubs[category].publish(pose)
-            detected_obj.position.append(pose)
-            detected_obj.category.append(category)
-            detected_obj.confidence.append(score)
 
             cata_str = f"{cls_dict[category]}/{category}"
             # draw the bounding box and the category. For visualization only
@@ -258,7 +255,6 @@ class DetectionMLNode(Node):
                         cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
 
         if length > 0:
-            self.arm_detected_obj_pub.publish(detected_obj)
             bbs_np = np.array(bbs_nms).flatten()
             self.arm_bounding_box_pub.publish(Float32MultiArray(data=bbs_np))
 

@@ -15,11 +15,11 @@ class BehaviorTree(ptr.trees.BehaviourTree):
     def __init__(self, unicode_tree_debug=False):
         self.root = pt.composites.Sequence("MainTree", memory=True)
         self.root.add_children([
-            Initializer(),
-            Exploration(),
+            # Initializer(),
+            # Exploration(),
             Pick(),
-            Place(),
-            CheckTaskCompletion(),
+            # Place(),
+            # CheckTaskCompletion(),
         ])
 
         super(BehaviorTree, self).__init__(

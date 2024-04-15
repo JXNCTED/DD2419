@@ -19,7 +19,6 @@ class FinetuneObjectActionServer(Node):
     def __init__(self):
         super().__init__('finetune_object_action_server')
         self.detected_obj_lock = Lock()
-        self.detected_obj = None
         self.target_obj_id = None
 
         self.K_arm = np.array([[513.34301, 0., 307.89617],
@@ -43,7 +42,6 @@ class FinetuneObjectActionServer(Node):
                                   [0, 0.1, 0, 0],
                                   [0, 0, 0.1, 0],
                                   [0, 0, 0, 0.1]])
-        self.index = None
         self.last_valid_measurement_stamp = None
 
         self.coeffs_arm = np.array(
@@ -67,15 +65,14 @@ class FinetuneObjectActionServer(Node):
         with self.detected_obj_lock:
             if self.target_obj_id is None:
                 return
-            self.index = None
+            index = None
             for i in range(0, len(msg.data), 6):
                 if int(msg.data[i+5]) == int(self.target_obj_id):
-                    self.index = i
+                    index = i
                     break
-            self.detected_obj = self.index if self.index is not None else None
-            if self.detected_obj is None:
+            if index is None:
                 return
-        x, y, w, h = msg.data[self.index:self.index+4]
+        x, y, w, h = msg.data[index:index+4]
         center_x = x + w / 2
         center_y = y + h / 2
         self.last_valid_measurement_stamp = self.get_clock().now()

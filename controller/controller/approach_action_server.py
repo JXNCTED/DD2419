@@ -203,7 +203,8 @@ class ApproachActionServer(Node):
                 point = None
                 while (cnt < TIMEOUT):
                     for (point_det, category) in self.objects:
-                        if str(category) == self.target and rclpy.time.Time().nanoseconds - self.object_stamp.nanoseconds < 5e8:
+                        # if str(category) == self.target and rclpy.time.Time().nanoseconds - self.object_stamp.nanoseconds < 5e8:
+                        if str(category) == self.target and rclpy.time.Time().nanoseconds - rclpy.time.Time().from_msg(self.object_stamp).nanoseconds < 5e8:
                             point = point_det
                             break
                     if point is not None:
