@@ -89,11 +89,6 @@ class FinetuneObjectActionServer(Node):
     def execute_callback(self, goal_handle):
         self.get_logger().info('Executing goal...')
         result = Finetune.Result()
-        with self.detected_obj_lock:
-            if self.detected_obj is None:
-                self.get_logger().warn('No object detected')
-                goal_handle.abort()
-                return result
 
         # use chassis to move the robot to the target object
         is_first = True
@@ -194,22 +189,23 @@ class FinetuneObjectActionServer(Node):
             return result
 
         rect = cv2.minAreaRect(np.concatenate(valid_contours))
-        box = cv2.boxPoints(rect)
-        box = np.int0(box)
-        centroid = np.mean(box, axis=0)
-        cv2.drawContours(img, [box], 0, (0, 0, 255), 2)
-        cv2.circle(img, (int(centroid[0]), int(
-            centroid[1])), 10, (0, 0, 255), -1)
+        # box = cv2.boxPoints(rect)
+        # box = np.int0(box)
+        # centroid = np.mean(box, axis=0)
+        # cv2.drawContours(img, [box], 0, (0, 0, 255), 2)
+        # cv2.circle(img, (int(centroid[0]), int(
+        #     centroid[1])), 10, (0, 0, 255), -1)
 
-        cv2.circle(img, (int(self.filter.x[0]), int(
-            self.filter.x[2])), 10, (0, 0, 255), -1)
-        cv2.drawContours(img, valid_contours, -1, (0, 255, 0), 3)
+        # cv2.circle(img, (int(self.filter.x[0]), int(
+        #     self.filter.x[2])), 10, (0, 0, 255), -1)
+        # cv2.drawContours(img, valid_contours, -1, (0, 255, 0), 3)
 
-        cv2.imshow('test', img)
+        # cv2.imshow('test', img)
 
-        cv2.waitKey(0)
-        cv2.destroyAllWindows()
-
+        # cv2.waitKey(0)
+        # cv2.destroyAllWindows()
+        self.get_logger().info(
+            f'world_x: {world_x}, world_y: {world_y}, angle: {rect[2]}')
         result.success = True
         result.position = [world_x, world_y]  # not sure if this is correct
         result.angle = rect[2] / 180.0 * pi
