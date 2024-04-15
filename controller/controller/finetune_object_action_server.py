@@ -20,6 +20,8 @@ class FinetuneObjectActionServer(Node):
         super().__init__('finetune_object_action_server')
         self.detected_obj_lock = Lock()
         self.target_obj_id = None
+        self.detected_pos = None
+        self.index = None
 
         self.K_arm = np.array([[513.34301, 0., 307.89617],
                                [0., 513.84807, 244.62007],
@@ -44,6 +46,8 @@ class FinetuneObjectActionServer(Node):
                                   [0, 0, 0, 0.1]])
         self.last_valid_measurement_stamp = None
 
+        self.rate = self.create_rate(100)
+
         self.coeffs_arm = np.array(
             [-0.474424, 0.207336, -0.002361, 0.000427, 0.000000])
 
@@ -62,20 +66,21 @@ class FinetuneObjectActionServer(Node):
         )
 
     def arm_detected_obj_callback(self, msg: Float32MultiArray):
+        self.last_valid_measurement_stamp = self.get_clock().now()
+        self.detected_pos = msg.data
         with self.detected_obj_lock:
             if self.target_obj_id is None:
                 return
-            index = None
+            self.index = None
             for i in range(0, len(msg.data), 6):
                 if int(msg.data[i+5]) == int(self.target_obj_id):
-                    index = i
+                    self.index = i
                     break
-            if index is None:
+            if self.index is None:
                 return
-        x, y, w, h = msg.data[index:index+4]
+        x, y, w, h = msg.data[self.index:self.index+4]
         center_x = x + w / 2
         center_y = y + h / 2
-        self.last_valid_measurement_stamp = self.get_clock().now()
         self.filter.predict()
         self.filter.update([center_x, center_y])
 
@@ -88,14 +93,46 @@ class FinetuneObjectActionServer(Node):
         result = Finetune.Result()
 
         # use chassis to move the robot to the target object
-        is_first = True
+        cnt = 0
+        while (cnt < 5):
+            with self.detected_obj_lock:
+                if self.target_obj_id is None:
+                    self.get_logger().warn('No target object id')
+                    goal_handle.abort()
+                    return result
+
+                self.index = None
+                if self.detected_pos is None:
+                    cnt += 1
+                    self.rate.sleep()
+                    continue
+                for i in range(0, len(self.detected_pos), 6):
+                    if int(self.detected_pos[i+5]) == int(self.target_obj_id):
+                        self.index = i
+                        break
+                if self.index is None:
+                    cnt += 1
+                    self.rate.sleep()
+                    continue
+                else:
+                    # reset the kalman filter state
+                    self.filter.x = np.array(
+                        [self.detected_pos[self.index], 0, self.detected_pos[self.index+2], 0])
+                    break
+        else:
+            self.get_logger().warn('No valid measurement')
+            goal_handle.abort()
+            return result
+
         while rclpy.ok():
             # find the object with the target id in field x, y, w, h, confidence, category
 
             # calculate the center point
 
             # debug display
-            if self.get_clock().now().nanoseconds - rclpy.time.Time.from_msg(self.last_valid_measurement_stamp).nanoseconds > 5e8:
+            if self.last_valid_measurement_stamp is None:
+                continue
+            if self.get_clock().now().nanoseconds - self.last_valid_measurement_stamp.nanoseconds > 5e8:
                 self.get_logger().warn('No valid measurement. timeout')
                 twist = Twist()
                 twist.linear.x = 0.0

@@ -15,7 +15,7 @@ class BehaviorTree(ptr.trees.BehaviourTree):
     def __init__(self, unicode_tree_debug=False):
         self.root = pt.composites.Sequence("MainTree", memory=True)
         self.root.add_children([
-            # Initializer(),
+            Initializer(),
             # Exploration(),
             Pick(),
             # Place(),

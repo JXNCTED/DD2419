@@ -27,13 +27,14 @@ current_object = '9'  # object id, or <aruco_id> for aruco markers
 class Initializer(pt.composites.Sequence):
     def __init__(self, name="Initializer"):
         super(Initializer, self).__init__(name=name, memory=True)
-        timeout = pt.decorators.Timeout(
-            name="Timeout", duration=2, child=ArmToHome())
-        retry = pt.decorators.Retry(
-            name="Retry", child=timeout, num_failures=3)
-        failure_is_success = pt.decorators.FailureIsSuccess(
-            name="FailureIsSuccess", child=retry)
-        self.add_children([failure_is_success])
+        # timeout = pt.decorators.Timeout(
+        #     name="Timeout", duration=2, child=ArmToHome())
+        # retry = pt.decorators.Retry(
+        #     name="Retry", child=timeout, num_failures=3)
+        # failure_is_success = pt.decorators.FailureIsSuccess(
+        #     name="FailureIsSuccess", child=retry)
+        # self.add_children([failure_is_success])
+        self.add_children([ArmToHome()])
 
 
 class Exploration(pt.composites.Sequence):
@@ -109,10 +110,11 @@ class ArmToHome(pt.behaviour.Behaviour, Node):
         self.position_reached = diff < 2000
 
     def update(self):
-        if self.position_reached:
-            return pt.common.Status.SUCCESS
-        else:
-            return pt.common.Status.RUNNING
+        return pt.common.Status.SUCCESS
+        # if self.position_reached:
+        #     return pt.common.Status.SUCCESS
+        # else:
+        #     return pt.common.Status.RUNNING
 
 
 class GetObjectPositionBehavior(pt.behaviour.Behaviour):
@@ -155,7 +157,7 @@ class ApproachObjectBehavior(pt.behaviour.Behaviour, Node):
         self.action_client = ActionClient(self, Approach, 'approach')
         self.future = None
 
-        self.initialized = False
+        self.initialised = False
 
         self.change_camera_mode_pub = self.create_publisher(
             String, '/detection_ml/change_mode', 10)
@@ -164,7 +166,7 @@ class ApproachObjectBehavior(pt.behaviour.Behaviour, Node):
         global current_object
 
         rclpy.spin_once(self, timeout_sec=0.01)
-        if not self.initialized:
+        if not self.initialised or self.future is None:
             goal_msg = Approach.Goal()
             goal_msg.target = current_object
             if not self.action_client.wait_for_server(timeout_sec=0.01):
@@ -172,7 +174,7 @@ class ApproachObjectBehavior(pt.behaviour.Behaviour, Node):
 
             self.future = self.action_client.send_goal_async(goal_msg)
 
-            self.initialized = True
+            self.initialised = True
             return pt.common.Status.RUNNING
         else:
             if not self.future.done():
@@ -182,8 +184,12 @@ class ApproachObjectBehavior(pt.behaviour.Behaviour, Node):
                 return pt.common.Status.RUNNING
 
             if self.future.result().status == GoalStatus.STATUS_SUCCEEDED:
+                self.initialised = False
+                self.change_camera_mode_pub.publish(String(data='arm-camera'))
+                self.future = None
                 return pt.common.Status.SUCCESS
-
+            self.initialised = False
+            self.future = None
             return pt.common.Status.FAILURE
 
 
@@ -196,37 +202,41 @@ class FineTuneObjectPositionBehavior(pt.behaviour.Behaviour, Node):
         pt.behaviour.Behaviour.__init__(self, name=name)
         Node.__init__(self, node_name=name)
 
-        self.ret_state = None
-        self.finetune_target = None
+        self.initialised = False
         self.action_client = ActionClient(self, Finetune, 'finetune')
         self.future = None
-
-    # def initialise(self):
-    #     global current_object
-    #     self.finetune_target = current_object
-    #     self.future = self.send_finetune_goal()
-    #     self.future.add_done_callback(self.future_callback)
-
-    # def send_finetune_goal(self):
-    #     goal_msg = Finetune.Goal()
-    #     goal_msg.object_id = self.finetune_target if not self.finetune_target is None else "aruco_1"
-    #     self.action_client.wait_for_server()
-    #     return self.action_client.send_goal_async(goal_msg)
-
-    # def future_callback(self, future):
-    #     goal_handle = future.result()
-    #     if not goal_handle.accepted:
-    #         self.ret_state = pt.common.Status.FAILURE
-    #         return
-
-    #     self.ret_state = pt.common.Status.SUCCESS
+        self.camera_mode_pub = self.create_publisher(
+            String, '/detection_ml/change_mode', 10)
 
     def update(self):
-        return pt.common.Status.RUNNING
-        if self.ret_state is None:
-            rclpy.spin_once(self)
+        global current_object
+
+        rclpy.spin_once(self, timeout_sec=0.01)
+        if not self.initialised:
+            goal_msg = Finetune.Goal()
+            goal_msg.object_id = current_object
+            if not self.action_client.wait_for_server(timeout_sec=0.01):
+                return pt.common.Status.RUNNING
+
+            self.future = self.action_client.send_goal_async(goal_msg)
+
+            self.initialised = True
             return pt.common.Status.RUNNING
-        return self.ret_state
+        else:
+            if not self.future.done():
+                return pt.common.Status.RUNNING
+
+            if self.future.result().status == GoalStatus.STATUS_EXECUTING:
+                return pt.common.Status.RUNNING
+
+            if self.future.result().status == GoalStatus.STATUS_SUCCEEDED:
+                self.initialised = False
+                self.future = None
+                self.camera_mode_pub.publish(String(data='front-camera'))
+                return pt.common.Status.SUCCESS
+            self.initialised = False
+            self.future = None
+            return pt.common.Status.FAILURE
 
 
 class PickObjectBehavior(pt.behaviour.Behaviour):
