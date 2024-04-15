@@ -15,6 +15,7 @@ from sensor_msgs.msg import JointState
 from robp_interfaces.action import Approach, Finetune
 import rclpy
 from rclpy.action import ActionClient
+from action_msgs.msg import GoalStatus
 
 # I know I should probably not use global variables, but not sure how to pass data
 # between behaviors, so here are every behavior's global variables
@@ -56,7 +57,7 @@ class Pick(pt.composites.Sequence):
             # PlanToObjectBehavior(),
             ApproachObjectBehavior(),
             FineTuneObjectPositionBehavior(),
-            PickObjectBehavior(),
+            # PickObjectBehavior(),
         ])
 
 
@@ -151,33 +152,39 @@ class ApproachObjectBehavior(pt.behaviour.Behaviour, Node):
         pt.behaviour.Behaviour.__init__(self, name=name)
         Node.__init__(self, node_name=name)
 
-        self.approach_target = None
         self.action_client = ActionClient(self, Approach, 'approach')
         self.future = None
+
+        self.initialized = False
 
         self.change_camera_mode_pub = self.create_publisher(
             String, '/detection_ml/change_mode', 10)
 
-        self.action_client.wait_for_server()
-
-    def initialise(self):
-        global current_object
-        self.approach_target = current_object
-        self.future = self.send_approach_goal()
-
-    def send_approach_goal(self):
-        goal_msg = Approach.Goal()
-        goal_msg.target = self.approach_target if not self.approach_target is None else "aruco_1"
-        return self.action_client.send_goal_async(goal_msg)
-
     def update(self):
-        rclpy.spin_once(self)
-        return pt.common.Status.RUNNING
-        # if not self.future.done():
-        #     return pt.common.Status.RUNNING
-        # if self.future is None or self.future.result().status != 2:
-        #     return pt.common.Status.RUNNING
-        # return pt.common.Status.SUCCESS
+        global current_object
+
+        rclpy.spin_once(self, timeout_sec=0.01)
+        if not self.initialized:
+            goal_msg = Approach.Goal()
+            goal_msg.target = current_object
+            if not self.action_client.wait_for_server(timeout_sec=0.01):
+                return pt.common.Status.RUNNING
+
+            self.future = self.action_client.send_goal_async(goal_msg)
+
+            self.initialized = True
+            return pt.common.Status.RUNNING
+        else:
+            if not self.future.done():
+                return pt.common.Status.RUNNING
+
+            if self.future.result().status == GoalStatus.STATUS_EXECUTING:
+                return pt.common.Status.RUNNING
+
+            if self.future.result().status == GoalStatus.STATUS_SUCCEEDED:
+                return pt.common.Status.SUCCESS
+
+            return pt.common.Status.FAILURE
 
 
 class FineTuneObjectPositionBehavior(pt.behaviour.Behaviour, Node):
@@ -194,25 +201,25 @@ class FineTuneObjectPositionBehavior(pt.behaviour.Behaviour, Node):
         self.action_client = ActionClient(self, Finetune, 'finetune')
         self.future = None
 
-    def initialise(self):
-        global current_object
-        self.finetune_target = current_object
-        self.future = self.send_finetune_goal()
-        self.future.add_done_callback(self.future_callback)
+    # def initialise(self):
+    #     global current_object
+    #     self.finetune_target = current_object
+    #     self.future = self.send_finetune_goal()
+    #     self.future.add_done_callback(self.future_callback)
 
-    def send_finetune_goal(self):
-        goal_msg = Finetune.Goal()
-        goal_msg.object_id = self.finetune_target if not self.finetune_target is None else "aruco_1"
-        self.action_client.wait_for_server()
-        return self.action_client.send_goal_async(goal_msg)
+    # def send_finetune_goal(self):
+    #     goal_msg = Finetune.Goal()
+    #     goal_msg.object_id = self.finetune_target if not self.finetune_target is None else "aruco_1"
+    #     self.action_client.wait_for_server()
+    #     return self.action_client.send_goal_async(goal_msg)
 
-    def future_callback(self, future):
-        goal_handle = future.result()
-        if not goal_handle.accepted:
-            self.ret_state = pt.common.Status.FAILURE
-            return
+    # def future_callback(self, future):
+    #     goal_handle = future.result()
+    #     if not goal_handle.accepted:
+    #         self.ret_state = pt.common.Status.FAILURE
+    #         return
 
-        self.ret_state = pt.common.Status.SUCCESS
+    #     self.ret_state = pt.common.Status.SUCCESS
 
     def update(self):
         return pt.common.Status.RUNNING
