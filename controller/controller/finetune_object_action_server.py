@@ -12,12 +12,13 @@ from sensor_msgs.msg import Image
 from cv_bridge import CvBridge
 import numpy as np
 from filterpy.kalman import KalmanFilter
+from threading import Lock
 
 
 class FinetuneObjectActionServer(Node):
     def __init__(self):
         super().__init__('finetune_object_action_server')
-
+        self.detected_obj_lock = Lock()
         self.detected_obj = None
         self.target_obj_id = None
 
@@ -63,16 +64,17 @@ class FinetuneObjectActionServer(Node):
         )
 
     def arm_detected_obj_callback(self, msg: Float32MultiArray):
-        if self.target_obj_id is None:
-            return
-        self.index = None
-        for i in range(0, len(msg.data), 6):
-            if int(msg.data[i+5]) == int(self.target_obj_id):
-                self.index = i
-                break
-        self.detected_obj = self.index if self.index is not None else None
-        if self.detected_obj is None:
-            return
+        with self.detected_obj_lock:
+            if self.target_obj_id is None:
+                return
+            self.index = None
+            for i in range(0, len(msg.data), 6):
+                if int(msg.data[i+5]) == int(self.target_obj_id):
+                    self.index = i
+                    break
+            self.detected_obj = self.index if self.index is not None else None
+            if self.detected_obj is None:
+                return
         x, y, w, h = msg.data[self.index:self.index+4]
         center_x = x + w / 2
         center_y = y + h / 2
@@ -87,11 +89,11 @@ class FinetuneObjectActionServer(Node):
     def execute_callback(self, goal_handle):
         self.get_logger().info('Executing goal...')
         result = Finetune.Result()
-
-        if self.detected_obj is None:
-            self.get_logger().warn('No object detected')
-            goal_handle.abort()
-            return result
+        with self.detected_obj_lock:
+            if self.detected_obj is None:
+                self.get_logger().warn('No object detected')
+                goal_handle.abort()
+                return result
 
         # use chassis to move the robot to the target object
         is_first = True
@@ -122,6 +124,7 @@ class FinetuneObjectActionServer(Node):
 
             cv2.circle(display_img, CENTER, 5, (0, 255, 255), -1)
             cv2.imshow('image', display_img)
+            cv2.waitKey(1)
 
             if abs(self.filter.x[0] - CENTER[0]) < 32 and abs(self.filter.x[2] - CENTER[1]) < 60:
                 self.get_logger().info('reached')
@@ -167,10 +170,6 @@ class FinetuneObjectActionServer(Node):
         world_x = self.filter.x[0] * world_z / self.K_arm[0, 0]
         world_y = self.filter.x[2] * world_z / self.K_arm[1, 1]
 
-        result.success = True
-        result.position = [world_x, world_y]
-        result.angle = 0.0
-
         img = cv2.bilateralFilter(self.img, 25, 90, 70)
 
         gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
@@ -183,20 +182,18 @@ class FinetuneObjectActionServer(Node):
         valid_contours = []
         if len(contours) > 0:
             length_mask = [cv2.arcLength(c, True) > 100 for c in contours]
-            contours = np.concatenate(
-                [c for c, a in zip(contours, length_mask) if a])
-            # find the contour that within 180 pixels from the center of the image
-            for c in contours:
-                if (c[0, 0] - CENTER[0])**2 + (c[0, 1] - CENTER[1])**2 < 180**2:
-                    cv2.drawContours(img, [c], 0, (0, 255, 0), 3)
-                    valid_contours.append(c)
+            dist_mask = [abs(cv2.pointPolygonTest(
+                c, (self.filter.x[0], self.filter.x[2]), True)) < 70 for c in contours]
 
-        if (len)(valid_contours) == 0:
+            valid_contours = [c for c, a, b in zip(
+                contours, length_mask, dist_mask) if a and b]
+
+        if len(valid_contours) == 0:
             self.get_logger().warn('No valid contours found')
             goal_handle.abort()
             return result
 
-        rect = cv2.minAreaRect(valid_contours)
+        rect = cv2.minAreaRect(np.concatenate(valid_contours))
         box = cv2.boxPoints(rect)
         box = np.int0(box)
         centroid = np.mean(box, axis=0)
@@ -204,22 +201,27 @@ class FinetuneObjectActionServer(Node):
         cv2.circle(img, (int(centroid[0]), int(
             centroid[1])), 10, (0, 0, 255), -1)
 
+        cv2.circle(img, (int(self.filter.x[0]), int(
+            self.filter.x[2])), 10, (0, 0, 255), -1)
+        cv2.drawContours(img, valid_contours, -1, (0, 255, 0), 3)
+
         cv2.imshow('test', img)
-        # circle around self.filter.x[0], self.filter.x[2]
-        # circle_center = (int(self.filter.x[0]), int(self.filter.x[2]))
 
-        # cv2.circle(img, circle_center, 180, (255, 0, 0), 2)
-
-        # cv2.imshow('test', img)
         cv2.waitKey(0)
+        cv2.destroyAllWindows()
+
+        result.success = True
+        result.position = [world_x, world_y]  # not sure if this is correct
+        result.angle = rect[2] / 180.0 * pi
 
         goal_handle.succeed()
         return result
 
     def goal_callback(self, goal_request):
-        self.target_obj_id = goal_request.object_id
-        self.get_logger().info(
-            f'Received goal request: {goal_request.object_id}')
+        with self.detected_obj_lock:
+            self.target_obj_id = goal_request.object_id
+            self.get_logger().info(
+                f'Received goal request: {goal_request.object_id}')
         return rclpy.action.server.GoalResponse.ACCEPT
 
     def cancel_callback(self, goal_handle):
