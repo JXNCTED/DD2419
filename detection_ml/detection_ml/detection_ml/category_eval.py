@@ -81,10 +81,8 @@ class CategoryEvaluation(Node):
             except Exception as e:
                 self.get_logger().error(str(e))
                 return
-            stamped_position = PointStamped()
-            stamped_position.header = msg.header
-            stamped_position.point = obj.position
-            position = do_transform_point(stamped_position, t)
+
+            position = do_transform_point(obj.position, t)
             for stuff in self.list_of_stuff:
                 if stuff.residual(np.array([position.point.x, position.point.y])) < 0.15:
                     stuff.update(

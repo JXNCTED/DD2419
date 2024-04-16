@@ -64,7 +64,8 @@ class DetectionMLNode(Node):
             [
                 v2.ToImage(),
                 v2.ToDtype(torch.float32, scale=True),
-                v2.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
+                v2.Normalize(mean=[0.485, 0.456, 0.406],
+                             std=[0.229, 0.224, 0.225]),
             ]
         )
         self.get_logger().info("Model loaded")
@@ -176,9 +177,10 @@ class DetectionMLNode(Node):
             pose.point.y = position[1]
             pose.point.z = position[2]
             obj = Object()
-            obj.position.x = position[0]
-            obj.position.y = position[1]
-            obj.position.z = position[2]
+            obj.position.header = pose.header
+            obj.position.point.x = position[0]
+            obj.position.point.y = position[1]
+            obj.position.point.z = position[2]
             obj.category = category
             obj.confidence = score
             # self.pose_pub.publish(pose)
@@ -192,7 +194,8 @@ class DetectionMLNode(Node):
                 show_img, (x, y), (x + w, y + h), color=(0, 255, 0), thickness=2
             )
             cv2.putText(
-                show_img, cata_str, (x, y), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2
+                show_img, cata_str, (x,
+                                     y), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2
             )
 
         if length > 0:
@@ -202,14 +205,16 @@ class DetectionMLNode(Node):
         self.last_time = time.time()
         status_str = f"FPS: {fps}"
         cv2.putText(
-            show_img, status_str, (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2
+            show_img, status_str, (10,
+                                   30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2
         )
         cv2.imshow("detections", show_img)
         cv2.waitKey(1)
 
         if len(bbs_nms) > 0:
             bbs_nms = np.array(bbs_nms)
-            self.bounding_box_pub.publish(Float32MultiArray(data=bbs_nms.flatten()))
+            self.bounding_box_pub.publish(
+                Float32MultiArray(data=bbs_nms.flatten()))
 
 
 def non_max_suppression(boxes, threshold):

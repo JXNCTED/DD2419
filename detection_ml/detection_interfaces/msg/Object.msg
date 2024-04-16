@@ -1,3 +1,3 @@
-geometry_msgs/Point position
+geometry_msgs/PointStamped position
 int16 category
 float32 confidence
