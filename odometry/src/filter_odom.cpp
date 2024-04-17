@@ -93,7 +93,6 @@ class FilterOdom : public rclcpp::Node
         if (dt <= 0.0)
             return;
         double v = msg->vector.x;
-        // double w = msg->vector.y;
         x_ += v * cos(yaw_) * dt;
         y_ += v * sin(yaw_) * dt;
     }
@@ -120,7 +119,6 @@ class FilterOdom : public rclcpp::Node
     // Pubs and subs
     rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr odom_pub_;
     rclcpp::Subscription<sensor_msgs::msg::Imu>::SharedPtr imu_sub_;
-    // rclcpp::Subscription<sensor_msgs::msg::Imu>::SharedPtr phidget_gyro_sub_;
     rclcpp::Subscription<geometry_msgs::msg::Vector3Stamped>::SharedPtr
         wheel_odom_sub_;
     std::unique_ptr<tf2_ros::TransformBroadcaster> tf_broadcaster_;
