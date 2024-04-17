@@ -115,8 +115,9 @@ class DisplayMarkers(Node):
             # Updates the box with the new position and orientation
             box_yaw = euler_from_quaternion(
                 [t.transform.rotation.x, t.transform.rotation.y, t.transform.rotation.z, t.transform.rotation.w])[2]
+            # THIS IS STRANGE??
             box_center = np.array([
-                t.transform.translation.x - Box.BOX_WIDTH/2 * cos(box_yaw),
+                t.transform.translation.x + Box.BOX_WIDTH/2 * cos(box_yaw),
                 t.transform.translation.y
             ])
 
@@ -136,9 +137,11 @@ class DisplayMarkers(Node):
             position = box.get_position()
             if position[0] == 0 and position[1] == 0:
                 continue
+
             marker = VisMarker()
             marker.header.frame_id = "map"
             marker.header.stamp = self.get_clock().now().to_msg()
+            marker.ns = "box"
             marker.id = box.aruco_id
             marker.type = VisMarker.CUBE
             marker.action = VisMarker.MODIFY
@@ -158,6 +161,28 @@ class DisplayMarkers(Node):
             marker.color.g = 1.0
             marker.color.b = 0.0
             marker_array.markers.append(marker)
+
+            text_marker = VisMarker()
+            text_marker.header.frame_id = "map"
+            text_marker.header.stamp = self.get_clock().now().to_msg()
+            text_marker.ns = "box"
+            text_marker.id = box.aruco_id + 100
+            text_marker.type = VisMarker.TEXT_VIEW_FACING
+            text_marker.action = VisMarker.MODIFY
+            text_marker.pose.position.x = position[0]
+            text_marker.pose.position.y = position[1]
+            text_marker.pose.position.z = 0.2
+            text_marker.pose.orientation.w = 1.0
+            text_marker.text = f"box_{box.aruco_id}"
+            text_marker.lifetime = rclpy.duration.Duration(seconds=0).to_msg()
+            text_marker.scale.x = 0.1
+            text_marker.scale.y = 0.1
+            text_marker.scale.z = 0.1
+            text_marker.color.a = 1.0
+            text_marker.color.r = 1.0
+            text_marker.color.g = 1.0
+            text_marker.color.b = 1.0
+            marker_array.markers.append(text_marker)
         self.viz_publisher.publish(marker_array)
 
 
