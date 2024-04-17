@@ -47,7 +47,7 @@ def generate_launch_description():
 
     aruco_marker_publisher_params = {
         'image_is_rectified': True,
-        'marker_size': 0.0625,
+        'marker_size': 0.05,
         'reference_frame': '',
         'camera_frame': 'camera_color_optical_frame',
     }
