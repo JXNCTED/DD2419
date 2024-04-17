@@ -20,7 +20,7 @@ class LidarLandmarker : public rclcpp::Node
     LidarLandmarker() : Node("lidar_landmarker")
     {
         lidar_sub_ = this->create_subscription<sensor_msgs::msg::PointCloud2>(
-            "/compensated_scan_pc",
+            "/valid_scan",
             10,
             std::bind(
                 &LidarLandmarker::lidarCallback, this, std::placeholders::_1));

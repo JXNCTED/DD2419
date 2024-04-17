@@ -28,43 +28,15 @@ class FilterOdom : public rclcpp::Node
             sensorQos,
             std::bind(
                 &FilterOdom::realsense_callback, this, std::placeholders::_1));
-        // phidget_gyro_sub_ = this->create_subscription<sensor_msgs::msg::Imu>(
-        //     "/imu/data_raw",
-        //     10,
-        //     std::bind(
-        //         &FilterOdom::phidget_callback, this, std::placeholders::_1));
         // Publishers
         odom_pub_ =
             this->create_publisher<nav_msgs::msg::Odometry>("/odom", 10);
         path_pub_ = this->create_publisher<nav_msgs::msg::Path>("/path", 10);
         tf_broadcaster_ =
             std::make_unique<tf2_ros::TransformBroadcaster>(*this);
-        // Timer
-        // timer_ = this->create_wall_timer(
-        //     5ms, std::bind(&FilterOdom::timer_callback, this));
     }
 
    private:
-    // This is the main method that combines wheel and IMU odometry and
-    // publishes it as odom, path and tf.
-    // void timer_callback()
-    // {
-    //     rclcpp::Time stamp = realsense_stamp_;
-    //     // double wheels[2]    = wheel_odom;
-    //     // double realsense[2] = realsense_odom;
-    //     double dt      = 5.0 / 1000.0;
-    //     double avg_lin = wheel_odom[0];
-    //     // double avg_ang = (wheel_odom[1] + realsense_odom[1]) / 2.0;
-    //     double avg_ang = realsense_odom[1];
-
-    //     x_ += avg_lin * cos(yaw_) * dt;
-    //     y_ += avg_lin * sin(yaw_) * dt;
-    //     yaw_ += avg_ang * dt;
-    //     publish_odom(stamp);
-    //     publish_path(stamp);
-    //     broadcast_tf(stamp);
-    // }
-
     // Helper method that creates a odom message and publishes it.
     void publish_odom(const rclcpp::Time &stamp)
     {
@@ -124,12 +96,6 @@ class FilterOdom : public rclcpp::Node
         // double w = msg->vector.y;
         x_ += v * cos(yaw_) * dt;
         y_ += v * sin(yaw_) * dt;
-        // const double DT = 50.0 / 1000.0;
-
-        // wheel_odom[0]   = msg->x;
-        // wheel_odom[1]   = msg->y;
-        // x_ = x_ + msg->x * cos(yaw_) * DT;
-        // y_ = y_ + msg->x * sin(yaw_) * DT;
     }
     void realsense_callback(const sensor_msgs::msg::Imu::SharedPtr msg)
     {
@@ -149,25 +115,7 @@ class FilterOdom : public rclcpp::Node
         publish_odom(msg->header.stamp);
         publish_path(msg->header.stamp);
         broadcast_tf(msg->header.stamp);
-
-        // realsense_odom[0] =
-        //     (msg->linear_acceleration.z + _realsense_old[0]) / 2.0;
-        // realsense_odom[1] =
-        //     (-msg->angular_velocity.y + _realsense_old[1]) / 2.0;  // rad/s
-        // if (std::abs(realsense_odom[1]) < 0.01)
-        //     realsense_odom[1] = 0.0;
-        // _realsense_old[0] = msg->linear_acceleration.z;
-        // _realsense_old[1] = -msg->angular_velocity.y;
-        // realsense_stamp_  = msg->header.stamp;
     }
-    // void phidget_callback(const sensor_msgs::msg::Imu::SharedPtr msg)
-    // {
-    //     phidget_odom[0] =
-    //         msg->linear_acceleration
-    //             .x;  // ---------------- I dont know if this is the correct
-    //             axis
-    //     phidget_odom[1] = msg->angular_velocity.z;
-    // }
 
     // Pubs and subs
     rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr odom_pub_;
@@ -179,11 +127,6 @@ class FilterOdom : public rclcpp::Node
     rclcpp::Publisher<nav_msgs::msg::Path>::SharedPtr path_pub_;
 
     nav_msgs::msg::Path path_;
-    // Fields to store the subscriptions values.
-    // double wheel_odom[2];
-    // double _realsense_old[2];
-    // double realsense_odom[2];
-    // double phidget_odom[2];
 
     rclcpp::TimerBase::SharedPtr timer_;
     rclcpp::Time realsense_stamp_;
