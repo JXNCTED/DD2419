@@ -3,18 +3,47 @@
 import rclpy
 from rclpy.node import Node
 
-from tf2_ros import TransformException
 from tf2_ros.buffer import Buffer
 from tf2_ros.transform_listener import TransformListener
 from tf2_ros import TransformBroadcaster
-from tf_transformations import quaternion_from_euler, euler_from_quaternion, quaternion_about_axis, quaternion_multiply
-import math
-
+from tf_transformations import euler_from_quaternion, quaternion_from_euler
+import numpy as np
+from filterpy.kalman import KalmanFilter
+from math import cos, sin
 
 import tf2_geometry_msgs
 
-from aruco_msgs.msg import MarkerArray
+from aruco_msgs.msg import MarkerArray, Marker
 from geometry_msgs.msg import TransformStamped
+from typing import Final
+
+from visualization_msgs.msg import MarkerArray as VisMarkerArray
+from visualization_msgs.msg import Marker as VisMarker
+
+
+class Box:
+    BOX_WIDTH: Final = 0.16
+    BOX_LENGTH: Final = 0.24
+
+    def __init__(self, aruco_id, P=100, R=1, Q=0.1):
+        # x, y and yaw of the center of the box
+        self.filter = KalmanFilter(dim_x=3, dim_z=3)
+        self.filter.x = np.array([0, 0, 0])
+        self.filter.F = np.eye(3)
+        self.filter.H = np.eye(3)
+        self.filter.P = np.eye(3) * P
+        self.filter.R = np.eye(3) * R
+        self.filter.Q = np.eye(3) * Q
+
+        self.aruco_id = aruco_id  # aruco marker id
+
+    def update(self, position, yaw):
+        self.filter.predict()
+        self.filter.update(np.array(
+            [position[0], position[1], yaw]))
+
+    def get_position(self):
+        return np.array([self.filter.x[0], self.filter.x[1], self.filter.x[2]], dtype=np.float64)
 
 
 class DisplayMarkers(Node):
@@ -22,6 +51,10 @@ class DisplayMarkers(Node):
     def __init__(self):
 
         super().__init__('display_markers')
+
+        self.ACCEPTABLE_MARKER_IDS: Final = [1, 2, 3]
+
+        self.boxes = {i: Box(i) for i in self.ACCEPTABLE_MARKER_IDS}
 
         # Initialize the transform listerner and assign it a buffer
         self.tf_buffer = Buffer()
@@ -37,27 +70,35 @@ class DisplayMarkers(Node):
             self.aruco_callback,
             10
         )
+
+        self.viz_publisher = self.create_publisher(
+            VisMarkerArray, '/box_visualization', 10)
         self.subscription
 
     def aruco_callback(self, msg: MarkerArray):
-        t = TransformStamped()
+
+        marker: Marker
         for marker in msg.markers:
 
-            t.header.stamp = marker.header.stamp
+            if marker.id not in self.ACCEPTABLE_MARKER_IDS:
+                self.get_logger().warn(
+                    f"Marker ID {marker.id} not in acceptable marker IDs")
+                continue
 
-            t.child_frame_id = f'/aruco/detected{marker.id}'
-            t.header.frame_id = 'odom'
-
-            # Looks up transform between map and baselink.
             try:
                 look_trans = self.tf_buffer.lookup_transform(
-                    "odom", "camera_color_optical_frame", msg.header.stamp)
+                    "map", "camera_color_optical_frame", rclpy.time.Time())
             except Exception as e:
-                # print("Failed transformation")
                 self.get_logger().warn(str(e))
                 continue
 
-            # Applies the transformation.
+            # Applies the transformation in map frame
+
+            t = TransformStamped()
+            t.header.frame_id = "map"
+            t.header.stamp = msg.header.stamp
+            t.child_frame_id = f"aruco_{marker.id}"
+
             marker_transformed = tf2_geometry_msgs.do_transform_pose(
                 marker.pose.pose, look_trans)
 
@@ -71,11 +112,53 @@ class DisplayMarkers(Node):
             t.transform.rotation.z = marker_transformed.orientation.z
             t.transform.rotation.w = marker_transformed.orientation.w
 
+            # Updates the box with the new position and orientation
+            box_yaw = euler_from_quaternion(
+                [t.transform.rotation.x, t.transform.rotation.y, t.transform.rotation.z, t.transform.rotation.w])[2]
+            box_center = np.array([
+                t.transform.translation.x - Box.BOX_WIDTH/2 * cos(box_yaw),
+                t.transform.translation.y
+            ])
+
+            self.boxes[marker.id].update(box_center, box_yaw)
+
             # Publish the message.
             try:
                 self._tf_broadcaster.sendTransform(t)
-            except TransformException:
-                print("Error transforming")
+            except Exception as e:
+                self.get_logger().warn(str(e))
+        # display the box in rviz
+        self.visualize_box()
+
+    def visualize_box(self):
+        marker_array = VisMarkerArray()
+        for box in self.boxes.values():
+            position = box.get_position()
+            if position[0] == 0 and position[1] == 0:
+                continue
+            marker = VisMarker()
+            marker.header.frame_id = "map"
+            marker.header.stamp = self.get_clock().now().to_msg()
+            marker.id = box.aruco_id
+            marker.type = VisMarker.CUBE
+            marker.action = VisMarker.MODIFY
+            marker.pose.position.x = position[0]
+            marker.pose.position.y = position[1]
+            marker.pose.position.z = 0.0
+            box_q = quaternion_from_euler(0, 0, position[2])
+            marker.pose.orientation.x = box_q[0]
+            marker.pose.orientation.y = box_q[1]
+            marker.pose.orientation.z = box_q[2]
+            marker.pose.orientation.w = box_q[3]
+            marker.scale.x = Box.BOX_LENGTH
+            marker.scale.y = Box.BOX_WIDTH
+            marker.scale.z = 0.1
+            marker.color.a = 1.0
+            marker.color.r = 0.0
+            marker.color.g = 1.0
+            marker.color.b = 0.0
+            marker_array.markers.append(marker)
+        self.viz_publisher.publish(marker_array)
 
 
 def main():
