@@ -14,9 +14,12 @@ def generate_launch_description():
         ),
         Node(
             package='odometry', executable='wheel_odom', name='wheel_odom'),
-        # Node(
-        #     package='odometry', executable='lidar_compensator', name='lidar_compensator',
-        # ),
+        Node(
+            package='odometry', executable='lidar_compensator', name='lidar_compensator',
+        ),
+        Node(
+            package='odometry', executable='lidar_landmarker', name='lidar_compensator',
+        ),
         Node(
             package='odometry', executable='filter_odom', name='filter_odom',
         ),
