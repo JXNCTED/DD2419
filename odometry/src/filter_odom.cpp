@@ -104,7 +104,7 @@ class FilterOdom : public rclcpp::Node
         if (dt <= 0.0)
             return;
         double yaw_rate = 0.0;
-        if (std::abs(msg->linear_acceleration.z) < 0.01)
+        if (std::abs(msg->angular_velocity.z) < 0.01)
             yaw_rate = 0.0;
         else
             yaw_rate = -msg->angular_velocity.z;
