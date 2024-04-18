@@ -21,7 +21,8 @@ class WheelOdom : public rclcpp::Node
     void encodersCallback(const robp_interfaces::msg::Encoders::SharedPtr msg)
     {
         const float TICK_PER_REV = 3600;
-        const float WHEEL_RADIUS = 0.04921;
+        // const float WHEEL_RADIUS = 0.04921;
+        const float WHEEL_RADIUS = 0.051;
         const float WHEEL_BASE   = 0.3;
 
         const float DT = 50.0 / 1000.0;
