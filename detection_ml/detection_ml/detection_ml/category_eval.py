@@ -84,9 +84,10 @@ class CategoryEvaluation(Node):
             MarkerArray, "/category_eval/stuff", 10
         )
 
-        self.srv = self.create_service(GetStuff, "get_stuff", self.get_stuff_callback)
+        self.srv = self.create_service(
+            GetStuff, "get_stuff", self.get_stuff_callback)
 
-    def get_stuff_callback(self, request, response):
+    def get_stuff_callback(self, request: GetStuff.Request, response: GetStuff.Response):
         if request.pop:
             if self.list_of_stuff:
                 stuff = self.list_of_stuff.pop()
@@ -199,17 +200,20 @@ class CategoryEvaluation(Node):
             position = do_transform_point(obj.position, t)
             for stuff in self.list_of_stuff:
                 if (
-                    stuff.residual(np.array([position.point.x, position.point.y]))
+                    stuff.residual(
+                        np.array([position.point.x, position.point.y]))
                     < 0.15
                 ):
-                    stuff.update(obj.category, (position.point.x, position.point.y))
+                    stuff.update(
+                        obj.category, (position.point.x, position.point.y))
                     break
             else:
                 self.get_logger().info(
                     f"new stuff: {cls_dict[obj.category]} at {position.point.x, position.point.y}"
                 )
                 self.list_of_stuff.append(
-                    Stuff(np.array([position.point.x, position.point.y]), obj.category)
+                    Stuff(
+                        np.array([position.point.x, position.point.y]), obj.category)
                 )
         self.publish_markers()
 
