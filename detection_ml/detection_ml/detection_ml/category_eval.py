@@ -2,7 +2,7 @@ import rclpy
 import rclpy.duration
 from rclpy.node import Node
 
-from detection_interfaces.msg import DetectedObj
+from detection_interfaces.msg import DetectedObj, Object
 from collections import deque
 from dataclasses import dataclass
 from filterpy.kalman import KalmanFilter
@@ -13,6 +13,7 @@ import rclpy.time
 from tf2_ros import TransformListener, Buffer
 from tf2_geometry_msgs import do_transform_point
 from visualization_msgs.msg import Marker, MarkerArray
+from detection_interfaces.srv import GetStuff
 
 
 cls_dict = {
@@ -30,12 +31,11 @@ cls_dict = {
     11: "rc",
     12: "rs",
     13: "slush",
-    14: "wc"
+    14: "wc",
 }
 
 
 class Stuff:
-
     id = 0
 
     def __init__(self, position, category, P=100, R=1, Q=0.1):
@@ -67,9 +67,8 @@ class Stuff:
 
 
 class CategoryEvaluation(Node):
-
     def __init__(self):
-        super().__init__('category_eval')
+        super().__init__("category_eval")
         self.get_logger().info("Category evaluation node started")
 
         self.list_of_stuff: list[Stuff] = []
@@ -78,11 +77,58 @@ class CategoryEvaluation(Node):
         self.last_stamp = None
 
         self.create_subscription(
-            DetectedObj, '/detection_ml/detected_obj', self.obj_callback, 10
+            DetectedObj, "/detection_ml/detected_obj", self.obj_callback, 10
         )
 
         self.marker_publisher = self.create_publisher(
-            MarkerArray, '/category_eval/stuff', 10)
+            MarkerArray, "/category_eval/stuff", 10
+        )
+
+        self.srv = self.create_service(GetStuff, "get_stuff", self.get_stuff_callback)
+
+    def get_stuff_callback(self, request, response):
+        if request.pop:
+            if self.list_of_stuff:
+                stuff = self.list_of_stuff.pop()
+                _, category, position = stuff.getStuff()
+                response.stuff.position.header.frame_id = "map"
+                response.stuff.position.header.stamp = rclpy.time.Time()
+                response.stuff.category = category
+                response.stuff.confidence = 1
+                response.stuff.position.point.x = position[0]
+                response.stuff.position.point.y = position[1]
+                response.stuff.position.point.z = 0.0
+                return response
+            else:
+                response.stuff.position.header.frame_id = "map"
+                response.stuff.position.header.stamp = rclpy.time.Time()
+                response.stuff.category = -1
+                response.stuff.confidence = 0
+                response.stuff.position.point.x = 0.0
+                response.stuff.position.point.y = 0.0
+                response.stuff.position.point.z = 0.0
+                return response
+        else:
+            if self.list_of_stuff:
+                stuff = self.list_of_stuff[-1]
+                _, category, position = stuff.getStuff()
+                response.stuff.position.header.frame_id = "map"
+                response.stuff.position.header.stamp = rclpy.time.Time()
+                response.stuff.category = category
+                response.stuff.confidence = 1
+                response.stuff.position.point.x = position[0]
+                response.stuff.position.point.y = position[1]
+                response.stuff.position.point.z = 0.0
+                return response
+            else:
+                response.stuff.position.header.frame_id = "map"
+                response.stuff.position.header.stamp = rclpy.time.Time()
+                response.stuff.category = -1
+                response.stuff.confidence = 0
+                response.stuff.position.point.x = 0.0
+                response.stuff.position.point.y = 0.0
+                response.stuff.position.point.z = 0.0
+                return response
 
     def publish_markers(self):
         markers = MarkerArray()
@@ -144,22 +190,27 @@ class CategoryEvaluation(Node):
         for obj in msg.obj:
             try:
                 t = self.tf_buffer.lookup_transform(
-                    "map", "camera_color_optical_frame", rclpy.time.Time())
+                    "map", "camera_color_optical_frame", rclpy.time.Time()
+                )
             except Exception as e:
                 self.get_logger().error(str(e))
                 return
 
             position = do_transform_point(obj.position, t)
             for stuff in self.list_of_stuff:
-                if stuff.residual(np.array([position.point.x, position.point.y])) < 0.15:
-                    stuff.update(
-                        obj.category, (position.point.x, position.point.y))
+                if (
+                    stuff.residual(np.array([position.point.x, position.point.y]))
+                    < 0.15
+                ):
+                    stuff.update(obj.category, (position.point.x, position.point.y))
                     break
             else:
                 self.get_logger().info(
-                    f"new stuff: {cls_dict[obj.category]} at {position.point.x, position.point.y}")
+                    f"new stuff: {cls_dict[obj.category]} at {position.point.x, position.point.y}"
+                )
                 self.list_of_stuff.append(
-                    Stuff(np.array([position.point.x, position.point.y]), obj.category))
+                    Stuff(np.array([position.point.x, position.point.y]), obj.category)
+                )
         self.publish_markers()
 
 
@@ -173,5 +224,5 @@ def main():
     rclpy.shutdown()
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

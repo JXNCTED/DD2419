@@ -1,0 +1,5 @@
+# Use pop=false within Peek() and pop=true within Pick().
+bool pop
+---
+# Ignore the confidence score.
+Object stuff
