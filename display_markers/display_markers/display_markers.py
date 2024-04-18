@@ -20,6 +20,8 @@ from typing import Final
 from visualization_msgs.msg import MarkerArray as VisMarkerArray
 from visualization_msgs.msg import Marker as VisMarker
 
+from detection_interfaces.srv import GetBox
+
 
 class Box:
     BOX_WIDTH: Final = 0.16
@@ -73,7 +75,41 @@ class DisplayMarkers(Node):
 
         self.viz_publisher = self.create_publisher(
             VisMarkerArray, '/box_visualization', 10)
-        self.subscription
+        self.srv = self.create_service(
+            GetBox, 'get_box', self.get_box_callback)
+
+    def get_box_callback(self, request: GetBox.Request, response: GetBox.Response):
+        box_id = int(request.box_id)
+        if box_id not in self.ACCEPTABLE_MARKER_IDS:
+            response.success = False
+            response.box_pose.header.frame_id = "map"
+            response.box_pose.header.stamp = self.get_clock().now().to_msg()
+            response.box_pose.pose.position.x = 0
+            response.box_pose.pose.position.y = 0
+            response.box_pose.pose.position.z = 0
+            response.box_pose.pose.orientation.x = 0
+            response.box_pose.pose.orientation.y = 0
+            response.box_pose.pose.orientation.z = 0
+            response.box_pose.pose.orientation.w = 1
+
+            self.get_logger().warn(
+                f"Box ID {box_id} not in acceptable box IDs")
+            return response
+
+        box = self.boxes[box_id]
+        position = box.get_position()
+        response.success = True
+        response.box_pose.header.frame_id = "map"
+        response.box_pose.header.stamp = self.get_clock().now().to_msg()
+        response.box_pose.pose.position.x = position[0]
+        response.box_pose.pose.position.y = position[1]
+        response.box_pose.pose.position.z = 0
+        q = quaternion_from_euler(0, 0, position[2])
+        response.box_pose.pose.orientation.x = q[0]
+        response.box_pose.pose.orientation.y = q[1]
+        response.box_pose.pose.orientation.z = q[2]
+        response.box_pose.pose.orientation.w = q[3]
+        return response
 
     def aruco_callback(self, msg: MarkerArray):
 

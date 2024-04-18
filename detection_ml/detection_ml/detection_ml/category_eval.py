@@ -42,8 +42,8 @@ class Stuff:
         self.category = deque(maxlen=10)
         self.gaussian = KalmanFilter(dim_x=2, dim_z=2)
         self.gaussian.x = np.array([position[0], position[1]])
-        self.gaussian.F = np.array([[1, 0], [0, 1]])
-        self.gaussian.H = np.array([[1, 0], [0, 1]])
+        self.gaussian.F = np.eye(2)
+        self.gaussian.H = np.eye(2)
         self.gaussian.P = np.eye(2) * P
         self.gaussian.R = np.eye(2) * R
         self.gaussian.Q = np.eye(2) * Q

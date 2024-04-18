@@ -15,6 +15,7 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   "msg/DetectedObj.msg"
   "msg/Object.msg"
   "srv/GetStuff.srv"
+  "srv/GetBox.srv"
   DEPENDENCIES geometry_msgs std_msgs
 )
 
