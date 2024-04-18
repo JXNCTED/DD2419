@@ -11,7 +11,6 @@
 #include "sensor_msgs/msg/laser_scan.hpp"
 #include "sensor_msgs/msg/point_cloud2.hpp"
 // #include "tf2_eigen/tf2_eigen/tf2_eigen.hpp"
-#include "tf2_geometry_msgs/tf2_geometry_msgs/tf2_geometry_msgs.hpp"
 #include "tf2_ros/buffer.h"
 #include "tf2_ros/transform_broadcaster.h"
 #include "tf2_ros/transform_listener.h"
@@ -45,7 +44,7 @@ class LidarLandmarker : public rclcpp::Node
             std::make_unique<tf2_ros::TransformListener>(*tf_buffer_);
 
         timer_ = this->create_wall_timer(
-            3s, std::bind(&LidarLandmarker::timerCallback, this));
+            1s, std::bind(&LidarLandmarker::timerCallback, this));
 
         T_map_odom.setIdentity();
     }
@@ -53,6 +52,11 @@ class LidarLandmarker : public rclcpp::Node
    private:
     void timerCallback()
     {
+        if (lastCloud.empty() or mapCloud.empty())
+        {
+            return;
+        }
+        const static double ICP_THRESHOLD = 0.01;
         // inital guess
         Eigen::Matrix4d T_map_base_guess = T_map_odom * T_odom_base;
 
@@ -60,6 +64,7 @@ class LidarLandmarker : public rclcpp::Node
         pcl::IterativeClosestPoint<pcl::PointXYZ, pcl::PointXYZ> icp;
         icp.setInputSource(lastCloud.makeShared());
         icp.setInputTarget(mapCloud.makeShared());
+        icp.setRANSACOutlierRejectionThreshold(0.1);
         pcl::PointCloud<pcl::PointXYZ> final;
         icp.align(final, T_map_base_guess.cast<float>());
 
@@ -72,12 +77,34 @@ class LidarLandmarker : public rclcpp::Node
                     icp.getFinalTransformation()(0, 3),
                     icp.getFinalTransformation()(1, 3),
                     icp.getFinalTransformation()(2, 3));
-        // if (icp.hasConverged() and icp.getFitnessScore() < 0.01)
-        // {
-        //     // update T_map_odom ??
-        //     T_map_odom =
-        //         icp.getFinalTransformation().cast<double>() * T_odom_base;
-        // }
+
+        // update T_map_odom
+        if (icp.hasConverged() and icp.getFitnessScore() < 0.08 and
+            icp.getFinalTransformation()(0, 3) < 0.1 and
+            icp.getFinalTransformation()(1, 3) < 0.1 and
+            icp.getFinalTransformation()(2, 3) == 0)
+        {
+            T_map_odom =
+                T_map_odom * icp.getFinalTransformation().cast<double>();
+
+            if (icp.getFitnessScore() < ICP_THRESHOLD)
+            {
+                pcl::PointCloud<pcl::PointXYZ> lastCloudInMap;
+                pcl::transformPointCloud(lastCloud,
+                                         lastCloudInMap,
+                                         T_map_odom.cast<float>().inverse());
+
+                mapCloud += lastCloud;
+
+                // downsample
+                pcl::VoxelGrid<pcl::PointXYZ> voxel_grid;
+                voxel_grid.setInputCloud(mapCloud.makeShared());
+                voxel_grid.setLeafSize(DOWN_SAMPLE_RESOLUTION,
+                                       DOWN_SAMPLE_RESOLUTION,
+                                       DOWN_SAMPLE_RESOLUTION);
+                voxel_grid.filter(mapCloud);
+            }
+        }
     }
 
     void odomCallback(const nav_msgs::msg::Odometry::SharedPtr msg)
@@ -129,7 +156,9 @@ class LidarLandmarker : public rclcpp::Node
         // downsample
         pcl::VoxelGrid<pcl::PointXYZ> voxel_grid;
         voxel_grid.setInputCloud(cloud.makeShared());
-        voxel_grid.setLeafSize(0.1, 0.1, 0.1);
+        voxel_grid.setLeafSize(DOWN_SAMPLE_RESOLUTION,
+                               DOWN_SAMPLE_RESOLUTION,
+                               DOWN_SAMPLE_RESOLUTION);
         voxel_grid.filter(cloud);
 
         // transform to map frame
@@ -163,7 +192,11 @@ class LidarLandmarker : public rclcpp::Node
         pcl::transformPointCloud(cloud, cloud, T_map_lidar.cast<float>());
 
         // add to map
-        mapCloud += cloud;
+        // mapCloud += cloud;
+        if (mapCloud.empty())
+        {
+            mapCloud = cloud;
+        }
 
         // publish map
         sensor_msgs::msg::PointCloud2 mapMsg;
@@ -188,6 +221,8 @@ class LidarLandmarker : public rclcpp::Node
         tf_map_odom.transform.rotation.z = q_map_odom.z();
         tf_broadcaster_->sendTransform(tf_map_odom);
     }
+
+    constexpr static double DOWN_SAMPLE_RESOLUTION = 0.05;
 
     rclcpp::Subscription<sensor_msgs::msg::LaserScan>::SharedPtr lidar_sub_;
     rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr odom_sub_;
