@@ -84,52 +84,30 @@ class CategoryEvaluation(Node):
             MarkerArray, "/category_eval/stuff", 10
         )
 
-        self.srv = self.create_service(
-            GetStuff, "get_stuff", self.get_stuff_callback)
+        self.srv = self.create_service(GetStuff, "get_stuff", self.get_stuff_callback)
 
-    def get_stuff_callback(self, request: GetStuff.Request, response: GetStuff.Response):
-        if request.pop:
-            if self.list_of_stuff:
+    def get_stuff_callback(
+        self, request: GetStuff.Request, response: GetStuff.Response
+    ):
+        if self.list_of_stuff:
+            if request.pop:
                 stuff = self.list_of_stuff.pop()
-                _, category, position = stuff.getStuff()
-                response.stuff.position.header.frame_id = "map"
-                response.stuff.position.header.stamp = rclpy.time.Time()
-                response.stuff.category = category
-                response.stuff.confidence = 1
-                response.stuff.position.point.x = position[0]
-                response.stuff.position.point.y = position[1]
-                response.stuff.position.point.z = 0.0
-                return response
             else:
-                response.stuff.position.header.frame_id = "map"
-                response.stuff.position.header.stamp = rclpy.time.Time()
-                response.stuff.category = -1
-                response.stuff.confidence = 0
-                response.stuff.position.point.x = 0.0
-                response.stuff.position.point.y = 0.0
-                response.stuff.position.point.z = 0.0
-                return response
-        else:
-            if self.list_of_stuff:
                 stuff = self.list_of_stuff[-1]
-                _, category, position = stuff.getStuff()
-                response.stuff.position.header.frame_id = "map"
-                response.stuff.position.header.stamp = rclpy.time.Time()
-                response.stuff.category = category
-                response.stuff.confidence = 1
-                response.stuff.position.point.x = position[0]
-                response.stuff.position.point.y = position[1]
-                response.stuff.position.point.z = 0.0
-                return response
-            else:
-                response.stuff.position.header.frame_id = "map"
-                response.stuff.position.header.stamp = rclpy.time.Time()
-                response.stuff.category = -1
-                response.stuff.confidence = 0
-                response.stuff.position.point.x = 0.0
-                response.stuff.position.point.y = 0.0
-                response.stuff.position.point.z = 0.0
-                return response
+            _, category, position = stuff.getStuff()
+            response.success = True
+            response.stuff.position.header.frame_id = "map"
+            response.stuff.position.header.stamp = rclpy.time.Time()
+            response.stuff.category = category
+            response.stuff.confidence = 1
+            response.stuff.position.point.x = position[0]
+            response.stuff.position.point.y = position[1]
+            response.stuff.position.point.z = 0.0
+            return response
+        else:
+            response.success = False
+            response.stuff = Object()
+            return response
 
     def publish_markers(self):
         markers = MarkerArray()
@@ -200,20 +178,19 @@ class CategoryEvaluation(Node):
             position = do_transform_point(obj.position, t)
             for stuff in self.list_of_stuff:
                 if (
-                    stuff.residual(
-                        np.array([position.point.x, position.point.y]))
+                    stuff.residual(np.array([position.point.x, position.point.y]))
                     < 0.15
                 ):
-                    stuff.update(
-                        obj.category, (position.point.x, position.point.y))
+                    stuff.update(obj.category, (position.point.x, position.point.y))
+                    # publish image with bounding box and category
+                    # the robot should speak here, explain what it sees
                     break
             else:
                 self.get_logger().info(
                     f"new stuff: {cls_dict[obj.category]} at {position.point.x, position.point.y}"
                 )
                 self.list_of_stuff.append(
-                    Stuff(
-                        np.array([position.point.x, position.point.y]), obj.category)
+                    Stuff(np.array([position.point.x, position.point.y]), obj.category)
                 )
         self.publish_markers()
 
