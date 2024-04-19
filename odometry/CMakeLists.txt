@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.8)
 project(odometry)
 
 if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
-  add_compile_options(-Wall -Wextra -Wpedantic)
+  add_compile_options(-Wall -Wextra -Wno-pedantic)
 endif()
 
 # find dependencies
@@ -19,6 +19,9 @@ find_package(tf2_geometry_msgs REQUIRED)
 find_package(OpenCV REQUIRED)
 find_package(PCL REQUIRED)
 
+# add_subdirectory(Fusion)
+add_subdirectory(Fusion/Fusion)
+
 
 
 add_executable(vi_odom src/vi_odom.cpp)
@@ -34,7 +37,9 @@ target_include_directories(ekf PUBLIC
 
 target_include_directories(filter_odom PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
-  $<INSTALL_INTERFACE:include>)
+  $<INSTALL_INTERFACE:include>
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/Fusion>)
+
 
 target_include_directories(vi_odom PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
@@ -99,7 +104,7 @@ ament_target_dependencies(
   "tf2_geometry_msgs"
 )
 
-target_link_libraries(filter_odom ekf)
+target_link_libraries(filter_odom ekf Fusion)
 
 ament_target_dependencies(
   lidar_compensator

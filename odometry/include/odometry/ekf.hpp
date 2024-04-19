@@ -9,32 +9,36 @@ class EKF
                                                  Eigen::VectorXd,
                                                  const double &);
     using ObservationModelFunc = Eigen::VectorXd (*)(Eigen::VectorXd);
-    using VecMatFunc           = Eigen::MatrixXd (*)(Eigen::VectorXd);
-    using VoidMatFunc          = Eigen::MatrixXd (*)();
+    using VecMatFunc  = Eigen::MatrixXd (*)(Eigen::VectorXd, const double &);
+    using VoidMatFunc = Eigen::MatrixXd (*)();
 
-    EKF() = delete;
+    EKF() = default;
     EKF(const size_t &n,
         const ProcessModelFunc &f,
-        const ObservationModelFunc &h,
-        const VecMatFunc &j_f);
+        const VecMatFunc &j_f,
+        const Eigen::MatrixXd &Q,
+        const Eigen::MatrixXd &P);
 
     void init(const Eigen::VectorXd &x0);
 
     auto predict(const Eigen::VectorXd &u, const double &dt) -> Eigen::VectorXd;
 
-    auto update(const Eigen::VectorXd &z, const VecMatFunc &j_h)
-        -> Eigen::VectorXd;
+    auto update(const Eigen::VectorXd &z,
+                const VecMatFunc &j_h,
+                const Eigen::MatrixXd &R,
+                const double &dt) -> Eigen::VectorXd;
 
     auto getState() -> Eigen::VectorXd { return x; }
 
+    auto isInitialized() -> bool { return initialized; }
+
    private:
+    bool initialized = false;
     // system dim
-    const size_t n;
+    size_t n;
 
     // process function
     ProcessModelFunc f;
-    // observation function
-    ObservationModelFunc h;
 
     // process jacobian
     VecMatFunc jacobian_f;
@@ -45,9 +49,6 @@ class EKF
     // process noise covariance
     Eigen::MatrixXd Q;
 
-    // observe noise covariance
-    Eigen::MatrixXd R;
-
     // error state covariance
     Eigen::MatrixXd P;
 
@@ -55,6 +56,4 @@ class EKF
     Eigen::MatrixXd K;
 
     Eigen::VectorXd x;
-
-    std::mutex mtx;
 };
