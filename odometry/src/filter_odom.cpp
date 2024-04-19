@@ -2,6 +2,7 @@
 #include "geometry_msgs/msg/vector3_stamped.hpp"  //wheel_odom
 #include "nav_msgs/msg/odometry.hpp"              //odometry
 #include "nav_msgs/msg/path.hpp"                  //path
+#include "odometry/ekf.hpp"
 #include "rclcpp/qos.hpp"
 #include "rclcpp/rclcpp.hpp"                        //general
 #include "sensor_msgs/msg/imu.hpp"                  //imu
@@ -10,10 +11,32 @@
 #include "tf2_ros/transform_broadcaster.h"          //tf
 
 using namespace std::chrono_literals;
+
+EKF::ProcessModelFunc processModel = [](Eigen::VectorXd x,
+                                        Eigen::VectorXd u,
+                                        const double &dt) -> Eigen::VectorXd
+{
+    Eigen::VectorXd x_next = Eigen::VectorXd::Zero(x.size());
+    return x_next;
+};
+
+EKF::ObservationModelFunc observationModel = [](Eigen::VectorXd x)
+{
+    Eigen::VectorXd z = Eigen::VectorXd::Zero(3);
+    return z;
+};
+
+EKF::VecMatFunc jacobianF = [](Eigen::VectorXd x) -> Eigen::MatrixXd
+{
+    Eigen::MatrixXd F = Eigen::MatrixXd::Zero(x.size(), x.size());
+    return F;
+};
+
 class FilterOdom : public rclcpp::Node
 {
    public:
-    FilterOdom() : Node("filter_odom")
+    FilterOdom()
+        : Node("filter_odom"), ekf(5, processModel, observationModel, jacobianF)
     {
         rclcpp::SensorDataQoS sensorQos;
         // Subscriptions
@@ -43,10 +66,11 @@ class FilterOdom : public rclcpp::Node
         nav_msgs::msg::Odometry odom;
         odom.header.stamp         = stamp;
         odom.header.frame_id      = "odom";
-        odom.pose.pose.position.x = x_;
-        odom.pose.pose.position.y = y_;
+        odom.pose.pose.position.x = ekf.getState()(0);
+        odom.pose.pose.position.y = ekf.getState()(1);
         odom.pose.pose.position.z = 0.0;
-        tf2::Quaternion q = tf2::Quaternion(tf2::Vector3(0, 0, 1), yaw_);
+        tf2::Quaternion q =
+            tf2::Quaternion(tf2::Vector3(0, 0, 1), ekf.getState()(2));
         odom.pose.pose.orientation = tf2::toMsg(q);
 
         odom_pub_->publish(odom);
@@ -56,12 +80,13 @@ class FilterOdom : public rclcpp::Node
     void publish_path(const rclcpp::Time &stamp)
     {
         geometry_msgs::msg::PoseStamped pose;
-        pose.header.stamp     = stamp;
-        pose.header.frame_id  = "odom";
-        pose.pose.position.x  = x_;
-        pose.pose.position.y  = y_;
-        pose.pose.position.z  = 0.0;
-        tf2::Quaternion q     = tf2::Quaternion(tf2::Vector3(0, 0, 1), yaw_);
+        pose.header.stamp    = stamp;
+        pose.header.frame_id = "odom";
+        pose.pose.position.x = ekf.getState()(0);
+        pose.pose.position.y = ekf.getState()(1);
+        pose.pose.position.z = 0.0;
+        tf2::Quaternion q =
+            tf2::Quaternion(tf2::Vector3(0, 0, 1), ekf.getState()(2));
         pose.pose.orientation = tf2::toMsg(q);
         path_.header.stamp    = stamp;
         path_.header.frame_id = "odom";
@@ -76,10 +101,11 @@ class FilterOdom : public rclcpp::Node
         odom_tf.header.stamp            = stamp;
         odom_tf.header.frame_id         = "odom";
         odom_tf.child_frame_id          = "base_link";
-        odom_tf.transform.translation.x = x_;
-        odom_tf.transform.translation.y = y_;
+        odom_tf.transform.translation.x = ekf.getState()(0);
+        odom_tf.transform.translation.y = ekf.getState()(1);
         odom_tf.transform.translation.z = 0.0;
-        tf2::Quaternion q = tf2::Quaternion(tf2::Vector3(0, 0, 1), yaw_);
+        tf2::Quaternion q =
+            tf2::Quaternion(tf2::Vector3(0, 0, 1), ekf.getState()(2));
         odom_tf.transform.rotation = tf2::toMsg(q);
         tf_broadcaster_->sendTransform(odom_tf);
     }
@@ -87,33 +113,33 @@ class FilterOdom : public rclcpp::Node
     // Callbacks from wheel enconders, realsense IMU and phidget IMU.
     void wheel_callback(const geometry_msgs::msg::Vector3Stamped::SharedPtr msg)
     {
-        static double last_time = rclcpp::Time(msg->header.stamp).seconds();
-        double dt = rclcpp::Time(msg->header.stamp).seconds() - last_time;
-        last_time = rclcpp::Time(msg->header.stamp).seconds();
-        if (dt <= 0.0)
-            return;
-        double v = msg->vector.x;
-        x_ += v * cos(yaw_) * dt;
-        y_ += v * sin(yaw_) * dt;
+        // static double last_time = rclcpp::Time(msg->header.stamp).seconds();
+        // double dt = rclcpp::Time(msg->header.stamp).seconds() - last_time;
+        // last_time = rclcpp::Time(msg->header.stamp).seconds();
+        // if (dt <= 0.0)
+        //     return;
+        // double v = msg->vector.x;
+        // x_ += v * cos(yaw_) * dt;
+        // y_ += v * sin(yaw_) * dt;
     }
     void realsense_callback(const sensor_msgs::msg::Imu::SharedPtr msg)
     {
-        static double last_time = rclcpp::Time(msg->header.stamp).seconds();
-        double dt = rclcpp::Time(msg->header.stamp).seconds() - last_time;
-        last_time = rclcpp::Time(msg->header.stamp).seconds();
-        if (dt <= 0.0)
-            return;
-        double yaw_rate = 0.0;
-        if (std::abs(msg->angular_velocity.z) < 0.01)
-            yaw_rate = 0.0;
-        else
-            yaw_rate = -msg->angular_velocity.z;
+        // static double last_time = rclcpp::Time(msg->header.stamp).seconds();
+        // double dt = rclcpp::Time(msg->header.stamp).seconds() - last_time;
+        // last_time = rclcpp::Time(msg->header.stamp).seconds();
+        // if (dt <= 0.0)
+        //     return;
+        // double yaw_rate = 0.0;
+        // if (std::abs(msg->angular_velocity.z) < 0.01)
+        //     yaw_rate = 0.0;
+        // else
+        //     yaw_rate = -msg->angular_velocity.z;
 
-        yaw_ = yaw_ + yaw_rate * dt;
+        // yaw_ = yaw_ + yaw_rate * dt;
 
-        publish_odom(msg->header.stamp);
-        publish_path(msg->header.stamp);
-        broadcast_tf(msg->header.stamp);
+        // publish_odom(msg->header.stamp);
+        // publish_path(msg->header.stamp);
+        // broadcast_tf(msg->header.stamp);
     }
 
     // Pubs and subs
@@ -129,13 +155,10 @@ class FilterOdom : public rclcpp::Node
     rclcpp::TimerBase::SharedPtr timer_;
     rclcpp::Time realsense_stamp_;
 
-    // The pose of the robot.
-    float x_   = 0.0;
-    float y_   = 0.0;
-    float yaw_ = 0.0;
+    EKF ekf;
 };
 
-int main(int argc, char **argv)
+auto main(int argc, char **argv) -> int
 {
     rclcpp::init(argc, argv);
     rclcpp::spin(std::make_shared<FilterOdom>());

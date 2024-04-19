@@ -1,29 +1,31 @@
 #pragma once
 #include <eigen3/Eigen/Dense>
-
-using ProcessModelFunc     = Eigen::VectorXd (*)(Eigen::VectorXd, Eigen::VectorXd);
-using ObservationModelFunc = Eigen::VectorXd (*)(Eigen::VectorXd);
-using VecMatFunc           = Eigen::MatrixXd (*)(Eigen::VectorXd);
-using VoidMatFunc          = Eigen::MatrixXd (*)(void);
+#include <mutex>
 
 class EKF
 {
    public:
+    using ProcessModelFunc     = Eigen::VectorXd (*)(Eigen::VectorXd,
+                                                 Eigen::VectorXd,
+                                                 const double &);
+    using ObservationModelFunc = Eigen::VectorXd (*)(Eigen::VectorXd);
+    using VecMatFunc           = Eigen::MatrixXd (*)(Eigen::VectorXd);
+    using VoidMatFunc          = Eigen::MatrixXd (*)();
+
     EKF() = delete;
     EKF(const size_t &n,
         const ProcessModelFunc &f,
         const ObservationModelFunc &h,
-        const VecMatFunc &j_f,
-        const VecMatFunc &j_h,
-        const VoidMatFunc &update_q,
-        const VecMatFunc &update_r,
-        const Eigen::MatrixXd &P0);
+        const VecMatFunc &j_f);
 
     void init(const Eigen::VectorXd &x0);
 
-    Eigen::VectorXd predict(const Eigen::VectorXd &u);
+    auto predict(const Eigen::VectorXd &u, const double &dt) -> Eigen::VectorXd;
 
-    Eigen::VectorXd update(const Eigen::VectorXd &z);
+    auto update(const Eigen::VectorXd &z, const VecMatFunc &j_h)
+        -> Eigen::VectorXd;
+
+    auto getState() -> Eigen::VectorXd { return x; }
 
    private:
     // system dim
@@ -36,27 +38,23 @@ class EKF
 
     // process jacobian
     VecMatFunc jacobian_f;
-    Eigen::MatrixXd F;
 
     // observation jacobian
-    VecMatFunc jacobian_h;
     Eigen::MatrixXd H;
 
     // process noise covariance
-    VoidMatFunc update_Q;
     Eigen::MatrixXd Q;
 
     // observe noise covariance
-    VecMatFunc update_R;
     Eigen::MatrixXd R;
 
     // error state covariance
-    Eigen::MatrixXd P_pri;
-    Eigen::MatrixXd P_post;
+    Eigen::MatrixXd P;
 
     // Kalman gain
     Eigen::MatrixXd K;
 
-    Eigen::VectorXd x_pri;
-    Eigen::VectorXd x_post;
+    Eigen::VectorXd x;
+
+    std::mutex mtx;
 };

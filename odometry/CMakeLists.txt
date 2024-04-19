@@ -32,6 +32,10 @@ target_include_directories(ekf PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
   $<INSTALL_INTERFACE:include>)
 
+target_include_directories(filter_odom PUBLIC
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+  $<INSTALL_INTERFACE:include>)
+
 target_include_directories(vi_odom PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
   $<INSTALL_INTERFACE:include>)
@@ -94,6 +98,8 @@ ament_target_dependencies(
   "tf2_ros"
   "tf2_geometry_msgs"
 )
+
+target_link_libraries(filter_odom ekf)
 
 ament_target_dependencies(
   lidar_compensator
