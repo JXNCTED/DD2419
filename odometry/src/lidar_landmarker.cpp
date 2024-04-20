@@ -114,7 +114,6 @@ class LidarLandmarker : public rclcpp::Node
                                    DOWN_SAMPLE_RESOLUTION);
             voxel_grid.filter(mapCloud);
         }
-        // }
     }
 
     void odomCallback(const nav_msgs::msg::Odometry::SharedPtr msg)
@@ -162,14 +161,6 @@ class LidarLandmarker : public rclcpp::Node
             point.z = 0;
             cloud.push_back(point);
         }
-
-        // downsample
-        // pcl::VoxelGrid<pcl::PointXYZ> voxel_grid;
-        // voxel_grid.setInputCloud(cloud.makeShared());
-        // voxel_grid.setLeafSize(DOWN_SAMPLE_RESOLUTION,
-        //                        DOWN_SAMPLE_RESOLUTION,
-        //                        DOWN_SAMPLE_RESOLUTION);
-        // voxel_grid.filter(cloud);
 
         // transform to map frame
         geometry_msgs::msg::TransformStamped tf_odom_lidar;
@@ -232,7 +223,7 @@ class LidarLandmarker : public rclcpp::Node
         tf_broadcaster_->sendTransform(tf_map_odom);
     }
 
-    constexpr static double DOWN_SAMPLE_RESOLUTION = 0.02;
+    constexpr static double DOWN_SAMPLE_RESOLUTION = 0.05;
 
     rclcpp::Subscription<sensor_msgs::msg::LaserScan>::SharedPtr lidar_sub_;
     rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr odom_sub_;
@@ -250,7 +241,7 @@ class LidarLandmarker : public rclcpp::Node
     pcl::PointCloud<pcl::PointXYZ> lastCloud;
 };
 
-int main(int argc, char *argv[])
+auto main(int argc, char *argv[]) -> int
 {
     rclcpp::init(argc, argv);
 
