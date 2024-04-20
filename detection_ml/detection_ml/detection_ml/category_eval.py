@@ -63,7 +63,12 @@ class Stuff:
         return norm(self.gaussian.residual_of(position))
 
     def getStuff(self):
-        return self.id, max(self.category, key=self.category.count), self.gaussian.x
+        # get stuff if the category has more than 5 votes
+        max_category = max(self.category, key=self.category.count)
+        if self.category.count(max_category) > 5:
+            return self.id, max_category, self.gaussian.x
+        else:  # return none if the category has less than 5 votes
+            return self.id, 0, self.gaussian.x
 
 
 class CategoryEvaluation(Node):
@@ -84,7 +89,10 @@ class CategoryEvaluation(Node):
             MarkerArray, "/category_eval/stuff", 10
         )
 
-        self.srv = self.create_service(GetStuff, "get_stuff", self.get_stuff_callback)
+        self.prune_timer = self.create_timer(2.0, self.prune_none)
+
+        self.srv = self.create_service(
+            GetStuff, "get_stuff", self.get_stuff_callback)
 
     def get_stuff_callback(
         self, request: GetStuff.Request, response: GetStuff.Response
@@ -109,9 +117,33 @@ class CategoryEvaluation(Node):
             response.stuff = Object()
             return response
 
+    def prune_none(self):
+        for stuff in self.list_of_stuff:
+            _, category, _ = stuff.getStuff()
+            if category == 0:
+                self.list_of_stuff.remove(stuff)
+                # delete the marker
+                markers = MarkerArray()
+                marker = Marker()
+                marker.header.frame_id = "map"
+                marker.header.stamp = self.last_stamp
+                marker.ns = "stuff"
+                marker.id = stuff.id
+                marker.action = Marker.DELETE
+                markers.markers.append(marker)
+                text_marker = Marker()
+                text_marker.header.frame_id = "map"
+                text_marker.header.stamp = self.last_stamp
+                text_marker.ns = "stuff"
+                text_marker.id = stuff.id + 1000
+                text_marker.action = Marker.DELETE
+                markers.markers.append(text_marker)
+                self.marker_publisher.publish(markers)
+
     def publish_markers(self):
         markers = MarkerArray()
         for i, stuff in enumerate(self.list_of_stuff):
+
             id, category, position = stuff.getStuff()
             marker_text = Marker()
             marker_text.header.frame_id = "map"
@@ -169,29 +201,54 @@ class CategoryEvaluation(Node):
         for obj in msg.obj:
             try:
                 t = self.tf_buffer.lookup_transform(
-                    "map", "camera_color_optical_frame", rclpy.time.Time()
+                    "map", msg.header.frame_id, msg.header.stamp
                 )
             except Exception as e:
                 self.get_logger().error(str(e))
                 return
 
             position = do_transform_point(obj.position, t)
-            for stuff in self.list_of_stuff:
-                if (
-                    stuff.residual(np.array([position.point.x, position.point.y]))
-                    < 0.15
-                ):
-                    stuff.update(obj.category, (position.point.x, position.point.y))
-                    # publish image with bounding box and category
-                    # the robot should speak here, explain what it sees
-                    break
+
+            min_residule = 1000
+            min_residule_index = -1
+            for i, stuff in enumerate(self.list_of_stuff):
+                residule = stuff.residual(
+                    np.array([position.point.x, position.point.y]))
+                if residule < min_residule:
+                    min_residule = residule
+                    min_residule_index = i
+
+            if min_residule < 0.15:
+                self.list_of_stuff[min_residule_index].update(
+                    obj.category, (position.point.x, position.point.y))
             else:
                 self.get_logger().info(
                     f"new stuff: {cls_dict[obj.category]} at {position.point.x, position.point.y}"
                 )
                 self.list_of_stuff.append(
-                    Stuff(np.array([position.point.x, position.point.y]), obj.category)
+                    Stuff(
+                        np.array([position.point.x, position.point.y]), obj.category)
                 )
+
+            # for stuff in self.list_of_stuff:
+            #     if (
+            #         stuff.residual(
+            #             np.array([position.point.x, position.point.y]))
+            #         < 0.15
+            #     ):
+            #         stuff.update(
+            #             obj.category, (position.point.x, position.point.y))
+            #         # publish image with bounding box and category
+            #         # the robot should speak here, explain what it sees
+            #         break
+            # else:
+            #     self.get_logger().info(
+            #         f"new stuff: {cls_dict[obj.category]} at {position.point.x, position.point.y}"
+            #     )
+            #     self.list_of_stuff.append(
+            #         Stuff(
+            #             np.array([position.point.x, position.point.y]), obj.category)
+            #     )
         self.publish_markers()
 
 

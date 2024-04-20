@@ -12,6 +12,7 @@ import numpy as np
 from std_msgs.msg import String, Float32MultiArray
 import torch_tensorrt
 from detection_interfaces.msg import DetectedObj
+from detection_interfaces.msg import Object
 from geometry_msgs.msg import PointStamped
 
 cls_dict = {
@@ -110,8 +111,6 @@ class DetectionMLNode(Node):
 
         # publish the pose of each category. For visualization only, could not handle multiple objects of the same category
         NUM_CLASSES = 15
-        self.pose_pubs = [self.create_publisher(
-            PointStamped, f"/detection_ml/pose{i}", 10) for i in range(NUM_CLASSES)]
 
         self.get_logger().info("Node initialized")
 
@@ -144,7 +143,7 @@ class DetectionMLNode(Node):
         u = x + w/2
         v = y + h/2
         world_z = self.np_depth[int(v), int(u)]
-        if world_z == 0:
+        if world_z == 0 or world_z < 200 or world_z > 2000:
             return np.array([0.0, 0.0, 0.0])
         world_x = (u - self.K[0, 2]) * world_z / self.K[0, 0]
         world_y = (v - self.K[1, 2]) * world_z / self.K[1, 1]
@@ -196,11 +195,12 @@ class DetectionMLNode(Node):
             pose.point.x = position[0]
             pose.point.y = position[1]
             pose.point.z = position[2]
-            # self.pose_pub.publish(pose)
-            self.pose_pubs[category].publish(pose)
-            detected_obj.position.append(pose)
-            detected_obj.category.append(category)
-            detected_obj.confidence.append(score)
+
+            obj = Object()
+            obj.category = category
+            obj.confidence = score
+            obj.position = pose
+            detected_obj.obj.append(obj)
 
         if length > 0:
             self.detected_obj_pub.publish(detected_obj)
