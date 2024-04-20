@@ -1,0 +1,2 @@
+# PickAndPlace.msg
+string phase

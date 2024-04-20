@@ -44,6 +44,13 @@ class GridMap
             const int &sizeY,
             const int &startX,
             const int &startY);
+    // constructor from file
+    /**
+     * @brief Construct a new Grid Map object based on the given file
+     *
+     * @param dir directory of the file
+     */
+    GridMap(const std::string &dir);
 
     // getter and setter
     /**

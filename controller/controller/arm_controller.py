@@ -1,78 +1,249 @@
 #!/usr/bin/env python
 import rclpy
+import rclpy.action
 from rclpy.node import Node
 from std_msgs.msg import Int16MultiArray
 from sensor_msgs.msg import JointState
-import queue
+from rclpy.action import ActionServer
+from robp_interfaces.action import Arm
+from math import pi, sin, cos, atan2, sqrt, acos, asin
+
+
+def j12_ik(x, z):
+    """
+    joint 1 and 2 inverse kinematics
+    """
+    L1 = 0.101
+    L2 = 0.094
+
+    d = sqrt(x**2 + z**2)
+
+    if d > L1 + L2:
+        return 0, 0, 0
+
+    beta = acos((L1**2 + L2**2 - d**2) / (2 * L1 * L2))
+    gamma = atan2(z, x)
+    alpha = acos((L1**2 + d**2 - L2**2) / (2 * L1 * d))
+
+    q1 = pi / 2 - gamma - alpha
+    q2 = pi - beta
+
+    q3 = alpha + beta + gamma - pi / 2
+
+    return q1, q2, q3
 
 
 class ArmController(Node):
     def __init__(self):
         super().__init__('arm_controller')
 
-        self.action_queue = queue.Queue()
         self.current_joint_pos = [12000, 12000, 12000, 12000, 12000, 12000]
-        self.target_joint_pos = [12000, 12000, 12000, 12000, 12000, 12000]
+        self.command_list = [12000 for _ in range(6)]
 
-        self.position_reached = True
+        self.current_command = "none"
 
-        self.timeoutCnt = 0
+        self.object_angle = 0.0
+        self.object_position = [0.0, 0.0]
 
         self.arm_pub_ = self.create_publisher(
             Int16MultiArray, '/multi_servo_cmd_sub', 10)
         self.arm_pos_sub_ = self.create_subscription(
             JointState, '/servo_pos_publisher', self.arm_pos_callback, 10)
-        self.arm_joint_space_target_sub = self.create_subscription(
-            JointState, '/servo_joint_space_target', self.joint_space_target_callback, 10)
-        self.timer = self.create_timer(0.1, self.timer_callback)
+
+        self.rate = self.create_rate(1/3)
+        self.rate_place = self.create_rate(1/4)  # sleep
+
+        self.action_server_ = ActionServer(
+            self, Arm, 'arm', execute_callback=self.execute_callback, goal_callback=self.goal_callback, cancel_callback=self.cancel_callback
+        )
 
     def arm_pos_callback(self, msg: JointState):
         self.current_joint_pos = msg.position
-        diff = 0
-        for i in range(6):
-            diff += abs(self.current_joint_pos[i] - self.target_joint_pos[i])
-        self.position_reached = diff < 2000
-        print(f"diff:{diff} {self.position_reached}")
 
-    def joint_space_target_callback(self, msg: JointState):
-        QUEUE_SIZE = 30
-        if self.action_queue.qsize() <= QUEUE_SIZE:
-            self.action_queue.put(msg)
+    def execute_callback(self, goal_handle) -> Arm.Result:
+        self.get_logger().info(f'executing {self.current_command}')
 
-    def timer_callback(self):
-        if (self.position_reached and not self.action_queue.empty()):
-            next_target = self.action_queue.get()
-            self.target_joint_pos = next_target.position
+        if self.current_command == "pick":
+            # open the gripper
+            self.command_list[0] = 0
+            for i in range(5):
+                self.command_list[i+1] = 12000
 
-            arm_pub_msg = Int16MultiArray()
-            arm_pub_msg.data = [-1 for i in range(12)]
+            msg = Int16MultiArray()
+            msg.data.extend(self.command_list)
+            msg.data.extend([1000 for _ in range(6)])
+
+            self.arm_pub_.publish(msg)
+
+            self.rate.sleep()
+
+            z = 0.01  # compensate for the gravity
+
+            x, y = self.object_position
+            angle = self.object_angle
+            q1, q2, q3 = j12_ik(sqrt(x**2 + y**2), z)
+            if q1 == 0 and q2 == 0 and q3 == 0:
+                self.get_logger().warn("Invalid position")
+                result = Arm.Result()
+                result.success = False
+                goal_handle.abort()
+                return result
+
+            self.command_list[0] = -1
+            self.command_list[1] = 12000 - \
+                int((angle - atan2(x, y)) * 18000 / pi)
+            self.command_list[2] = 12000 - int(q3 * 18000 / pi)
+            self.command_list[3] = 12000 + int(q2 * 18000 / pi)
+            self.command_list[4] = 12000 - int(q1 * 18000 / pi)
+            self.command_list[5] = 12000 + int(atan2(x, y) * 18000 / pi)
+
             for i in range(6):
-                arm_pub_msg.data[i] = int(self.target_joint_pos[i])
-                arm_pub_msg.data[i+6] = 1000
-            self.arm_pub_.publish(arm_pub_msg)
-            self.position_reached = False
-            print("published")
-        elif not self.position_reached:
-            self.timeoutCnt += 1
-            if self.timeoutCnt >= 10:
-                self.timeoutCnt = 0
-                arm_pub_msg = Int16MultiArray()
-                arm_pub_msg.data = [-1 for i in range(12)]
-                for i in range(6):
-                    arm_pub_msg.data[i] = int(self.target_joint_pos[i])
-                    arm_pub_msg.data[i+6] = 1000
-                self.arm_pub_.publish(arm_pub_msg)
-                self.position_reached = False
-                print("timeout, published")
+                if self.command_list[i] >= 24000:
+                    self.command_list[i] = 24000
+                elif self.command_list[i] <= -1:
+                    self.command_list[i] = -1
+
+            self.get_logger().info(f'command list: {self.command_list}')
+
+            move_time = [1000 for _ in range(6)]
+
+            msg = Int16MultiArray()
+            msg.data.extend(self.command_list)
+            msg.data.extend(move_time)
+
+            self.arm_pub_.publish(msg)
+
+            self.rate.sleep()
+
+            # now close the gripper
+            self.command_list[0] = 12000  # or whatever pick position is
+
+            for i in range(5):
+                self.command_list[i+1] = -1
+
+            msg = Int16MultiArray()
+            msg.data.extend(self.command_list)
+            msg.data.extend(move_time)
+
+            self.arm_pub_.publish(msg)
+
+            self.rate.sleep()
+
+            for i in range(5):
+                self.command_list[i+1] = 12000
+
+            msg = Int16MultiArray()
+            msg.data.extend(self.command_list)
+            msg.data.extend(move_time)
+
+            self.arm_pub_.publish(msg)
+
+        elif self.current_command == "place":
+            self.rate_place.sleep()
+            z = 0.05
+
+            x, y = 0, 0.15
+            angle = 0
+            q1, q2, q3 = j12_ik(sqrt(x**2 + y**2), z)
+            if q1 == 0 and q2 == 0 and q3 == 0:
+                self.get_logger().warn("Invalid position")
+                result = Arm.Result()
+                result.success = False
+                goal_handle.abort()
+                return result
+
+            self.command_list[0] = -1
+            self.command_list[1] = 12000 - \
+                int((angle - atan2(x, y)) * 18000 / pi)
+            self.command_list[2] = 12000 - \
+                int(q3 * 18000 / pi) + int(pi / 2 * 18000 / pi)
+            self.command_list[3] = 12000 + int(q2 * 18000 / pi)
+            self.command_list[4] = 12000 - int(q1 * 18000 / pi)
+            self.command_list[5] = 12000 + int(atan2(x, y) * 18000 / pi)
+
+            for i in range(6):
+                if self.command_list[i] >= 24000:
+                    self.command_list[i] = 24000
+                elif self.command_list[i] <= -1:
+                    self.command_list[i] = -1
+
+            self.get_logger().info(f'command list: {self.command_list}')
+
+            move_time = [1000 for _ in range(6)]
+
+            msg = Int16MultiArray()
+            msg.data.extend(self.command_list)
+            msg.data.extend(move_time)
+
+            self.arm_pub_.publish(msg)
+
+            self.rate_place.sleep()
+
+            # now open the gripper
+            self.command_list[0] = 0
+
+            for i in range(5):
+                self.command_list[i+1] = -1
+
+            msg = Int16MultiArray()
+            msg.data.extend(self.command_list)
+            msg.data.extend(move_time)
+
+            self.arm_pub_.publish(msg)
+
+            self.rate_place.sleep()
+
+            for i in range(6):
+                self.command_list[i] = 12000
+
+            msg = Int16MultiArray()
+            msg.data.extend(self.command_list)
+            msg.data.extend(move_time)
+
+            self.arm_pub_.publish(msg)
+
+        result = Arm.Result()
+        result.success = True
+
+        goal_handle.succeed()
+
+        return result
+
+    def goal_callback(self, goal_request):
+        self.get_logger().info(
+            f'Received goal request: {goal_request.command}')
+
+        if goal_request.command == "pick":
+            self.current_command = goal_request.command
+            self.object_angle = goal_request.angle
+            self.object_position = goal_request.position
+            self.get_logger().info(
+                f'Accepting {goal_request.command, goal_request.angle, goal_request.position}')
+            return rclpy.action.GoalResponse.ACCEPT
+        elif goal_request.command == "place":
+            self.current_command = goal_request.command
+            self.get_logger().info(f'Accepting {goal_request.command}')
+            return rclpy.action.GoalResponse.ACCEPT
         else:
-            return
+            self.get_logger().info('Rejecting the goal request')
+            return rclpy.action.GoalResponse.REJECT
+
+    def cancel_callback(self, goal_handle):
+        self.get_logger().info('Received cancel request')
+        return rclpy.action.CancelResponse.ACCEPT
+
+    def destroy(self):
+        self.get_logger().info('Destroying arm controller...')
+        self.action_server_.destroy()
+        super().destroy_node()
 
 
 def main():
     rclpy.init()
+    executor = rclpy.executors.MultiThreadedExecutor(3)
     node = ArmController()
     try:
-        rclpy.spin(node)
+        rclpy.spin(node, executor)
     except KeyboardInterrupt:
         pass
     rclpy.shutdown()

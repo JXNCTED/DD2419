@@ -129,15 +129,8 @@ class MappingNode : public rclcpp::Node
         {
             RCLCPP_ERROR(this->get_logger(), "%s", ex.what());
         }
-        // conver to odom frame with do transform
         geometry_msgs::msg::PoseStamped pose_odom;
-        pose_odom.pose.position.x  = msg->pose.pose.position.x;
-        pose_odom.pose.position.y  = msg->pose.pose.position.y;
-        pose_odom.pose.position.z  = msg->pose.pose.position.z;
-        pose_odom.pose.orientation = msg->pose.pose.orientation;
-        tf2::doTransform(pose_odom, pose_odom, transform_stamped_map_odom);
-        pose.x = pose_odom.pose.position.x;
-        pose.y = pose_odom.pose.position.y;
+        pose_odom.pose.position.x = msg->pose.pose.position.x;
         tf2::Quaternion q(pose_odom.pose.orientation.x,
                           pose_odom.pose.orientation.y,
                           pose_odom.pose.orientation.z,

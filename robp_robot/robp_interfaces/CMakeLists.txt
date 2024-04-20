@@ -13,12 +13,15 @@ find_package(rosidl_default_generators REQUIRED)
 
 set(msg_files
   "msg/DutyCycles.msg"
-  "msg/Encoders.msg"
-)
+  "msg/Encoders.msg")
 
 set(action_files
   "action/Pursuit.action"
+  "action/Arm.action"
+  "action/Finetune.action"
+  "action/Approach.action"
 )
+
 
 rosidl_generate_interfaces(${PROJECT_NAME}
   ${msg_files}
