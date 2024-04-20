@@ -89,7 +89,7 @@ class CategoryEvaluation(Node):
             MarkerArray, "/category_eval/stuff", 10
         )
 
-        self.prune_timer = self.create_timer(2.0, self.prune_none)
+        self.prune_timer = self.create_timer(1.0, self.prune_none)
 
         self.srv = self.create_service(
             GetStuff, "get_stuff", self.get_stuff_callback)
@@ -230,25 +230,6 @@ class CategoryEvaluation(Node):
                         np.array([position.point.x, position.point.y]), obj.category)
                 )
 
-            # for stuff in self.list_of_stuff:
-            #     if (
-            #         stuff.residual(
-            #             np.array([position.point.x, position.point.y]))
-            #         < 0.15
-            #     ):
-            #         stuff.update(
-            #             obj.category, (position.point.x, position.point.y))
-            #         # publish image with bounding box and category
-            #         # the robot should speak here, explain what it sees
-            #         break
-            # else:
-            #     self.get_logger().info(
-            #         f"new stuff: {cls_dict[obj.category]} at {position.point.x, position.point.y}"
-            #     )
-            #     self.list_of_stuff.append(
-            #         Stuff(
-            #             np.array([position.point.x, position.point.y]), obj.category)
-            #     )
         self.publish_markers()
 
 
