@@ -175,8 +175,9 @@ class FilterOdom : public rclcpp::Node
         path_pub_ = this->create_publisher<nav_msgs::msg::Path>("/path", 10);
         tf_broadcaster_ =
             std::make_unique<tf2_ros::TransformBroadcaster>(*this);
-        timer_ = this->create_wall_timer(
-            100ms, std::bind(&FilterOdom::timer_callback, this));
+        // debug print timer
+        // timer_ = this->create_wall_timer(
+        //     100ms, std::bind(&FilterOdom::timer_callback, this));
 
         ekf.init(Eigen::VectorXd::Zero(6));
         last_time = now().seconds();
@@ -296,17 +297,17 @@ class FilterOdom : public rclcpp::Node
             return;
         }
 
-        // Eigen::VectorXd u = Eigen::VectorXd::Zero(2);
-        // ekf.predict(u, dt);
+        Eigen::VectorXd u = Eigen::VectorXd::Zero(2);
+        ekf.predict(u, dt);
 
-        // Eigen::VectorXd z = Eigen::VectorXd::Zero(2);
-        // // z(0)              = -msg->linear_acceleration.y;
-        // z(0) = -ahrs.getBodyAccel()(1);
-        // if (std::abs(msg->angular_velocity.z) < 0.01)
-        //     z(1) = 0.0;
-        // else
-        //     z(1) = -msg->angular_velocity.z;
-        // ekf.update(z, jacobianImuH, Rimu, dt);
+        Eigen::VectorXd z = Eigen::VectorXd::Zero(2);
+        // z(0)              = -msg->linear_acceleration.y;
+        z(0) = -ahrs.getBodyAccel()(1);
+        if (std::abs(msg->angular_velocity.z) < 0.01)
+            z(1) = 0.0;
+        else
+            z(1) = -msg->angular_velocity.z;
+        ekf.update(z, jacobianImuH, Rimu, dt);
     }
 
     void mag_callback(const sensor_msgs::msg::MagneticField::SharedPtr msg)

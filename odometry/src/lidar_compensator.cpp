@@ -5,7 +5,7 @@
 #include "sensor_msgs/msg/laser_scan.hpp"
 
 const double YAW_THRESHOLD =
-    0.05;  // only publish the lidar if yaw velocity is below this threshold
+    0.15;  // only publish the lidar if yaw velocity is below this threshold
 // only publish the lidar if yaw velocity is below this threshold
 class LidarPassThrough : public rclcpp::Node
 {
@@ -39,14 +39,12 @@ class LidarPassThrough : public rclcpp::Node
     {
         std::lock_guard<std::mutex> lock(mtx);
         last_stamp = msg->header.stamp;
-        if (msg->angular_velocity.z < YAW_THRESHOLD)
-        {
-            is_stable = true;
-        }
-        else
-        {
-            is_stable = false;
-        }
+        // a simple delay to ensure the imu data is stable
+        static size_t stableCnt = 0;
+        stableCnt = (std::abs(msg->angular_velocity.z) < YAW_THRESHOLD)
+                        ? stableCnt + 1
+                        : 0;
+        is_stable = stableCnt > 70;
     }
 
     void scanCallback(const sensor_msgs::msg::LaserScan::SharedPtr msg)

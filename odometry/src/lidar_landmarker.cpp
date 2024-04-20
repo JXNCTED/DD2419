@@ -58,15 +58,19 @@ class LidarLandmarker : public rclcpp::Node
         }
         const static double ICP_THRESHOLD = 0.01;
         // inital guess
-        Eigen::Matrix4d T_map_base_guess = T_map_odom * T_odom_base;
+        // Eigen::Matrix4d T_map_base_guess = T_map_odom * T_odom_base;
+
+        pcl::PointCloud<pcl::PointXYZ> lastCloudInMap;
+
+        pcl::transformPointCloud(
+            lastCloud, lastCloudInMap, T_map_odom.cast<float>().inverse());
 
         // ICP
         pcl::IterativeClosestPoint<pcl::PointXYZ, pcl::PointXYZ> icp;
         icp.setInputSource(lastCloud.makeShared());
         icp.setInputTarget(mapCloud.makeShared());
-        icp.setRANSACOutlierRejectionThreshold(0.1);
         pcl::PointCloud<pcl::PointXYZ> final;
-        icp.align(final, T_map_base_guess.cast<float>());
+        icp.align(final);
 
         RCLCPP_INFO(this->get_logger(),
                     "ICP converged: %s",
@@ -79,32 +83,38 @@ class LidarLandmarker : public rclcpp::Node
                     icp.getFinalTransformation()(2, 3));
 
         // update T_map_odom
-        if (icp.hasConverged() and icp.getFitnessScore() < 0.08 and
-            icp.getFinalTransformation()(0, 3) < 0.1 and
-            icp.getFinalTransformation()(1, 3) < 0.1 and
-            icp.getFinalTransformation()(2, 3) == 0)
+
+        if (icp.hasConverged() and icp.getFitnessScore() < 0.9)
         {
             T_map_odom =
-                T_map_odom * icp.getFinalTransformation().cast<double>();
+                icp.getFinalTransformation().cast<double>() * T_map_odom;
 
-            if (icp.getFitnessScore() < ICP_THRESHOLD)
-            {
-                pcl::PointCloud<pcl::PointXYZ> lastCloudInMap;
-                pcl::transformPointCloud(lastCloud,
-                                         lastCloudInMap,
-                                         T_map_odom.cast<float>().inverse());
+            mapCloud += lastCloud;
 
-                mapCloud += lastCloud;
+            // publish tf
+            geometry_msgs::msg::TransformStamped tf_map_odom;
+            tf_map_odom.header.stamp            = this->now();
+            tf_map_odom.header.frame_id         = "map";
+            tf_map_odom.child_frame_id          = "odom";
+            tf_map_odom.transform.translation.x = T_map_odom(0, 3);
+            tf_map_odom.transform.translation.y = T_map_odom(1, 3);
+            tf_map_odom.transform.translation.z = T_map_odom(2, 3);
+            Eigen::Quaterniond q_map_odom(T_map_odom.block<3, 3>(0, 0));
+            tf_map_odom.transform.rotation.w = q_map_odom.w();
+            tf_map_odom.transform.rotation.x = q_map_odom.x();
+            tf_map_odom.transform.rotation.y = q_map_odom.y();
+            tf_map_odom.transform.rotation.z = q_map_odom.z();
+            tf_broadcaster_->sendTransform(tf_map_odom);
 
-                // downsample
-                pcl::VoxelGrid<pcl::PointXYZ> voxel_grid;
-                voxel_grid.setInputCloud(mapCloud.makeShared());
-                voxel_grid.setLeafSize(DOWN_SAMPLE_RESOLUTION,
-                                       DOWN_SAMPLE_RESOLUTION,
-                                       DOWN_SAMPLE_RESOLUTION);
-                voxel_grid.filter(mapCloud);
-            }
+            // downsample
+            pcl::VoxelGrid<pcl::PointXYZ> voxel_grid;
+            voxel_grid.setInputCloud(mapCloud.makeShared());
+            voxel_grid.setLeafSize(DOWN_SAMPLE_RESOLUTION,
+                                   DOWN_SAMPLE_RESOLUTION,
+                                   DOWN_SAMPLE_RESOLUTION);
+            voxel_grid.filter(mapCloud);
         }
+        // }
     }
 
     void odomCallback(const nav_msgs::msg::Odometry::SharedPtr msg)
@@ -154,12 +164,12 @@ class LidarLandmarker : public rclcpp::Node
         }
 
         // downsample
-        pcl::VoxelGrid<pcl::PointXYZ> voxel_grid;
-        voxel_grid.setInputCloud(cloud.makeShared());
-        voxel_grid.setLeafSize(DOWN_SAMPLE_RESOLUTION,
-                               DOWN_SAMPLE_RESOLUTION,
-                               DOWN_SAMPLE_RESOLUTION);
-        voxel_grid.filter(cloud);
+        // pcl::VoxelGrid<pcl::PointXYZ> voxel_grid;
+        // voxel_grid.setInputCloud(cloud.makeShared());
+        // voxel_grid.setLeafSize(DOWN_SAMPLE_RESOLUTION,
+        //                        DOWN_SAMPLE_RESOLUTION,
+        //                        DOWN_SAMPLE_RESOLUTION);
+        // voxel_grid.filter(cloud);
 
         // transform to map frame
         geometry_msgs::msg::TransformStamped tf_odom_lidar;
@@ -222,7 +232,7 @@ class LidarLandmarker : public rclcpp::Node
         tf_broadcaster_->sendTransform(tf_map_odom);
     }
 
-    constexpr static double DOWN_SAMPLE_RESOLUTION = 0.05;
+    constexpr static double DOWN_SAMPLE_RESOLUTION = 0.02;
 
     rclcpp::Subscription<sensor_msgs::msg::LaserScan>::SharedPtr lidar_sub_;
     rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr odom_sub_;
