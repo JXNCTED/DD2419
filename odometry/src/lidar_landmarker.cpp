@@ -56,7 +56,7 @@ class LidarLandmarker : public rclcpp::Node
         {
             return;
         }
-        const static double ICP_THRESHOLD = 0.01;
+        const static double ICP_THRESHOLD = 0.9;
         // inital guess
         // Eigen::Matrix4d T_map_base_guess = T_map_odom * T_odom_base;
 
@@ -84,7 +84,7 @@ class LidarLandmarker : public rclcpp::Node
 
         // update T_map_odom
 
-        if (icp.hasConverged() and icp.getFitnessScore() < 0.9)
+        if (icp.hasConverged() and icp.getFitnessScore() < ICP_THRESHOLD)
         {
             T_map_odom =
                 icp.getFinalTransformation().cast<double>() * T_map_odom;
