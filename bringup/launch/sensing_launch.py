@@ -17,9 +17,9 @@ def generate_launch_description():
         Node(
             package='odometry', executable='lidar_compensator', name='lidar_compensator',
         ),
-        # Node(
-        #     package='odometry', executable='lidar_landmarker', name='lidar_landmarker',
-        # ),
+        Node(
+            package='odometry', executable='lidar_landmarker', name='lidar_landmarker',
+        ),
         Node(
             package='odometry', executable='filter_odom', name='filter_odom',
         ),
@@ -48,6 +48,12 @@ def generate_launch_description():
         ),
         Node(
             package='workspace', executable='workspace', name='workspace',
+        ),
+        Node(
+            package='detection_ml', executable='detection_ml', name='detection_ml',
+        ),
+        Node(
+            package='detection_ml', executable='category_eval', name='detection_ml',
         ),
         Node(
             package='display_markers', executable='display_markers', name='display_markers'),
