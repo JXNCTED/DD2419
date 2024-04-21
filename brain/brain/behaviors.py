@@ -12,28 +12,37 @@ from std_msgs.msg import String
 from std_msgs.msg import Bool
 from std_msgs.msg import Int16MultiArray
 from sensor_msgs.msg import JointState
-from robp_interfaces.action import Approach, Finetune
+from robp_interfaces.action import Approach, Finetune, Arm
 import rclpy
 from rclpy.action import ActionClient
 from action_msgs.msg import GoalStatus
+from typing import TypedDict
 
 # I know I should probably not use global variables, but not sure how to pass data
 # between behaviors, so here are every behavior's global variables
 
 # global variables
-current_object = '9'  # object id, or <aruco_id> for aruco markers
+# current_object = '9'  # object id, or <aruco_id> for aruco markers
+
+
+class TemplateBehaviour(pt.behaviour.Behaviour, Node):
+    def __init__(self, name='TemplateBehaviour'):
+        pt.behaviour.Behaviour.__init__(self, name=name)
+        Node.__init__(self, node_name=name)
+
+        self.blackboard = self.attach_blackboard_client(name)
+
+    def register_bb(self, key, read_access=True, write_access=True):
+        self.blackboard.register_key(
+            key=key, access=pt.common.Access.READ if read_access else pt.common.Access.WRITE)
+        self.blackboard.register_key(
+            key=key, access=pt.common.Access.WRITE if write_access else pt.common.Access.READ)
 
 
 class Initializer(pt.composites.Sequence):
     def __init__(self, name="Initializer"):
         super(Initializer, self).__init__(name=name, memory=True)
-        # timeout = pt.decorators.Timeout(
-        #     name="Timeout", duration=2, child=ArmToHome())
-        # retry = pt.decorators.Retry(
-        #     name="Retry", child=timeout, num_failures=3)
-        # failure_is_success = pt.decorators.FailureIsSuccess(
-        #     name="FailureIsSuccess", child=retry)
-        # self.add_children([failure_is_success])
+
         self.add_children([ArmToHome()])
 
 
@@ -56,9 +65,9 @@ class Pick(pt.composites.Sequence):
         self.add_children([
             # GetObjectPositionBehavior(),
             # PlanToObjectBehavior(),
-            ApproachObjectBehavior(),
+            # ApproachObjectBehavior(),
             FineTuneObjectPositionBehavior(),
-            # PickObjectBehavior(),
+            PickObjectBehavior(),
         ])
 
 
@@ -78,14 +87,16 @@ class Place(pt.composites.Sequence):
         ])
 
 
-class ArmToHome(pt.behaviour.Behaviour, Node):
+class ArmToHome(TemplateBehaviour):
     def __init__(self, name="ArmToHome"):
-        pt.behaviour.Behaviour.__init__(self, name=name)
-        Node.__init__(self, node_name=name)
+        super().__init__(name=name)
         self.publisher_ = self.create_publisher(
             Int16MultiArray, '/multi_servo_cmd_sub', 10)
         self.subscriber_ = self.create_subscription(
             JointState, '/servo_pos_publisher', self.arm_pos_callback, 10)
+
+        self.register_bb('current_target_object',
+                         read_access=True, write_access=True)
 
         self.current_joint_pos = [12000, 12000, 12000, 12000, 12000, 12000]
         self.position_reached = False
@@ -93,14 +104,15 @@ class ArmToHome(pt.behaviour.Behaviour, Node):
         self.HOME_POSITION = [12000 for i in range(12)]
         for i in range(6):
             self.HOME_POSITION[i+6] = 800
-        self.HOME_POSITION[0] = 5000
+        self.HOME_POSITION[0] = 0
         self.HOME_POSITION[1] = 12000
         self.HOME_POSITION[2] = 2000
-        self.HOME_POSITION[3] = 18000
-        self.HOME_POSITION[4] = 10000
+        self.HOME_POSITION[3] = 16000
+        self.HOME_POSITION[4] = 8000
 
     def initialise(self):
         self.publisher_.publish(Int16MultiArray(data=self.HOME_POSITION))
+        self.blackboard.set('current_target_object', '1')
 
     def arm_pos_callback(self, msg: JointState):
         self.current_joint_pos = msg.position
@@ -111,10 +123,6 @@ class ArmToHome(pt.behaviour.Behaviour, Node):
 
     def update(self):
         return pt.common.Status.SUCCESS
-        # if self.position_reached:
-        #     return pt.common.Status.SUCCESS
-        # else:
-        #     return pt.common.Status.RUNNING
 
 
 class GetObjectPositionBehavior(pt.behaviour.Behaviour):
@@ -145,14 +153,13 @@ class PlanToObjectBehavior(pt.behaviour.Behaviour):
         return pt.common.Status.SUCCESS
 
 
-class ApproachObjectBehavior(pt.behaviour.Behaviour, Node):
+class ApproachObjectBehavior(TemplateBehaviour):
     """
     use realsense to approach the object
     """
 
     def __init__(self, name="ApproachObjectBehavior"):
-        pt.behaviour.Behaviour.__init__(self, name=name)
-        Node.__init__(self, node_name=name)
+        super().__init__(name=name)
 
         self.action_client = ActionClient(self, Approach, 'approach')
         self.future = None
@@ -162,13 +169,21 @@ class ApproachObjectBehavior(pt.behaviour.Behaviour, Node):
         self.change_camera_mode_pub = self.create_publisher(
             String, '/detection_ml/change_mode', 10)
 
+        self.register_bb('current_target_object',
+                         read_access=True, write_access=True)
+
+    def initialise(self) -> None:
+        super().initialise()
+        self.change_camera_mode_pub.publish(String(data='front-camera'))
+
     def update(self):
-        global current_object
+        # global current_object
 
         rclpy.spin_once(self, timeout_sec=0.01)
         if not self.initialised or self.future is None:
             goal_msg = Approach.Goal()
-            goal_msg.target = current_object
+            # goal_msg.target = current_object
+            goal_msg.target = self.blackboard.current_target_object
             if not self.action_client.wait_for_server(timeout_sec=0.01):
                 return pt.common.Status.RUNNING
 
@@ -185,7 +200,6 @@ class ApproachObjectBehavior(pt.behaviour.Behaviour, Node):
 
             if self.future.result().status == GoalStatus.STATUS_SUCCEEDED:
                 self.initialised = False
-                self.change_camera_mode_pub.publish(String(data='arm-camera'))
                 self.future = None
                 return pt.common.Status.SUCCESS
             self.initialised = False
@@ -193,63 +207,128 @@ class ApproachObjectBehavior(pt.behaviour.Behaviour, Node):
             return pt.common.Status.FAILURE
 
 
-class FineTuneObjectPositionBehavior(pt.behaviour.Behaviour, Node):
+class FineTuneObjectPositionBehavior(TemplateBehaviour):
     """
     fine tune the object position with real sense detection
     """
 
     def __init__(self, name="FineTuneObjectPositionBehavior"):
-        pt.behaviour.Behaviour.__init__(self, name=name)
-        Node.__init__(self, node_name=name)
+        # pt.behaviour.Behaviour.__init__(self, name=name)
+        # Node.__init__(self, node_name=name)
+        super().__init__(name=name)
 
-        self.initialised = False
+        # self.initialised = False
         self.action_client = ActionClient(self, Finetune, 'finetune')
-        self.future = None
+        # self.future = None
+        self.state = pt.common.Status.RUNNING
         self.camera_mode_pub = self.create_publisher(
             String, '/detection_ml/change_mode', 10)
 
-    def update(self):
-        global current_object
+        self.register_bb('current_target_object',
+                         read_access=True, write_access=True)
 
-        rclpy.spin_once(self, timeout_sec=0.01)
-        if not self.initialised:
-            goal_msg = Finetune.Goal()
-            goal_msg.object_id = current_object
-            if not self.action_client.wait_for_server(timeout_sec=0.01):
-                return pt.common.Status.RUNNING
+        self.register_bb('pick_pos', read_access=True, write_access=True)
 
-            self.future = self.action_client.send_goal_async(goal_msg)
+    def initialise(self) -> None:
+        super().initialise()
+        self.camera_mode_pub.publish(String(data='arm-camera'))
 
-            self.initialised = True
-            return pt.common.Status.RUNNING
+        self.action_client.wait_for_server()
+
+        goal_msg = Finetune.Goal()
+        goal_msg.object_id = self.blackboard.current_target_object
+        self.send_goal_future = self.action_client.send_goal_async(goal_msg)
+        self.send_goal_future.add_done_callback(self.goal_response_callback)
+
+    def goal_response_callback(self, future):
+        goal_handle = future.result()
+        if not goal_handle.accepted:
+            self.state = pt.common.Status.FAILURE
+
+            self.send_goal_future = None
+            self.get_result_future = None
+            return
+
+        self.get_result_future = goal_handle.get_result_async()
+        self.get_result_future.add_done_callback(self.get_result_callback)
+
+    def get_result_callback(self, future):
+        result = future.result().result
+        if result.success:
+            self.blackboard.pick_pos = {
+                'x': result.position[0],
+                'y': result.position[1],
+                'angle': result.angle
+            }
+            self.state = pt.common.Status.SUCCESS
+
         else:
-            if not self.future.done():
-                return pt.common.Status.RUNNING
+            self.state = pt.common.Status.FAILURE
 
-            if self.future.result().status == GoalStatus.STATUS_EXECUTING:
-                return pt.common.Status.RUNNING
+        self.send_goal_future = None
+        self.get_result_future = None
 
-            if self.future.result().status == GoalStatus.STATUS_SUCCEEDED:
-                self.initialised = False
-                self.future = None
-                self.camera_mode_pub.publish(String(data='front-camera'))
-                return pt.common.Status.SUCCESS
-            self.initialised = False
-            self.future = None
+    def update(self):
+        rclpy.spin_once(self, timeout_sec=0.01)
+        if self.state == pt.common.Status.FAILURE:
+            self.state = pt.common.Status.RUNNING
             return pt.common.Status.FAILURE
+        else:
+            return self.state
+        # global current_object
 
 
-class PickObjectBehavior(pt.behaviour.Behaviour):
+class PickObjectBehavior(TemplateBehaviour):
     """
     pick up the object with the arm
     """
 
     def __init__(self, name="PickObjectBehavior"):
-        super(PickObjectBehavior, self).__init__(name=name)
+        super().__init__(name=name)
+
+        self.register_bb('pick_pos', read_access=True, write_access=True)
+
+        self.action_client = ActionClient(self, Arm, 'arm')
+
+        self.state = pt.common.Status.RUNNING
+
+    def initialise(self) -> None:
+        super().initialise()
+        goal_msg = Arm.Goal()
+        goal_msg.command = "pick"
+        goal_msg.position = [float(self.blackboard.pick_pos['x']),
+                             float(self.blackboard.pick_pos['y']) + 0.20]  # offset from arm_base to gripper
+        goal_msg.angle = -self.blackboard.pick_pos['angle']
+
+        self.action_client.wait_for_server()
+
+        self.send_goal_future = self.action_client.send_goal_async(goal_msg)
+        self.send_goal_future.add_done_callback(self.goal_response_callback)
+
+    def goal_response_callback(self, future):
+        goal_handle = future.result()
+        if not goal_handle.accepted:
+            self.state = pt.common.Status.FAILURE
+            self.send_goal_future = None
+            self.get_result_future = None
+            return
+
+        self.get_result_future = goal_handle.get_result_async()
+        self.get_result_future.add_done_callback(self.get_result_callback)
+
+    def get_result_callback(self, future):
+        result = future.result().result
+        if result.success:
+            self.state = pt.common.Status.SUCCESS
+        else:
+            self.state = pt.common.Status.FAILURE
+
+        self.send_goal_future = None
+        self.get_result_future = None
 
     def update(self):
-        # place holder for the pick object behavior
-        return pt.common.Status.RUNNING
+        rclpy.spin_once(self, timeout_sec=0.01)
+        return self.state
 
 
 class GetBoxPositionBehavior(pt.behaviour.Behaviour):
@@ -262,7 +341,7 @@ class GetBoxPositionBehavior(pt.behaviour.Behaviour):
 
     def update(self):
         # place holder for the get box behavior
-        return pt.common.Status.SUCCESS
+        return pt.common.Status.RUNNING
 
 
 class PlanToBoxBehavior(pt.behaviour.Behaviour):
@@ -297,31 +376,8 @@ class PlaceBehavior(pt.behaviour.Behaviour, Node):
     """
 
     def __init__(self, name="PlaceBehavior"):
-        super(PlaceBehavior, self).__init__(name=name)
-        # Send info to move arm into correct position
-        # Pause
-        # Send info to open gripper
-        # Pause
         pt.behaviour.Behaviour.__init__(self, name=name)
         Node.__init__(self, node_name=name)
-        self.publisher_ = self.create_publisher(
-            Int16MultiArray, '/multi_servo_cmd_sub', 10)
-        self.subscriber_ = self.create_subscription(
-            JointState, '/servo_pos_publisher', self.arm_pos_callback, 10)
-
-        self.current_joint_pos = [12000, 12000, 12000, 12000, 12000, 12000]
-        self.position_reached = False
-        # Use the callback here??
-        self.PLACE_POSITION = [12000 for i in range(12)]
-        for i in range(6):
-            self.PLACE_POSITION[i+6] = 800
-
-        # Replace these values with the correct place-arm-values. :)
-        self.PLACE_POSITION[0] = 5000
-        self.PLACE_POSITION[1] = 12000
-        self.PLACE_POSITION[2] = 2000
-        self.PLACE_POSITION[3] = 18000
-        self.PLACE_POSITION[4] = 10000
 
     def update(self):
         # place holder for the place behavior
@@ -364,3 +420,11 @@ class CheckExplorationCompletion(pt.behaviour.Behaviour):
     def update(self):
         # place holder for the check exploration completion behavior
         return pt.common.Status.SUCCESS
+
+
+class PickPosDict(TypedDict):
+    # x and y in arm camera frame
+    x: float
+    y: float
+    # angle measured clockwise from camera vertical axis
+    angle: float

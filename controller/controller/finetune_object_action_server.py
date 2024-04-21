@@ -13,6 +13,7 @@ from cv_bridge import CvBridge
 import numpy as np
 from filterpy.kalman import KalmanFilter
 from threading import Lock
+from rclpy.callback_groups import ReentrantCallbackGroup
 
 
 class FinetuneObjectActionServer(Node):
@@ -48,21 +49,23 @@ class FinetuneObjectActionServer(Node):
 
         self.rate = self.create_rate(100)
 
+        cb_group = ReentrantCallbackGroup()
+
         self.coeffs_arm = np.array(
             [-0.474424, 0.207336, -0.002361, 0.000427, 0.000000])
 
         self.arm_detected_obj_sub = self.create_subscription(
-            Float32MultiArray, '/detection_ml/arm_bounding_box', self.arm_detected_obj_callback, 10
+            Float32MultiArray, '/detection_ml/arm_bounding_box', self.arm_detected_obj_callback, 10, callback_group=cb_group
         )
 
         self.arm_camera_image_sub = self.create_subscription(
-            Image, '/image_raw', self.arm_camera_image_callback, 10)
+            Image, '/image_raw', self.arm_camera_image_callback, 10, callback_group=cb_group)
 
         self.twist_pub = self.create_publisher(
-            Twist, '/motor_controller/twist', 10)
+            Twist, '/motor_controller/twist', 10, callback_group=cb_group)
 
         self.action_server_ = ActionServer(
-            self, Finetune, 'finetune', execute_callback=self.execute_callback, goal_callback=self.goal_callback, cancel_callback=self.cancel_callback
+            self, Finetune, 'finetune', execute_callback=self.execute_callback, goal_callback=self.goal_callback, cancel_callback=self.cancel_callback, callback_group=cb_group
         )
 
     def arm_detected_obj_callback(self, msg: Float32MultiArray):
@@ -94,31 +97,31 @@ class FinetuneObjectActionServer(Node):
 
         # use chassis to move the robot to the target object
         cnt = 0
-        while (cnt < 5):
-            with self.detected_obj_lock:
-                if self.target_obj_id is None:
-                    self.get_logger().warn('No target object id')
-                    goal_handle.abort()
-                    return result
+        TIMEOUT = 200
+        while (cnt < TIMEOUT):
+            if self.target_obj_id is None:
+                self.get_logger().warn('No target object id')
+                goal_handle.abort()
+                return result
 
-                self.index = None
-                if self.detected_pos is None:
-                    cnt += 1
-                    self.rate.sleep()
-                    continue
-                for i in range(0, len(self.detected_pos), 6):
-                    if int(self.detected_pos[i+5]) == int(self.target_obj_id):
-                        self.index = i
-                        break
-                if self.index is None:
-                    cnt += 1
-                    self.rate.sleep()
-                    continue
-                else:
-                    # reset the kalman filter state
-                    self.filter.x = np.array(
-                        [self.detected_pos[self.index], 0, self.detected_pos[self.index+2], 0])
+            self.index = None
+            if self.detected_pos is None:
+                cnt += 1
+                self.rate.sleep()
+                continue
+            for i in range(0, len(self.detected_pos), 6):
+                if int(self.detected_pos[i+5]) == int(self.target_obj_id):
+                    self.index = i
                     break
+            if self.index is None:
+                cnt += 1
+                self.rate.sleep()
+                continue
+            else:
+                # reset the kalman filter state
+                self.filter.x = np.array(
+                    [self.detected_pos[self.index], 0, self.detected_pos[self.index+2], 0])
+                break
         else:
             self.get_logger().warn('No valid measurement')
             goal_handle.abort()
@@ -132,7 +135,7 @@ class FinetuneObjectActionServer(Node):
             # debug display
             if self.last_valid_measurement_stamp is None:
                 continue
-            if self.get_clock().now().nanoseconds - self.last_valid_measurement_stamp.nanoseconds > 5e8:
+            if self.get_clock().now().nanoseconds - self.last_valid_measurement_stamp.nanoseconds > 1e9:
                 self.get_logger().warn('No valid measurement. timeout')
                 twist = Twist()
                 twist.linear.x = 0.0
@@ -149,39 +152,39 @@ class FinetuneObjectActionServer(Node):
             cv2.circle(display_img, (int(self.filter.x[0]), int(self.filter.x[2])),
                        5, (255, 0, 0), -1)
 
-            CENTER = (320, 240)  # center camera coordinate
+            CENTER = (320, 300)  # center camera coordinate
 
             cv2.circle(display_img, CENTER, 5, (0, 255, 255), -1)
-            cv2.imshow('image', display_img)
-            cv2.waitKey(1)
+            # cv2.imshow('image', display_img)
+            # cv2.waitKey(1)
 
-            if abs(self.filter.x[0] - CENTER[0]) < 32 and abs(self.filter.x[2] - CENTER[1]) < 60:
+            if abs(self.filter.x[0] - CENTER[0]) < 20 and abs(self.filter.x[2] - CENTER[1]) < 40:
                 self.get_logger().info('reached')
                 break
             theta_normalized = atan2(
                 CENTER[1] - self.filter.x[2], CENTER[0] - self.filter.x[0]) / pi
 
-            self.get_logger().info(f'x{self.filter.x}')
-
             twist = Twist()
-            KP = -2.0
+            KP = -1.0
+            LINEAR_VEL = 0.06
+
             if (0 < theta_normalized <= 0.4):
-                twist.linear.x = 0.1
+                twist.linear.x = LINEAR_VEL
                 twist.angular.z = -(0.5 - theta_normalized) * KP
             elif (0.6 < theta_normalized <= 1):
-                twist.linear.x = 0.1
+                twist.linear.x = LINEAR_VEL
                 twist.angular.z = (theta_normalized - 0.5) * KP
             elif (0.4 < theta_normalized <= 0.6):
-                twist.linear.x = 0.1
+                twist.linear.x = LINEAR_VEL
                 twist.angular.z = 0.0
             elif (-0.6 < theta_normalized <= -0.4):
-                twist.linear.x = -0.1
+                twist.linear.x = -LINEAR_VEL
                 twist.angular.z = 0.0
             elif (-0.4 < theta_normalized <= 0):
-                twist.linear.x = -0.1
+                twist.linear.x = -LINEAR_VEL
                 twist.angular.z = 0.0
             elif (-1 < theta_normalized <= -0.6):
-                twist.linear.x = -0.1
+                twist.linear.x = -LINEAR_VEL
                 twist.angular.z = 0.0
 
             goal_handle.distance = sqrt(
@@ -190,9 +193,10 @@ class FinetuneObjectActionServer(Node):
             self.twist_pub.publish(twist)
 
         twist = Twist()
-        twist.linear.x = 0.0
-        twist.angular.z = 0.0
-        self.twist_pub.publish(twist)
+        for _ in range(100):
+            twist.linear.x = 0.0
+            twist.angular.z = 0.0
+            self.twist_pub.publish(twist)
 
         world_z = 0.2  # 20 cm camera above the ground
 
@@ -224,23 +228,21 @@ class FinetuneObjectActionServer(Node):
             return result
 
         rect = cv2.minAreaRect(np.concatenate(valid_contours))
-        # box = cv2.boxPoints(rect)
-        # box = np.int0(box)
-        # centroid = np.mean(box, axis=0)
+        cv2.drawContours(img, valid_contours, -1, (0, 255, 0), 2)
+        box = cv2.boxPoints(rect)
+        box = np.int0(box)
         # cv2.drawContours(img, [box], 0, (0, 0, 255), 2)
-        # cv2.circle(img, (int(centroid[0]), int(
-        #     centroid[1])), 10, (0, 0, 255), -1)
-
-        # cv2.circle(img, (int(self.filter.x[0]), int(
-        #     self.filter.x[2])), 10, (0, 0, 255), -1)
-        # cv2.drawContours(img, valid_contours, -1, (0, 255, 0), 3)
-
-        # cv2.imshow('test', img)
+        # cv2.circle(img, (int(self.filter.x[0]), int(self.filter.x[2])),
+        #            5, (255, 0, 0), -1)
+        # cv2.circle(img, CENTER, 5, (0, 255, 255), -1)
+        # cv2.imshow('image', img)
 
         # cv2.waitKey(0)
         # cv2.destroyAllWindows()
         self.get_logger().info(
             f'world_x: {world_x}, world_y: {world_y}, angle: {rect[2]}')
+
+        self.get_logger().info('Finetune object succeeded')
         result.success = True
         result.position = [world_x, world_y]  # not sure if this is correct
         result.angle = rect[2] / 180.0 * pi

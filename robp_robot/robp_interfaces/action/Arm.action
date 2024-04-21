@@ -1,7 +1,7 @@
 # pick or place
 string command
 # position x, y on the ground (assumed z constant)
-float32[<=2] position
+float32[2] position
 # orientation of the object, where 0 is vertically up in arm camera
 float32 angle
 ---

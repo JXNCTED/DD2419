@@ -18,7 +18,7 @@ class BehaviorTree(ptr.trees.BehaviourTree):
             Initializer(),
             # Exploration(),
             Pick(),
-            # Place(),
+            Place(),
             # CheckTaskCompletion(),
         ])
 

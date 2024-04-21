@@ -93,11 +93,9 @@ class ApproachActionServer(Node):
     def detected_pos_callback(self, msg: DetectedObj):
         self.object_stamp = msg.header.stamp
         self.objects.clear()
-        length = len(msg.position)
-
-        for i in range(length):
+        for obj in msg.obj:
             self.objects.append(
-                (msg.position[i], msg.category[i]))
+                (obj.position, obj.category))
 
     def destroy(self):
         self.get_logger().info('Destroying...')
@@ -124,7 +122,7 @@ class ApproachActionServer(Node):
                 delta = self.get_clock().now().nanoseconds - \
                     rclpy.time.Time().from_msg(self.aruco_stamp).nanoseconds
                 self.get_logger().info(f'delta: {delta}')
-                if f"aruco_{id}" == self.target and delta < 5e8:
+                if f"aruco_{id}" == self.target and delta < 1e9:
                     pose = pose_det
                     break
 
@@ -145,7 +143,7 @@ class ApproachActionServer(Node):
                     for (pose_det, id) in self.markers:
                         delta = self.get_clock().now().nanoseconds - \
                             rclpy.time.Time().from_msg(self.aruco_stamp).nanoseconds
-                        if f"aruco_{id}" == self.target and delta < 5e8:
+                        if f"aruco_{id}" == self.target and delta < 1e9:
                             pose = pose_det
                             break
                     if pose is not None:
@@ -171,7 +169,7 @@ class ApproachActionServer(Node):
 
             # find the target from objects
             cnt = 0
-            TIMEOUT = 50
+            TIMEOUT = 100
             while (cnt < TIMEOUT):
                 for (point_det, category) in self.objects:
                     if str(category) == self.target:
@@ -203,7 +201,7 @@ class ApproachActionServer(Node):
                 while (cnt < TIMEOUT):
                     for (point_det, category) in self.objects:
                         # if str(category) == self.target and rclpy.time.Time().nanoseconds - self.object_stamp.nanoseconds < 5e8:
-                        if str(category) == self.target and rclpy.time.Time().nanoseconds - rclpy.time.Time().from_msg(self.object_stamp).nanoseconds < 5e8:
+                        if str(category) == self.target and rclpy.time.Time().nanoseconds - rclpy.time.Time().from_msg(self.object_stamp).nanoseconds < 1e9:
                             point = point_det
                             break
                     if point is not None:
@@ -224,6 +222,19 @@ class ApproachActionServer(Node):
                 goal_handle.abort()
                 result.success = False
                 return result
+
+        # go forward a bit
+        twist = Twist()
+        for _ in range(50):  # 0.5s
+            twist.linear.x = 0.5
+            self._publish_vel.publish(twist)
+            self.rate.sleep()
+
+        for _ in range(50):  # 0.5s
+            twist.linear.x = 0.0
+            self._publish_vel.publish(twist)
+            self.rate.sleep()
+
         self.get_logger().info('Goal succeeded')
         goal_handle.succeed()
         result.success = True

@@ -1,12 +1,15 @@
 #!/usr/bin/env python
 import rclpy
 import rclpy.action
+import rclpy.logging
 from rclpy.node import Node
 from std_msgs.msg import Int16MultiArray
 from sensor_msgs.msg import JointState
 from rclpy.action import ActionServer
 from robp_interfaces.action import Arm
 from math import pi, sin, cos, atan2, sqrt, acos, asin
+
+from numpy import clip
 
 
 def j12_ik(x, z):
@@ -18,12 +21,18 @@ def j12_ik(x, z):
 
     d = sqrt(x**2 + z**2)
 
-    if d > L1 + L2:
-        return 0, 0, 0
+    if d > L1 + L2:  #
+        rclpy.logging.get_logger("ik").warn(
+            f"invalid position, deacrease d to {L1 + L2}")
+        d = L1 + L2
 
-    beta = acos((L1**2 + L2**2 - d**2) / (2 * L1 * L2))
+    # beta = acos((L1**2 + L2**2 - d**2) / (2 * L1 * L2))
+    # gamma = atan2(z, x)
+    # alpha = acos((L1**2 + d**2 - L2**2) / (2 * L1 * d))
+
+    beta = acos(clip((L1**2 + L2**2 - d**2) / (2 * L1 * L2), -1, 1))
     gamma = atan2(z, x)
-    alpha = acos((L1**2 + d**2 - L2**2) / (2 * L1 * d))
+    alpha = acos(clip((L1**2 + d**2 - L2**2) / (2 * L1 * d), -1, 1))
 
     q1 = pi / 2 - gamma - alpha
     q2 = pi - beta
