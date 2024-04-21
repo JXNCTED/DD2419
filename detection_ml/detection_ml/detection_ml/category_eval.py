@@ -34,6 +34,10 @@ cls_dict = {
     14: "wc",
 }
 
+rv_dict = {v: k for k, v in cls_dict.items()}
+
+cls_dict.update(rv_dict)
+
 
 class Stuff:
     id = 0

@@ -101,6 +101,7 @@ def generate_launch_description():
                 'inverted': False,
                 'angle_compensate': True,
             }],
+            ros_arguments=['--log-level', 'warn'],
         ),
         # Node(executable='static_transform_publisher', package='tf2_ros', arguments=[
         #     '--child-frame-id', 'lidar_link', '--frame-id', 'base_link']),

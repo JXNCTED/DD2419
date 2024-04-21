@@ -99,8 +99,7 @@ def launch_setup(context, params, param_name_suffix=''):
             executable='realsense2_camera_node',
             parameters=[params, params_from_file],
             output=LaunchConfiguration('output' + param_name_suffix),
-            arguments=['--ros-args', '--log-level',
-                       LaunchConfiguration('log_level' + param_name_suffix)],
+            arguments=['--ros-args', '--log-level', 'warn'],
             emulate_tty=True,
         )
     ]
