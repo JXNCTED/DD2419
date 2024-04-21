@@ -18,7 +18,7 @@ def velocity(pose):
     x = pose.position.z
     y = -pose.position.x
 
-    v = 0.5
+    v = 0.2
     dist = np.sqrt(x**2 + y**2)
     alpha = np.arctan2(y, x)
 
@@ -191,10 +191,10 @@ class ApproachActionServer(Node):
             # goto pose
             twist = Twist()
             KP = -1.0
-            while (point.point.z > 0.25):
+            while (point.point.z > 0.28):
                 self.get_logger().info(f'distance: {point.point.z}')
                 twist.angular.z = point.point.x * KP
-                twist.linear.x = 0.5
+                twist.linear.x = 0.2
                 self._publish_vel.publish(twist)
                 cnt = 0
                 point = None
@@ -225,8 +225,8 @@ class ApproachActionServer(Node):
 
         # go forward a bit
         twist = Twist()
-        for _ in range(50):  # 0.5s
-            twist.linear.x = 0.5
+        for _ in range(50):  # 0.5s for 10cm
+            twist.linear.x = 0.2
             self._publish_vel.publish(twist)
             self.rate.sleep()
 

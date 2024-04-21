@@ -38,16 +38,16 @@ class MappingNode : public rclcpp::Node
             std::bind(&MappingNode::odomCallback, this, std::placeholders::_1));
 
         // lidar_sub_ =
-        // this->create_subscription<sensor_msgs::msg::PointCloud2>(
-        //     "/compensated_scan_pc",
-        //     10,
-        //     std::bind(
-        //         &MappingNode::lidarCallback, this, std::placeholders::_1));
-        lidar_sub_ = this->create_subscription<sensor_msgs::msg::LaserScan>(
-            "/scan",
+        this->create_subscription<sensor_msgs::msg::PointCloud2>(
+            "/valid_scan",
             10,
             std::bind(
                 &MappingNode::lidarCallback, this, std::placeholders::_1));
+        // lidar_sub_ = this->create_subscription<sensor_msgs::msg::LaserScan>(
+        //     "/scan",
+        //     10,
+        //     std::bind(
+        //         &MappingNode::lidarCallback, this, std::placeholders::_1));
 
         rclcpp::SensorDataQoS qos;
         point_cloud_sub_ =
@@ -151,49 +151,26 @@ class MappingNode : public rclcpp::Node
         pose_camera.y =
             transform_stamped_base_camera.transform.translation.y + pose.y;
         pose_camera.theta = yaw;
-
-        // pose.x = msg->pose.pose.position.x;
-        // pose.y = msg->pose.pose.position.y;
-        // tf2::Quaternion q(msg->pose.pose.orientation.x,
-        //                   msg->pose.pose.orientation.y,
-        //                   msg->pose.pose.orientation.z,
-        //                   msg->pose.pose.orientation.w);
-        // tf2::Matrix3x3 m(q);
-        // double roll, pitch, yaw;
-        // m.getRPY(roll, pitch, yaw);
-        // pose.theta = yaw;
-
-        // pose_lidar.x =
-        //     transform_stamped_base_lidar.transform.translation.x + pose.x;
-        // pose_lidar.y =
-        //     transform_stamped_base_lidar.transform.translation.y + pose.y;
-        // pose_lidar.theta = yaw;
-
-        // pose_camera.x =
-        //     transform_stamped_base_camera.transform.translation.x + pose.x;
-        // pose_camera.y =
-        //     transform_stamped_base_camera.transform.translation.y + pose.y;
-        // pose_camera.theta = yaw;
     }
 
     // get LIDAR measurement and call the updateMapLaser function
-    // void lidarCallback(const sensor_msgs::msg::PointCloud2::SharedPtr msg)
-    // {
-    //     mapper.updateMapLiDAR(msg, pose);
-    //     nav_msgs::msg::OccupancyGrid occu;
-    //     occu = map.toRosOccGrid();
-    //     occu_pub_->publish(occu);
-    // }
-
-    void lidarCallback(const sensor_msgs::msg::LaserScan::SharedPtr msg)
+    void lidarCallback(const sensor_msgs::msg::PointCloud2::SharedPtr msg)
     {
-        mapper.updateMapLiDAR(msg, pose_lidar);
+        mapper.updateMapLiDAR(msg, pose);
         nav_msgs::msg::OccupancyGrid occu;
         occu = map.toRosOccGrid();
         occu_pub_->publish(occu);
     }
 
-    const GridMap &getMap() { return map; }
+    // void lidarCallback(const sensor_msgs::msg::LaserScan::SharedPtr msg)
+    // {
+    //     mapper.updateMapLiDAR(msg, pose_lidar);
+    //     nav_msgs::msg::OccupancyGrid occu;
+    //     occu = map.toRosOccGrid();
+    //     occu_pub_->publish(occu);
+    // }
+
+    auto getMap() -> const GridMap & { return map; }
 
    private:
     GridMap map;
@@ -202,9 +179,8 @@ class MappingNode : public rclcpp::Node
     Pose pose_lidar;   // pose lidar in odom
     Pose pose_camera;  // pose camera in odom
     rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr odom_sub_;
-    // rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr
-    // lidar_sub_;
-    rclcpp::Subscription<sensor_msgs::msg::LaserScan>::SharedPtr lidar_sub_;
+    rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr lidar_sub_;
+    // rclcpp::Subscription<sensor_msgs::msg::LaserScan>::SharedPtr lidar_sub_;
     rclcpp::Subscription<sensor_msgs::msg::LaserScan>::SharedPtr
         point_cloud_sub_;
     rclcpp::Publisher<nav_msgs::msg::OccupancyGrid>::SharedPtr occu_pub_;

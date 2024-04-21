@@ -65,7 +65,7 @@ class Pick(pt.composites.Sequence):
         self.add_children([
             # GetObjectPositionBehavior(),
             # PlanToObjectBehavior(),
-            # ApproachObjectBehavior(),
+            ApproachObjectBehavior(),
             FineTuneObjectPositionBehavior(),
             PickObjectBehavior(),
         ])
@@ -112,7 +112,7 @@ class ArmToHome(TemplateBehaviour):
 
     def initialise(self):
         self.publisher_.publish(Int16MultiArray(data=self.HOME_POSITION))
-        self.blackboard.set('current_target_object', '1')
+        self.blackboard.set('current_target_object', '7')
 
     def arm_pos_callback(self, msg: JointState):
         self.current_joint_pos = msg.position
@@ -162,9 +162,9 @@ class ApproachObjectBehavior(TemplateBehaviour):
         super().__init__(name=name)
 
         self.action_client = ActionClient(self, Approach, 'approach')
-        self.future = None
+        # self.future = None
 
-        self.initialised = False
+        # self.initialised = False
 
         self.change_camera_mode_pub = self.create_publisher(
             String, '/detection_ml/change_mode', 10)
@@ -172,39 +172,47 @@ class ApproachObjectBehavior(TemplateBehaviour):
         self.register_bb('current_target_object',
                          read_access=True, write_access=True)
 
+        self.state = pt.common.Status.RUNNING
+
     def initialise(self) -> None:
         super().initialise()
         self.change_camera_mode_pub.publish(String(data='front-camera'))
+
+        goal_msg = Approach.Goal()
+        goal_msg.target = self.blackboard.current_target_object
+
+        self.action_client.wait_for_server()
+
+        self.send_goal_future = self.action_client.send_goal_async(goal_msg)
+        self.send_goal_future.add_done_callback(self.goal_response_callback)
+
+    def goal_response_callback(self, future):
+
+        goal_handle = future.result()
+        if not goal_handle.accepted:
+            self.state = pt.common.Status.FAILURE
+            self.send_goal_future = None
+            self.get_result_future = None
+            return
+
+        self.get_result_future = goal_handle.get_result_async()
+        self.get_result_future.add_done_callback(self.get_result_callback)
+
+    def get_result_callback(self, future):
+        result = future.result().result
+        if result.success:
+            self.state = pt.common.Status.SUCCESS
+        else:
+            self.state = pt.common.Status.FAILURE
+
+        self.send_goal_future = None
+        self.get_result_future = None
 
     def update(self):
         # global current_object
 
         rclpy.spin_once(self, timeout_sec=0.01)
-        if not self.initialised or self.future is None:
-            goal_msg = Approach.Goal()
-            # goal_msg.target = current_object
-            goal_msg.target = self.blackboard.current_target_object
-            if not self.action_client.wait_for_server(timeout_sec=0.01):
-                return pt.common.Status.RUNNING
-
-            self.future = self.action_client.send_goal_async(goal_msg)
-
-            self.initialised = True
-            return pt.common.Status.RUNNING
-        else:
-            if not self.future.done():
-                return pt.common.Status.RUNNING
-
-            if self.future.result().status == GoalStatus.STATUS_EXECUTING:
-                return pt.common.Status.RUNNING
-
-            if self.future.result().status == GoalStatus.STATUS_SUCCEEDED:
-                self.initialised = False
-                self.future = None
-                return pt.common.Status.SUCCESS
-            self.initialised = False
-            self.future = None
-            return pt.common.Status.FAILURE
+        return self.state
 
 
 class FineTuneObjectPositionBehavior(TemplateBehaviour):
