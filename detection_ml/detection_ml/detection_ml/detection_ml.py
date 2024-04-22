@@ -218,7 +218,7 @@ class DetectionMLNode(Node):
     def arm_img_callback(self, msg: Image):
         if self.mode == "front-camera":
             return
-        if self.K is None:
+        if self.K_arm is None:
             self.get_logger().info("No camera info received yet")
             return
 
