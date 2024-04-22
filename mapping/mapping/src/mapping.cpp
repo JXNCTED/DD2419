@@ -25,6 +25,8 @@
 #include "tf2_ros/buffer.h"
 #include "tf2_ros/transform_listener.h"
 
+using namespace std::chrono_literals;
+
 class MappingNode : public rclcpp::Node
 {
    public:
@@ -54,6 +56,14 @@ class MappingNode : public rclcpp::Node
 
         occu_pub_ = this->create_publisher<nav_msgs::msg::OccupancyGrid>(
             "/occupancy", 10);
+
+        timer_ = this->create_wall_timer(500ms,
+                                         [this]()
+                                         {
+                                             nav_msgs::msg::OccupancyGrid occu =
+                                                 map.toRosOccGrid();
+                                             occu_pub_->publish(occu);
+                                         });
 
         // read from /home/group7/workspace_2_tsv.tsv
         std::ifstream file("/home/group7/workspace_2_tsv.tsv", std::ios::in);
@@ -124,8 +134,8 @@ class MappingNode : public rclcpp::Node
     {
         // mapper.updateMapLiDAR(msg, pose);
         (void)msg;
-        nav_msgs::msg::OccupancyGrid occu = map.toRosOccGrid();
-        occu_pub_->publish(occu);
+        // nav_msgs::msg::OccupancyGrid occu = map.toRosOccGrid();
+        // occu_pub_->publish(occu);
     }
     auto getMap() -> const GridMap & { return map; }
 
@@ -171,7 +181,7 @@ void planPath(
                                   request->goal_pose.pose.position.y);
 }
 
-int main(int argc, char **argv)
+auto main(int argc, char **argv) -> int
 {
     rclcpp::init(argc, argv);
 
