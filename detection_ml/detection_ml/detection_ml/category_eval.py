@@ -2,7 +2,8 @@ import rclpy
 import rclpy.duration
 from rclpy.node import Node
 
-from detection_interfaces.msg import DetectedObj, Object
+from detection_interfaces.msg import DetectedObj, Object, StuffList
+from detection_interfaces.msg import Stuff as StuffMsg
 from collections import deque
 from dataclasses import dataclass
 from filterpy.kalman import KalmanFilter
@@ -14,6 +15,8 @@ from tf2_ros import TransformListener, Buffer
 from tf2_geometry_msgs import do_transform_point
 from visualization_msgs.msg import Marker, MarkerArray
 from detection_interfaces.srv import GetStuff
+
+from geometry_msgs.msg import PointStamped
 
 
 cls_dict = {
@@ -98,6 +101,30 @@ class CategoryEvaluation(Node):
         self.srv = self.create_service(
             GetStuff, "get_stuff", self.get_stuff_callback)
 
+        self.stuff_pub = self.create_publisher(
+            StuffList, "/category_eval/stuff_point", 10)
+
+        self.stuff_pub_timer = self.create_timer(1.0, self.publish_stuff_point)
+
+    def publish_stuff_point(self):
+        stuff_list = StuffList()
+        for stuff in self.list_of_stuff:
+            stuff_msg = StuffMsg()
+            id, category, position = stuff.getStuff()
+            stuff_msg.id = id
+            stuff_msg.category = category
+
+            stuff_point = PointStamped()
+            stuff_point.header.frame_id = "map"
+            stuff_point.header.stamp = self.last_stamp
+            stuff_point.point.x = position[0]
+            stuff_point.point.y = position[1]
+            stuff_point.point.z = 0.0
+
+            stuff_msg.point = stuff_point
+            stuff_list.data.append(stuff_msg)
+        self.stuff_pub.publish(stuff_list)
+
     def get_stuff_callback(
         self, request: GetStuff.Request, response: GetStuff.Response
     ):
@@ -109,7 +136,7 @@ class CategoryEvaluation(Node):
             _, category, position = stuff.getStuff()
             response.success = True
             response.stuff.position.header.frame_id = "map"
-            response.stuff.position.header.stamp = rclpy.time.Time()
+            response.stuff.position.header.stamp = self.last_stamp
             response.stuff.category = category
             response.stuff.confidence = 1
             response.stuff.position.point.x = position[0]
@@ -202,11 +229,15 @@ class CategoryEvaluation(Node):
 
     def obj_callback(self, msg: DetectedObj):
         self.last_stamp = msg.header.stamp
+        obj: Object
         for obj in msg.obj:
+            # skip none and box
+            if obj.category == cls_dict["none"] or obj.category == cls_dict["box"]:
+                continue
             try:
+                # extrapolate into the future??
                 t = self.tf_buffer.lookup_transform(
-                    "map", msg.header.frame_id, msg.header.stamp
-                )
+                    "map", msg.header.frame_id, msg.header.stamp, rclpy.duration.Duration(seconds=0.5))
             except Exception as e:
                 self.get_logger().error(str(e))
                 return

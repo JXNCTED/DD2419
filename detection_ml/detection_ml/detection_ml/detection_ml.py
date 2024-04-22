@@ -14,6 +14,7 @@ import torch_tensorrt
 from detection_interfaces.msg import DetectedObj
 from detection_interfaces.msg import Object
 from geometry_msgs.msg import PointStamped
+from realsense2_camera_msgs.msg import RGBD
 
 cls_dict = {
     0: "none",
@@ -71,9 +72,9 @@ class DetectionMLNode(Node):
         )
         self.get_logger().info("Model loaded")
 
-        self.K = None
+        # self.K = None
 
-        self.np_depth = None
+        # self.np_depth = None
 
         self.K_arm = np.array([[513.34301, 0., 307.89617],
                                [0., 513.84807, 244.62007],
@@ -82,17 +83,14 @@ class DetectionMLNode(Node):
         self.coeffs_arm = np.array(
             [-0.474424, 0.207336, -0.002361, 0.000427, 0.000000])
 
-        self.image_sub = self.create_subscription(
-            Image, "/camera/color/image_raw", self.img_callback, 10)
+        # self.image_sub = self.create_subscription(
+        #     Image, "/camera/color/image_raw", self.img_callback, 10)
 
         self.image_sub = self.create_subscription(
             Image, "/image_raw", self.arm_img_callback, 10)
 
-        # this is the aligned depth camera info and image
-        self.cam_info_sub = self.create_subscription(
-            CameraInfo, "/camera/aligned_depth_to_color/camera_info", self.cam_info_callback, 10)
-        self.depth_sub = self.create_subscription(
-            Image, "/camera/aligned_depth_to_color/image_raw", self.depth_callback, 10)
+        self.rgbd_sub = self.create_subscription(
+            RGBD, "/camera/rgbd", self.realsense_rbgd_callback, 10)
 
         self.change_mode_sub = self.create_subscription(
             String, "/detection_ml/change_mode", self.change_mode_callback, 10)
@@ -114,16 +112,6 @@ class DetectionMLNode(Node):
 
         self.get_logger().info("Node initialized")
 
-    # store the camera intrinsics
-    def cam_info_callback(self, msg: CameraInfo):
-        self.K = np.array(msg.k).reshape(3, 3)
-
-    # store the depth image
-    def depth_callback(self, msg: Image):
-        bridge = cv_bridge.CvBridge()
-        img = bridge.imgmsg_to_cv2(msg, "passthrough")
-        self.np_depth = img
-
     def change_mode_callback(self, msg: String):
         if msg.data == "front-camera":
             self.mode = "front-camera"
@@ -136,29 +124,26 @@ class DetectionMLNode(Node):
             return
 
     # project the bounding box to depth and get the position from camera_optical_frame
-    def get_position(self, bb):
-        if self.K is None or self.np_depth is None:
-            return np.array([0.0, 0.0, 0.0])
+    def get_position(self, K, depth, bb):
         x, y, w, h = bb[0], bb[1], bb[2], bb[3]
         u = x + w/2
         v = y + h/2
-        world_z = self.np_depth[int(v), int(u)]
-        if world_z == 0 or world_z < 200 or world_z > 2000:
+        world_z = depth[int(v), int(u)]
+        if world_z == 0 or world_z < 200 or world_z > 1000:
             return np.array([0.0, 0.0, 0.0])
-        world_x = (u - self.K[0, 2]) * world_z / self.K[0, 0]
-        world_y = (v - self.K[1, 2]) * world_z / self.K[1, 1]
+        world_x = (u - K[0, 2]) * world_z / K[0, 0]
+        world_y = (v - K[1, 2]) * world_z / K[1, 1]
         return np.array([world_x, world_y, world_z]) / 1000.0
 
-    def img_callback(self, msg: Image):
+    def realsense_rbgd_callback(self, msg: RGBD):
         if self.mode == "arm-camera":
             return
-        if self.K is None:
-            self.get_logger().info("No camera info received yet")
-            return
 
-        # convert the image to tensor and run the model
+        K = np.array(msg.depth_camera_info.k).reshape(3, 3)
+
         bridge = cv_bridge.CvBridge()
-        img = bridge.imgmsg_to_cv2(msg, "rgb8")
+        img = bridge.imgmsg_to_cv2(msg.rgb, "rgb8")
+        depth = bridge.imgmsg_to_cv2(msg.depth, "passthrough")
 
         input_img = torch.stack([self.val_input_transforms(img)]).to(
             "cuda")
@@ -173,7 +158,7 @@ class DetectionMLNode(Node):
         bbs_nms = non_max_suppression(bbs[0], IOU_THRESHOLD)
         length = len(bbs_nms)
         detected_obj = DetectedObj()
-        detected_obj.header = msg.header
+        detected_obj.header = msg.rgb.header
 
         for bb in bbs_nms:
             x, y, w, h, score, category = int(bb[0]), int(bb[1]), int(
@@ -186,12 +171,11 @@ class DetectionMLNode(Node):
                           color=(0, 255, 0), thickness=2)
             cv2.putText(show_img, cata_str, (x, y),
                         cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
-            position = self.get_position(bb)
+            position = self.get_position(K, depth, bb)
             if (position == np.array([0.0, 0.0, 0.0])).all():
                 continue
             pose = PointStamped()
-            pose.header.frame_id = "camera_color_optical_frame"
-            pose.header.stamp = msg.header.stamp
+            pose.header = msg.rgb.header
             pose.point.x = position[0]
             pose.point.y = position[1]
             pose.point.z = position[2]
