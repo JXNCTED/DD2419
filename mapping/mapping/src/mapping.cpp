@@ -38,16 +38,16 @@ class MappingNode : public rclcpp::Node
             std::bind(&MappingNode::odomCallback, this, std::placeholders::_1));
 
         // lidar_sub_ =
-        this->create_subscription<sensor_msgs::msg::PointCloud2>(
+        // this->create_subscription<sensor_msgs::msg::PointCloud2>(
+        //     "/valid_scan",
+        //     10,
+        //     std::bind(
+        //         &MappingNode::lidarCallback, this, std::placeholders::_1));
+        lidar_sub_ = this->create_subscription<sensor_msgs::msg::LaserScan>(
             "/valid_scan",
             10,
             std::bind(
                 &MappingNode::lidarCallback, this, std::placeholders::_1));
-        // lidar_sub_ = this->create_subscription<sensor_msgs::msg::LaserScan>(
-        //     "/scan",
-        //     10,
-        //     std::bind(
-        //         &MappingNode::lidarCallback, this, std::placeholders::_1));
 
         rclcpp::SensorDataQoS qos;
         point_cloud_sub_ =
@@ -154,11 +154,11 @@ class MappingNode : public rclcpp::Node
     }
 
     // get LIDAR measurement and call the updateMapLaser function
-    void lidarCallback(const sensor_msgs::msg::PointCloud2::SharedPtr msg)
+    void lidarCallback(const sensor_msgs::msg::LaserScan::SharedPtr msg)
     {
-        mapper.updateMapLiDAR(msg, pose);
-        nav_msgs::msg::OccupancyGrid occu;
-        occu = map.toRosOccGrid();
+        // mapper.updateMapLiDAR(msg, pose);
+        (void)msg;
+        nav_msgs::msg::OccupancyGrid occu = map.toRosOccGrid();
         occu_pub_->publish(occu);
     }
 
@@ -179,8 +179,9 @@ class MappingNode : public rclcpp::Node
     Pose pose_lidar;   // pose lidar in odom
     Pose pose_camera;  // pose camera in odom
     rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr odom_sub_;
-    rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr lidar_sub_;
-    // rclcpp::Subscription<sensor_msgs::msg::LaserScan>::SharedPtr lidar_sub_;
+    // rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr
+    // lidar_sub_;
+    rclcpp::Subscription<sensor_msgs::msg::LaserScan>::SharedPtr lidar_sub_;
     rclcpp::Subscription<sensor_msgs::msg::LaserScan>::SharedPtr
         point_cloud_sub_;
     rclcpp::Publisher<nav_msgs::msg::OccupancyGrid>::SharedPtr occu_pub_;

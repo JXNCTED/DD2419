@@ -201,8 +201,8 @@ class FinetuneObjectActionServer(Node):
         world_z = 0.2  # 20 cm camera above the ground
 
         # calculate the world coordinate
-        world_x = (self.filter.x[0] - CENTER[0]) / self.K_arm[0, 0] * world_z
-        world_y = (self.filter.x[2] - CENTER[1]) / self.K_arm[1, 1] * world_z
+        world_x = (self.filter.x[0] - 320) / self.K_arm[0, 0] * world_z
+        world_y = (self.filter.x[2] - 240) / self.K_arm[1, 1] * world_z
 
         img = cv2.bilateralFilter(self.img, 25, 90, 70)
 

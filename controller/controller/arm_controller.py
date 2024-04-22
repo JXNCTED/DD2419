@@ -76,7 +76,7 @@ class ArmController(Node):
             # open the gripper
             self.command_list[0] = 0
             for i in range(5):
-                self.command_list[i+1] = 12000
+                self.command_list[i+1] = -1
 
             msg = Int16MultiArray()
             msg.data.extend(self.command_list)
@@ -86,7 +86,7 @@ class ArmController(Node):
 
             self.rate.sleep()
 
-            z = 0.01  # compensate for the gravity
+            z = 0.03  # compensate for the gravity
 
             x, y = self.object_position
             angle = self.object_angle
@@ -125,7 +125,7 @@ class ArmController(Node):
             self.rate.sleep()
 
             # now close the gripper
-            self.command_list[0] = 12000  # or whatever pick position is
+            self.command_list[0] = 16000  # or whatever pick position is
 
             for i in range(5):
                 self.command_list[i+1] = -1

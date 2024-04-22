@@ -21,9 +21,9 @@ const double P_OCC   = 0.7;
  * @param gridSize size of the grid
  * @return double occupancy probability for this measurement
  */
-static double laserInvModel(const double &r,
-                            const double &R,
-                            const double &gridSize)
+static auto laserInvModel(const double &r,
+                          const double &R,
+                          const double &gridSize) -> double
 {
     // for all point less than ray measurement R, believe it's free
     if (r < (R - 0.5 * gridSize))
