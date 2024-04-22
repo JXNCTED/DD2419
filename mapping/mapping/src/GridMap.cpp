@@ -46,20 +46,24 @@ nav_msgs::msg::OccupancyGrid GridMap::toRosOccGrid()
             {
                 rosOccGrid.data[i + j * sizeX] = 100;
             }
-            if (gridBeliefLiDAR(i, j) >= OCC_THRESHOLD or
-                gridBeliefRGBD(i, j) >= OCC_THRESHOLD)
-            {
-                rosOccGrid.data[i + j * sizeX] = 100;
-            }
-            else if (gridBeliefLiDAR(i, j) == 0.5 and
-                     gridBeliefRGBD(i, j) == 0.5)
+            if (gridBeliefRGBD(i, j) == 0.5)
             {
                 rosOccGrid.data[i + j * sizeX] = -1;
             }
             else
             {
-                rosOccGrid.data[i + j * sizeX] = 0;
+                rosOccGrid.data[i + j * sizeX] = 100 * gridBeliefRGBD(i, j);
             }
+            // if (gridBeliefLiDAR(i, j) >= OCC_THRESHOLD or
+            //     gridBeliefRGBD(i, j) >= OCC_THRESHOLD)
+            // {
+            //     rosOccGrid.data[i + j * sizeX] = 100;
+            // }
+            // else if (gridBeliefLiDAR(i, j) == 0.5 and
+            //          gridBeliefRGBD(i, j) == 0.5)
+            // {
+            //     rosOccGrid.data[i + j * sizeX] = -1;
+            // }
         }
     }
     return rosOccGrid;
@@ -101,7 +105,8 @@ void GridMap::setGridLogBelief(const double &x,
 {
     const double belief = 1.0f - 1.0f / (1 + exp(logBelief));
     // const double beliefClamped = std::clamp(belief, 0.6, 0.9);
-    const double beliefClamped = std::clamp(belief, 0.1, 0.9);
+    // const double beliefClamped = std::clamp(belief, 0.1, 0.9);
+    const double beliefClamped = std::clamp(belief, 0.0, 1.0);
     setGridBelief(x, y, beliefClamped, type);
 }
 
@@ -148,11 +153,11 @@ struct Node
     {
     }
     // for priority queue
-    bool operator<(const Node &rhs) const { return f > rhs.f; }
+    auto operator<(const Node &rhs) const -> bool { return f > rhs.f; }
 };
 
 // euclidean distance
-float heuristic(int x, int y, int goalX, int goalY)
+auto heuristic(int x, int y, int goalX, int goalY) -> float
 {
     return sqrt((x - goalX) * (x - goalX) + (y - goalY) * (y - goalY));
 }

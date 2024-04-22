@@ -26,6 +26,10 @@ static auto laserInvModel(const double &r,
                           const double &gridSize) -> double
 {
     // for all point less than ray measurement R, believe it's free
+    if (R < 0)  // for no obstacle
+    {
+        return P_FREE;
+    }
     if (r < (R - 0.5 * gridSize))
     {
         return P_FREE;
@@ -153,15 +157,14 @@ void Mapper::updateMapRGBD(
     for (size_t i = 0; i < laserPtr->ranges.size(); i++)
     {
         double R = laserPtr->ranges.at(i);
-        // remove invalid measurement of INF
-        if (R > laserPtr->range_max)
+        if (R < laserPtr->range_min)
         {
             continue;
-            // R = 100;
         }
-        else if (R < laserPtr->range_min)
+        if (R > laserPtr->range_max or std::isinf(R))
         {
-            continue;
+            // R = 100;
+            R = -1;  // for no obstacle
         }
 
         // calculate the angle of the laser
@@ -172,7 +175,16 @@ void Mapper::updateMapRGBD(
 
         // store the point last updated
         Eigen::Vector2d lastPw(Eigen::Infinity, Eigen::Infinity);
-        for (double r = 0; r < R + gridSize; r += gridSize)
+        double scanRange = 0;
+        if (R < 0)
+        {
+            scanRange = laserPtr->range_max;
+        }
+        else
+        {
+            scanRange = R + gridSize;
+        }
+        for (double r = 0; r < scanRange; r += gridSize)
         {
             // calculate the point in the LiDAR frame
             Eigen::Vector2d pL(r * cosAng, r * sinAng);

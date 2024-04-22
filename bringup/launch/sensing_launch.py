@@ -45,9 +45,9 @@ def generate_launch_description():
             }],
             name='pointcloud_to_laserscan'
         ),
-        Node(
-            package='mapping', executable='mapping', name='mapping',
-        ),
+        # Node(
+        #     package='mapping', executable='mapping', name='mapping',
+        # ),
         Node(
             package='workspace', executable='workspace', name='workspace',
         ),
