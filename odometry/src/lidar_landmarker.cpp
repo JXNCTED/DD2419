@@ -59,6 +59,7 @@ class LidarLandmarker : public rclcpp::Node
             return;
         }
         const static double ICP_THRESHOLD = 0.6;
+
         // inital guess
         // Eigen::Matrix4d T_map_base_guess = T_map_odom * T_odom_base;
 
@@ -86,23 +87,27 @@ class LidarLandmarker : public rclcpp::Node
                 icp.getFinalTransformation().cast<double>() * T_map_odom;
 
             // publish tf
-            geometry_msgs::msg::TransformStamped tf_map_odom;
-            tf_map_odom.header.stamp            = this->now();
-            tf_map_odom.header.frame_id         = "map";
-            tf_map_odom.child_frame_id          = "odom";
-            tf_map_odom.transform.translation.x = T_map_odom(0, 3);
-            tf_map_odom.transform.translation.y = T_map_odom(1, 3);
-            tf_map_odom.transform.translation.z = T_map_odom(2, 3);
-            Eigen::Quaterniond q_map_odom(T_map_odom.block<3, 3>(0, 0));
-            tf_map_odom.transform.rotation.w = q_map_odom.w();
-            tf_map_odom.transform.rotation.x = q_map_odom.x();
-            tf_map_odom.transform.rotation.y = q_map_odom.y();
-            tf_map_odom.transform.rotation.z = q_map_odom.z();
-            tf_broadcaster_->sendTransform(tf_map_odom);
+            // geometry_msgs::msg::TransformStamped tf_map_odom;
+            // tf_map_odom.header.stamp            = this->now();
+            // tf_map_odom.header.frame_id         = "map";
+            // tf_map_odom.child_frame_id          = "odom";
+            // tf_map_odom.transform.translation.x = T_map_odom(0, 3);
+            // tf_map_odom.transform.translation.y = T_map_odom(1, 3);
+            // tf_map_odom.transform.translation.z = T_map_odom(2, 3);
+            // Eigen::Quaterniond q_map_odom(T_map_odom.block<3, 3>(0, 0));
+            // tf_map_odom.transform.rotation.w = q_map_odom.w();
+            // tf_map_odom.transform.rotation.x = q_map_odom.x();
+            // tf_map_odom.transform.rotation.y = q_map_odom.y();
+            // tf_map_odom.transform.rotation.z = q_map_odom.z();
+            // tf_broadcaster_->sendTransform(tf_map_odom);
 
             // only add to cloud if icp is good
-            if (icp.getFitnessScore() < 0.2)
+
+            // stop adding to map after some time
+            static size_t count = 0;
+            if (icp.getFitnessScore() < 0.2 and count < 240)  // 2 min?
             {
+                count++;
                 mapCloud += lastCloud;
                 pcl::VoxelGrid<pcl::PointXYZ> voxel_grid;
                 voxel_grid.setInputCloud(mapCloud.makeShared());
@@ -220,7 +225,7 @@ class LidarLandmarker : public rclcpp::Node
         sensor_msgs::msg::PointCloud2 mapMsg;
         pcl::toROSMsg(mapCloud, mapMsg);
         mapMsg.header.frame_id = "map";
-        mapMsg.header.stamp    = this->now();
+        mapMsg.header.stamp    = msg->header.stamp;
         lastCloud              = cloud;
         map_pub_->publish(mapMsg);
 
