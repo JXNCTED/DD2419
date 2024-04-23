@@ -5,6 +5,7 @@ Used in `tree.py`.
 """
 
 import py_trees as pt
+from py_trees.common import Status
 import py_trees_ros as ptr
 import rclpy.action
 from rclpy.node import Node
@@ -12,11 +13,17 @@ from std_msgs.msg import String
 from std_msgs.msg import Bool
 from std_msgs.msg import Int16MultiArray
 from sensor_msgs.msg import JointState
-from robp_interfaces.action import Approach, Finetune, Arm
+from robp_interfaces.action import Approach, Finetune, Arm, Explore, Pursuit
 import rclpy
 from rclpy.action import ActionClient
 from action_msgs.msg import GoalStatus
 from typing import TypedDict
+from detection_interfaces.srv import GetStuff
+from tf2_ros import Buffer, TransformListener
+from geometry_msgs.msg import Point
+
+
+from mapping_interfaces.srv import PathPlanObject
 
 # I know I should probably not use global variables, but not sure how to pass data
 # between behaviors, so here are every behavior's global variables
@@ -51,7 +58,7 @@ class Exploration(pt.composites.Sequence):
         super(Exploration, self).__init__(name=name, memory=True)
         self.add_children([
             ExplorePointBehavior(),
-            CheckExplorationCompletion(),
+            # CheckExplorationCompletion(),
         ])
 
 
@@ -63,11 +70,12 @@ class Pick(pt.composites.Sequence):
     def __init__(self, name="Pick"):
         super(Pick, self).__init__(name=name, memory=True)
         self.add_children([
-            # GetObjectPositionBehavior(),
-            # PlanToObjectBehavior(),
-            ApproachObjectBehavior(),
+            GetObjectPositionBehavior(),
+            PlanToObjectBehavior(),
+            # ApproachObjectBehavior(),
             FineTuneObjectPositionBehavior(),
             PickObjectBehavior(),
+            Done(),
         ])
 
 
@@ -80,8 +88,8 @@ class Place(pt.composites.Sequence):
         super(Place, self).__init__(name=name, memory=True)
         self.add_children([
             GetBoxPositionBehavior(),
-            PlanToBoxBehavior(),
-            ApproachObjectBehavior(),
+            PlanToObjectBehavior(),
+            # ApproachBoxBehavior(),
             FineTuneBoxPositionBehavior(),
             PlaceBehavior(),
         ])
@@ -95,8 +103,8 @@ class ArmToHome(TemplateBehaviour):
         self.subscriber_ = self.create_subscription(
             JointState, '/servo_pos_publisher', self.arm_pos_callback, 10)
 
-        self.register_bb('current_target_object',
-                         read_access=True, write_access=True)
+        # self.register_bb('current_target_object',
+        #                  read_access=True, write_access=True)
 
         self.current_joint_pos = [12000, 12000, 12000, 12000, 12000, 12000]
         self.position_reached = False
@@ -104,7 +112,7 @@ class ArmToHome(TemplateBehaviour):
         self.HOME_POSITION = [12000 for i in range(12)]
         for i in range(6):
             self.HOME_POSITION[i+6] = 800
-        self.HOME_POSITION[0] = 0
+        self.HOME_POSITION[0] = 3000
         self.HOME_POSITION[1] = 12000
         self.HOME_POSITION[2] = 2000
         self.HOME_POSITION[3] = 16000
@@ -112,7 +120,7 @@ class ArmToHome(TemplateBehaviour):
 
     def initialise(self):
         self.publisher_.publish(Int16MultiArray(data=self.HOME_POSITION))
-        self.blackboard.set('current_target_object', '7')
+        # self.blackboard.set('current_target_object', '7')
 
     def arm_pos_callback(self, msg: JointState):
         self.current_joint_pos = msg.position
@@ -122,35 +130,132 @@ class ArmToHome(TemplateBehaviour):
         self.position_reached = diff < 2000
 
     def update(self):
+
         return pt.common.Status.SUCCESS
 
 
-class GetObjectPositionBehavior(pt.behaviour.Behaviour):
+class GetObjectPositionBehavior(TemplateBehaviour):
     """
     select one object from the object list and get the position of the object
+    use peek
     """
 
     def __init__(self, name="GetObjectPositionBehavior"):
         super(GetObjectPositionBehavior, self).__init__(name=name)
-        # Initalize the subscriber
+        self.client = self.create_client(GetStuff, '/get_stuff')
+
+        self.register_bb('current_target_object',
+                         read_access=False, write_access=True)
+
+        self.state = pt.common.Status.RUNNING
+
+    def initialise(self) -> None:
+        super().initialise()
+        self.client.wait_for_service()
+        self.state = pt.common.Status.RUNNING
+
+        request = GetStuff.Request()
+        request.pop = False  # peek
+
+        self.future = self.client.call_async(request)
+        self.future.add_done_callback(self.future_callback)
+
+    def future_callback(self, future):
+        response = future.result()
+        if response is None:
+            self.state = pt.common.Status.FAILURE
+            return
+
+        self.state = pt.common.Status.SUCCESS
+        self.future = None
+
+        self.blackboard.current_target_object = str(response.stuff_id)
+        self.future = None
+        self.state = pt.common.Status.SUCCESS
 
     def update(self):
-        # place holder for the get object behavior
-        # Get the information from the topic.
-        return pt.common.Status.SUCCESS
+        rclpy.spin_once(self, timeout_sec=0.01)
+        return self.state
 
 
-class PlanToObjectBehavior(pt.behaviour.Behaviour):
+class PlanToObjectBehavior(TemplateBehaviour):
     """
-    use A star and pure pursuit to navigate to the object
+    plan to the object position
     """
 
     def __init__(self, name="PlanToObjectBehavior"):
-        super(PlanToObjectBehavior, self).__init__(name=name)
+        super().__init__(name=name)
+
+        self.register_bb('current_target_object',
+                         read_access=True, write_access=False)
+
+        self.path_plan_client = self.create_client(
+            PathPlanObject, 'path_plan_object')
+
+        self.pursuit_client = ActionClient(self, Pursuit, 'pursuit')
+
+        self.state = pt.common.Status.RUNNING
+
+    def initialise(self) -> None:
+        super().initialise()
+
+        self.path_plan_client.wait_for_service()
+        self.pursuit_client.wait_for_server()
+        path_plan_request = PathPlanObject.Request()
+        path_plan_request.target_object_id = int(
+            self.blackboard.current_target_object)
+
+        self.path_plan_future = self.path_plan_client.call_async(
+            path_plan_request)
+        self.path_plan_future.add_done_callback(self.path_plan_future_callback)
+
+    def path_plan_future_callback(self, future):
+        result = future.result()
+        if result is None:
+            self.state = pt.common.Status.FAILURE
+            return
+
+        waypoints = []
+        for pose in result.path.poses:
+            waypoints.insert(0, Point(
+                x=pose.pose.position.x, y=pose.pose.position.y))
+
+        goal_msg = Pursuit.Goal()
+        goal_msg.waypoints = waypoints
+
+        self.path_plan_future = None
+
+        self.pursuit_future = self.pursuit_client.send_goal_async(goal_msg)
+        self.pursuit_future.add_done_callback(self.pursuit_future_callback)
+
+    def pursuit_future_callback(self, future):
+        goal_handle = future.result()
+        if not goal_handle.accepted:
+            self.state = pt.common.Status.FAILURE
+            return
+
+        self.get_result_future = goal_handle.get_result_async()
+        self.get_result_future.add_done_callback(self.get_result_callback)
+
+    def get_result_callback(self, future):
+        result = future.result().result
+        if result is None:
+            self.state = pt.common.Status.FAILURE
+            return
+
+        if result.success:
+            self.state = pt.common.Status.SUCCESS
+        else:
+            self.state = pt.common.Status.FAILURE
+
+        self.pursuit_future = None
+        self.get_result_future = None
 
     def update(self):
-        # place holder for the plan to object behavior
-        return pt.common.Status.SUCCESS
+        # global current_object
+
+        rclpy.spin_once(self, timeout_sec=0.01)
+        return self.state
 
 
 class ApproachObjectBehavior(TemplateBehaviour):
@@ -239,6 +344,8 @@ class FineTuneObjectPositionBehavior(TemplateBehaviour):
 
     def initialise(self) -> None:
         super().initialise()
+
+        self.state = pt.common.Status.RUNNING
         self.camera_mode_pub.publish(String(data='arm-camera'))
 
         self.action_client.wait_for_server()
@@ -278,12 +385,11 @@ class FineTuneObjectPositionBehavior(TemplateBehaviour):
 
     def update(self):
         rclpy.spin_once(self, timeout_sec=0.01)
-        if self.state == pt.common.Status.FAILURE:
-            self.state = pt.common.Status.RUNNING
-            return pt.common.Status.FAILURE
-        else:
-            return self.state
-        # global current_object
+        return self.state
+
+    def terminate(self, new_status: Status) -> None:
+        self.camera_mode_pub.publish(String(data='front-camera'))
+        return super().terminate(new_status)
 
 
 class PickObjectBehavior(TemplateBehaviour):
@@ -352,19 +458,6 @@ class GetBoxPositionBehavior(pt.behaviour.Behaviour):
         return pt.common.Status.RUNNING
 
 
-class PlanToBoxBehavior(pt.behaviour.Behaviour):
-    """
-    plan to the box with A star and pure pursuit
-    """
-
-    def __init__(self, name="PlanToBoxBehavior"):
-        super(PlanToBoxBehavior, self).__init__(name=name)
-
-    def update(self):
-        # place holder for the plan to box behavior
-        return pt.common.Status.SUCCESS
-
-
 class FineTuneBoxPositionBehavior(pt.behaviour.Behaviour):
     """
     fine tune the box position with real sense detection
@@ -393,16 +486,6 @@ class PlaceBehavior(pt.behaviour.Behaviour, Node):
         return pt.common.Status.SUCCESS
 
 
-class PlaceObjectBehavior(pt.behaviour.Behaviour):
-    def __init__(self, name="PlaceObjectBehavior"):
-        super(PlaceObjectBehavior, self).__init__(name=name)
-
-    def update(self):
-        # place holder for the place box behavior
-
-        return pt.common.Status.SUCCESS
-
-
 class CheckTaskCompletion(pt.behaviour.Behaviour):
     def __init__(self, name="CheckTaskCompletion"):
         super(CheckTaskCompletion, self).__init__(name=name)
@@ -412,13 +495,48 @@ class CheckTaskCompletion(pt.behaviour.Behaviour):
         return pt.common.Status.RUNNING
 
 
-class ExplorePointBehavior(pt.behaviour.Behaviour):
+class ExplorePointBehavior(TemplateBehaviour):
     def __init__(self, name="ExplorePointBehavior"):
         super(ExplorePointBehavior, self).__init__(name=name)
 
+        self.action_client = ActionClient(self, Explore, 'explore')
+
+        self.state = pt.common.Status.RUNNING
+
+    def initialise(self) -> None:
+        super().initialise()
+
+        goal_msg = Explore.Goal()
+
+        self.action_client.wait_for_server()
+
+        self.send_goal_future = self.action_client.send_goal_async(goal_msg)
+        self.send_goal_future.add_done_callback(self.goal_response_callback)
+
+    def goal_response_callback(self, future):
+        goal_handle = future.result()
+        if not goal_handle.accepted:
+            self.state = pt.common.Status.FAILURE
+            self.send_goal_future = None
+            self.get_result_future = None
+            return
+
+        self.get_result_future = goal_handle.get_result_async()
+        self.get_result_future.add_done_callback(self.get_result_callback)
+
+    def get_result_callback(self, future):
+        result = future.result().result
+        if result.success:
+            self.state = pt.common.Status.SUCCESS
+        else:
+            self.state = pt.common.Status.FAILURE
+
+        self.send_goal_future = None
+        self.get_result_future = None
+
     def update(self):
-        # place holder for the explore point behavior
-        return pt.common.Status.SUCCESS
+        rclpy.spin_once(self, timeout_sec=0.01)
+        return self.state
 
 
 class CheckExplorationCompletion(pt.behaviour.Behaviour):
@@ -428,6 +546,18 @@ class CheckExplorationCompletion(pt.behaviour.Behaviour):
     def update(self):
         # place holder for the check exploration completion behavior
         return pt.common.Status.SUCCESS
+
+
+class Done(pt.behaviour.Behaviour):
+    '''
+    always return running
+    '''
+
+    def __init__(self, name="Done"):
+        super(Done, self).__init__(name=name)
+
+    def update(self):
+        return pt.common.Status.RUNNING
 
 
 class PickPosDict(TypedDict):

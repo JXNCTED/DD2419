@@ -58,7 +58,7 @@ class LidarLandmarker : public rclcpp::Node
         {
             return;
         }
-        const static double ICP_THRESHOLD = 0.6;
+        const static double ICP_THRESHOLD = 0.5;
 
         // inital guess
         // Eigen::Matrix4d T_map_base_guess = T_map_odom * T_odom_base;
@@ -105,7 +105,7 @@ class LidarLandmarker : public rclcpp::Node
 
             // stop adding to map after some time
             static size_t count = 0;
-            if (icp.getFitnessScore() < 0.2 and count < 240)  // 2 min?
+            if (icp.getFitnessScore() < 0.1 and count < 240)  // 2 min?
             {
                 count++;
                 mapCloud += lastCloud;

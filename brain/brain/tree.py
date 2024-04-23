@@ -16,10 +16,11 @@ class BehaviorTree(ptr.trees.BehaviourTree):
         self.root = pt.composites.Sequence("MainTree", memory=True)
         self.root.add_children([
             Initializer(),
-            # Exploration(),
+            Exploration(),
             Pick(),
-            Place(),
-            # CheckTaskCompletion(),
+            # Done(),
+            # Place(),
+            # Peek(),
         ])
 
         super(BehaviorTree, self).__init__(
@@ -31,7 +32,7 @@ class BehaviorTree(ptr.trees.BehaviourTree):
 def main(argv=None):
     rclpy.init(args=argv)
     bt = BehaviorTree(unicode_tree_debug=True)
-    pt.display.render_dot_tree(bt.root)
+    pt.display.render_dot_tree(bt.root, with_blackboard_variables=True)
 
     bt.tick_tock(100)
 

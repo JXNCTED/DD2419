@@ -129,8 +129,10 @@ class CategoryEvaluation(Node):
     ):
         if self.list_of_stuff:
             if request.pop:
+                self.get_logger().info("pop stuff")
                 stuff = self.list_of_stuff.pop()
             else:
+                self.get_logger().info("peek stuff")
                 stuff = self.list_of_stuff[-1]
             id, category, position = stuff.getStuff()
             response.success = True
