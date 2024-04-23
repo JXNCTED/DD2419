@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 import rclpy
 from rclpy.node import Node
-from mapping_interfaces.srv import PathPlan
+from mapping_interfaces.srv import PathPlan, PathPlanObject
 from nav_msgs.msg import Path, Odometry
 from geometry_msgs.msg import PoseStamped
 from rclpy.action import ActionClient
@@ -21,6 +21,13 @@ class NavGoalMove(Node):
         self.current_pose = PoseStamped()
         self.goal_pose = PoseStamped()
 
+        self.futures_obj = []
+        self.cli_obj = self.create_client(PathPlanObject, 'path_plan_object')
+        while not self.cli_obj.wait_for_service(timeout_sec=1.0):
+            self.get_logger().info('service not available, waiting again...')
+        self.req_obj = PathPlanObject.Request()
+        self.goal_obj = 0
+
         self.action_client = ActionClient(self, Pursuit, 'pursuit')
         # publisher for planned path
         self.path_planned_pub = self.create_publisher(
@@ -38,18 +45,24 @@ class NavGoalMove(Node):
 
     def send_path_plan_request(self):
         self.get_logger().info('send_path_plan_request...')
-        self.req.current_pose = self.current_pose
+        # self.req.current_pose = self.current_pose
         self.req.goal_pose = self.goal_pose
         # call the service, returns a future object and appends it to the list
         self.futures.append(self.cli.call_async(self.req))
+
+    def send_path_plan_object_request(self):
+        self.get_logger().info('send_path_plan_object_request...')
+        self.req_obj.target_object_id = self.goal_obj
+        # call the service, returns a future object and appends it to the list
+        self.futures_obj.append(self.cli_obj.call_async(self.req_obj))
 
     def target_nav_callback(self, msg: PoseStamped):
         self.get_logger().info('target_nav_callback...')
         self.goal_pose = msg
         self.send_path_plan_request()
+        # self.send_path_plan_object_request()
 
     def odom_callback(self, msg: Odometry):
-        self.current_pose.pose = msg.pose.pose
         self.current_pose.header = msg.header
 
     def loop(self):
@@ -75,6 +88,22 @@ class NavGoalMove(Node):
                         self.get_logger().info('Persuit goal action sent...')
                         # remove the future object from the list
                         self.futures.remove(future)
+                    except Exception as e:
+                        self.get_logger().warn('Service call failed %r' % (e,))
+            for future in self.futures_obj:
+                if future.done():
+                    try:
+                        response = future.result()
+                        self.path_planned_pub.publish(response.path)
+                        self.get_logger().info('Path planned published...')
+                        waypoints = []
+                        for pose in response.path.poses:
+                            waypoints.insert(0, Point(
+                                x=pose.pose.position.x, y=pose.pose.position.y))
+                        self.get_logger().info(
+                            f"waypoints number: {len(waypoints)}")
+
+                        self.futures_obj.remove(future)
                     except Exception as e:
                         self.get_logger().warn('Service call failed %r' % (e,))
 
