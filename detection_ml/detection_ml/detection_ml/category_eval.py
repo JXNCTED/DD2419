@@ -238,10 +238,10 @@ class CategoryEvaluation(Node):
                 continue
             try:
                 # extrapolate into the future??
-                # t = self.tf_buffer.lookup_transform(
-                #     "map", msg.header.frame_id, msg.header.stamp, rclpy.duration.Duration(seconds=3))
                 t = self.tf_buffer.lookup_transform(
-                    "map", msg.header.frame_id, rclpy.time.Time())
+                    "map", msg.header.frame_id, msg.header.stamp, rclpy.duration.Duration(seconds=0.8))
+                # t = self.tf_buffer.lookup_transform(
+                #     "map", msg.header.frame_id, rclpy.time.Time())
 
             except Exception as e:
                 self.get_logger().error(str(e))

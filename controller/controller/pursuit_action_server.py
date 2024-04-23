@@ -81,7 +81,7 @@ class PursuitActionServer(Node):
                 goal_handle.canceled()
                 self.get_logger('Goal canceled')
                 return result
-            if np.hypot(self.waypoints[-1].x - self.odom_x, self.waypoints[-1].y - self.odom_y) < 0.1:
+            if np.hypot(self.waypoints[-1].x - self.odom_x, self.waypoints[-1].y - self.odom_y) < 0.30:
                 self.waypoints = []
                 break
             for waypoint in self.waypoints:
@@ -93,8 +93,15 @@ class PursuitActionServer(Node):
                 # based on time to the goal point.
                 if np.hypot(waypoint.x - self.odom_x, waypoint.y - self.odom_y) > LOOK_AHEAD:
                     break
+
                 self.waypoints.pop(0)
             if len(self.waypoints) == 0:
+                break
+
+            if np.hypot(goal_point.x - self.odom_x, goal_point.y - self.odom_y) < 0.8:
+                self.get_logger().info('Reached goal')
+                goal_handle.succeed()
+                result.success = True
                 break
 
             lin, ang, t = self.velocity(self.waypoints[0])
@@ -105,21 +112,19 @@ class PursuitActionServer(Node):
             self.rate.sleep()
 
         twist = Twist()
-        twist.linear.x = 0.0
-        twist.angular.z = 0.0
-        self._publish_vel.publish(twist)
+        for _ in range(10):
+            twist.linear.x = 0.0
+            twist.angular.z = 0.0
+            self._publish_vel.publish(twist)
+            self.rate.sleep()
 
-        if np.hypot(goal_point.x - self.odom_x, goal_point.y - self.odom_y) < 0.1:
-            self.get_logger().info('Reached goal')
-            goal_handle.succeed()
-            result.success = True
-        else:
-            self.get_logger().info('Failed to reach goal')
-            goal_handle.abort()
+        self.get_logger().info('Reached goal')
+        goal_handle.succeed()
+        result.success = True
 
         return result
 
-    def velocity(self, target, lin_v=0.5):
+    def velocity(self, target, lin_v=0.2):
         """
         Calculate the angular velocity from the constant linear velocity,
         the position of the robot and the waypoint using a circle.

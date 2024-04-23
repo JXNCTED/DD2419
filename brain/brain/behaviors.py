@@ -72,7 +72,7 @@ class Pick(pt.composites.Sequence):
         self.add_children([
             GetObjectPositionBehavior(),
             PlanToObjectBehavior(),
-            # ApproachObjectBehavior(),
+            ApproachObjectBehavior(),
             FineTuneObjectPositionBehavior(),
             PickObjectBehavior(),
             Done(),
@@ -169,7 +169,12 @@ class GetObjectPositionBehavior(TemplateBehaviour):
         self.state = pt.common.Status.SUCCESS
         self.future = None
 
-        self.blackboard.current_target_object = str(response.stuff_id)
+        # self.blackboard.current_target_object = str(response.stuff_id)
+        current_obj = ObjectDict()
+        current_obj['stuff_id'] = response.stuff_id
+        current_obj['category'] = str(response.stuff.category)
+        current_obj['position'] = response.stuff.position.point
+        self.blackboard.current_target_object = current_obj
         self.future = None
         self.state = pt.common.Status.SUCCESS
 
@@ -202,8 +207,9 @@ class PlanToObjectBehavior(TemplateBehaviour):
         self.path_plan_client.wait_for_service()
         self.pursuit_client.wait_for_server()
         path_plan_request = PathPlanObject.Request()
-        path_plan_request.target_object_id = int(
-            self.blackboard.current_target_object)
+        # path_plan_request.target_object_id = int(
+        #     self.blackboard.current_target_object)
+        path_plan_request.target_object_id = self.blackboard.current_target_object['stuff_id']
 
         self.path_plan_future = self.path_plan_client.call_async(
             path_plan_request)
@@ -281,10 +287,12 @@ class ApproachObjectBehavior(TemplateBehaviour):
 
     def initialise(self) -> None:
         super().initialise()
+        self.state = pt.common.Status.RUNNING
+
         self.change_camera_mode_pub.publish(String(data='front-camera'))
 
         goal_msg = Approach.Goal()
-        goal_msg.target = self.blackboard.current_target_object
+        goal_msg.target = self.blackboard.current_target_object['category']
 
         self.action_client.wait_for_server()
 
@@ -351,7 +359,7 @@ class FineTuneObjectPositionBehavior(TemplateBehaviour):
         self.action_client.wait_for_server()
 
         goal_msg = Finetune.Goal()
-        goal_msg.object_id = self.blackboard.current_target_object
+        goal_msg.object_id = self.blackboard.current_target_object['category']
         self.send_goal_future = self.action_client.send_goal_async(goal_msg)
         self.send_goal_future.add_done_callback(self.goal_response_callback)
 
@@ -566,3 +574,9 @@ class PickPosDict(TypedDict):
     y: float
     # angle measured clockwise from camera vertical axis
     angle: float
+
+
+class ObjectDict(TypedDict):
+    stuff_id: int
+    category: str
+    position: Point
