@@ -12,10 +12,12 @@
 #include <geometry_msgs/msg/detail/pose_stamped__struct.hpp>
 #include <geometry_msgs/msg/detail/transform_stamped__struct.hpp>
 
+#include "detection_interfaces/msg/stuff_list.hpp"
 #include "geometry_msgs/msg/transform_stamped.hpp"
 #include "mapping/GridMap.hpp"
 #include "mapping/Mapper.hpp"
 #include "mapping_interfaces/srv/path_plan.hpp"
+#include "mapping_interfaces/srv/path_plan_object.hpp"
 #include "nav_msgs/msg/odometry.hpp"
 #include "rclcpp/qos.hpp"
 #include "rclcpp/rclcpp.hpp"
@@ -57,6 +59,14 @@ class MappingNode : public rclcpp::Node
         occu_pub_ = this->create_publisher<nav_msgs::msg::OccupancyGrid>(
             "/occupancy", 10);
 
+        stuff_list_sub_ =
+            this->create_subscription<detection_interfaces::msg::StuffList>(
+                "/category_eval/stuff_list",
+                10,
+                std::bind(&MappingNode::stuffListCallback,
+                          this,
+                          std::placeholders::_1));
+
         timer_ = this->create_wall_timer(500ms,
                                          [this]()
                                          {
@@ -64,6 +74,22 @@ class MappingNode : public rclcpp::Node
                                                  map.toRosOccGrid();
                                              occu_pub_->publish(occu);
                                          });
+
+        servicePlanPath =
+            this->create_service<mapping_interfaces::srv::PathPlan>(
+                "path_plan",
+                std::bind(&MappingNode::planPath,
+                          this,
+                          std::placeholders::_1,
+                          std::placeholders::_2));
+
+        servicePlanPathObject =
+            this->create_service<mapping_interfaces::srv::PathPlanObject>(
+                "path_plan_object",
+                std::bind(&MappingNode::planPathObject,
+                          this,
+                          std::placeholders::_1,
+                          std::placeholders::_2));
 
         // read from /home/group7/workspace_2_tsv.tsv
         std::ifstream file("/home/group7/workspace_2_tsv.tsv", std::ios::in);
@@ -88,19 +114,94 @@ class MappingNode : public rclcpp::Node
 
         RCLCPP_INFO(this->get_logger(), "Mapping node initialized");
     }
+
+    void planPath(
+        const std::shared_ptr<mapping_interfaces::srv::PathPlan::Request>
+            request,
+        std::shared_ptr<mapping_interfaces::srv::PathPlan::Response> response)
+    {
+        RCLCPP_INFO(rclcpp::get_logger("planPath"), "Incoming request");
+
+        geometry_msgs::msg::TransformStamped transform_stamped_map_odom;
+        tf2::TimePoint time_point = tf2::TimePoint(
+            std::chrono::seconds(odom_msg_->header.stamp.sec) +
+            std::chrono::nanoseconds(odom_msg_->header.stamp.nanosec));
+        try
+        {
+            transform_stamped_map_odom = tfBuffer->lookupTransform(
+                "map", "odom", time_point, tf2::durationFromSec(0.8));
+        }
+        catch (tf2::TransformException &ex)
+        {
+            RCLCPP_ERROR(this->get_logger(), "%s", ex.what());
+        }
+
+        geometry_msgs::msg::Pose start_pose;
+        tf2::doTransform(
+            odom_msg_->pose.pose, start_pose, transform_stamped_map_odom);
+
+        response->path = map.planPath(start_pose.position.x,
+                                      start_pose.position.y,
+                                      request->goal_pose.pose.position.x,
+                                      request->goal_pose.pose.position.y);
+    }
+
+    void planPathObject(
+        const std::shared_ptr<mapping_interfaces::srv::PathPlanObject::Request>
+            request,
+        std::shared_ptr<mapping_interfaces::srv::PathPlanObject::Response>
+            response)
+    {
+        RCLCPP_INFO(rclcpp::get_logger("planPathObject"), "Incoming request");
+
+        geometry_msgs::msg::TransformStamped transform_stamped_map_odom;
+        tf2::TimePoint time_point = tf2::TimePoint(
+            std::chrono::seconds(odom_msg_->header.stamp.sec) +
+            std::chrono::nanoseconds(odom_msg_->header.stamp.nanosec));
+        try
+        {
+            transform_stamped_map_odom = tfBuffer->lookupTransform(
+                "map", "odom", time_point, tf2::durationFromSec(0.8));
+        }
+        catch (tf2::TransformException &ex)
+        {
+            RCLCPP_ERROR(this->get_logger(), "%s", ex.what());
+        }
+
+        geometry_msgs::msg::Pose start_pose;
+        tf2::doTransform(
+            odom_msg_->pose.pose, start_pose, transform_stamped_map_odom);
+
+        response->path = map.planPath(start_pose.position.x,
+                                      start_pose.position.y,
+                                      request->target_object_id);
+    }
+
+    void stuffListCallback(
+        const detection_interfaces::msg::StuffList::SharedPtr msg)
+    {
+        mapper.updateMapStuffList(msg);
+    }
+
     void pointCloudCallback(const sensor_msgs::msg::LaserScan::SharedPtr msg)
     {
         mapper.updateMapRGBD(msg, pose_camera);
     }
     void odomCallback(const nav_msgs::msg::Odometry::SharedPtr msg)
     {
-        (void)msg;
+        odom_msg_ = msg;
+        tf2::TimePoint time_point =
+            tf2::TimePoint(std::chrono::seconds(msg->header.stamp.sec) +
+                           std::chrono::nanoseconds(msg->header.stamp.nanosec));
         try
         {
             transform_stamped_map_lidar = tfBuffer->lookupTransform(
-                "map", "lidar_link", tf2::TimePointZero);
-            transform_stamped_map_camera = tfBuffer->lookupTransform(
-                "map", "camera_link", tf2::TimePointZero);
+                "map", "lidar_link", time_point, tf2::durationFromSec(0.8));
+            transform_stamped_map_camera =
+                tfBuffer->lookupTransform("map",
+                                          "camera_depth_frame",
+                                          time_point,
+                                          tf2::durationFromSec(0.3));
         }
         catch (tf2::TransformException &ex)
         {
@@ -145,10 +246,14 @@ class MappingNode : public rclcpp::Node
     Pose pose_lidar;   // pose lidar in map
     Pose pose_camera;  // pose camera in map
     rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr odom_sub_;
+    nav_msgs::msg::Odometry::SharedPtr odom_msg_;
 
     rclcpp::Subscription<sensor_msgs::msg::LaserScan>::SharedPtr lidar_sub_;
     rclcpp::Subscription<sensor_msgs::msg::LaserScan>::SharedPtr
         point_cloud_sub_;
+    rclcpp::Subscription<detection_interfaces::msg::StuffList>::SharedPtr
+        stuff_list_sub_;
+
     rclcpp::Publisher<nav_msgs::msg::OccupancyGrid>::SharedPtr occu_pub_;
     rclcpp::TimerBase::SharedPtr timer_;
 
@@ -157,38 +262,21 @@ class MappingNode : public rclcpp::Node
 
     std::unique_ptr<tf2_ros::Buffer> tfBuffer;
     std::shared_ptr<tf2_ros::TransformListener> tfListener;
+
+    rclcpp::Service<mapping_interfaces::srv::PathPlan>::SharedPtr
+        servicePlanPath;
+    rclcpp::Service<mapping_interfaces::srv::PathPlanObject>::SharedPtr
+        servicePlanPathObject;
 };
 
 std::shared_ptr<MappingNode> node;
-
-/**
- * @brief path plan service handle function, request and response are defined in
- * mapping_interfaces/srv/PathPlan
- *
- * @param request
- * @param response
- */
-void planPath(
-    const std::shared_ptr<mapping_interfaces::srv::PathPlan::Request> request,
-    std::shared_ptr<mapping_interfaces::srv::PathPlan::Response> response)
-{
-    RCLCPP_INFO(rclcpp::get_logger("planPath"), "Incoming request");
-    GridMap &map = const_cast<GridMap &>(node->getMap());
-
-    response->path = map.planPath(request->current_pose.pose.position.x,
-                                  request->current_pose.pose.position.y,
-                                  request->goal_pose.pose.position.x,
-                                  request->goal_pose.pose.position.y);
-}
 
 auto main(int argc, char **argv) -> int
 {
     rclcpp::init(argc, argv);
 
     node = std::make_shared<MappingNode>();
-    rclcpp::Service<mapping_interfaces::srv::PathPlan>::SharedPtr service =
-        node->create_service<mapping_interfaces::srv::PathPlan>("path_plan",
-                                                                planPath);
+
     rclcpp::spin(node);
     rclcpp::shutdown();
     return 0;

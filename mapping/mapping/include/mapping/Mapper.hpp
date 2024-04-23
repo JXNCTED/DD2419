@@ -9,6 +9,7 @@
  *
  */
 #pragma once
+#include "detection_interfaces/msg/stuff_list.hpp"
 #include "mapping/GridMap.hpp"
 #include "sensor_msgs/msg/laser_scan.hpp"
 #include "sensor_msgs/msg/point_cloud2.hpp"
@@ -57,6 +58,9 @@ class Mapper
     void updateMapRGBD(const sensor_msgs::msg::LaserScan::SharedPtr rgbdPtr,
                        const Pose &pose);
 
+    void updateMapStuffList(
+        const detection_interfaces::msg::StuffList::SharedPtr stuffListPtr);
+
    private:
     /**
      * @brief update the grid with the given occupancy probability
@@ -70,4 +74,5 @@ class Mapper
 
     // pointer to the grid map, initialized in the constructor
     GridMap *map;
+    std::map<int, std::pair<double, double>> stuffList;
 };

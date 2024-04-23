@@ -223,3 +223,15 @@ void Mapper::updateGrid(const Eigen::Vector2d coor,
     // set belief back
     map->setGridLogBelief(coor(0), coor(1), logBelief, type);
 }
+
+void Mapper::updateMapStuffList(
+    const detection_interfaces::msg::StuffList::SharedPtr stuffListPtr)
+{
+    stuffList.clear();
+    for (const auto &stuff : stuffListPtr->data)
+    {
+        stuffList[stuff.id] =
+            std::make_pair(stuff.point.point.x, stuff.point.point.y);
+    }
+    map->updateStuffList(stuffList);
+}

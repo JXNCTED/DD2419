@@ -34,9 +34,9 @@ GridMap::GridMap(const double &gridSize,
     expandedGrid.resize(sizeX, sizeY);
 }
 
-nav_msgs::msg::OccupancyGrid GridMap::toRosOccGrid()
+auto GridMap::toRosOccGrid() -> nav_msgs::msg::OccupancyGrid
 {
-    const double OCC_THRESHOLD = 0.7;
+    // const double OCC_THRESHOLD = 0.7;
     for (int i = 0; i < sizeX; i++)
     {
         for (int j = 0; j < sizeY; j++)
@@ -110,9 +110,9 @@ void GridMap::setGridLogBelief(const double &x,
     setGridBelief(x, y, beliefClamped, type);
 }
 
-double GridMap::getGridLogBelief(const double &x,
-                                 const double &y,
-                                 const GridType &type)
+auto GridMap::getGridLogBelief(const double &x,
+                               const double &y,
+                               const GridType &type) -> double
 {
     int xOnGrid = cvFloor(x / gridSize) + startX;
     int yOnGrid = cvFloor(y / gridSize) + startY;
@@ -162,10 +162,10 @@ auto heuristic(int x, int y, int goalX, int goalY) -> float
     return sqrt((x - goalX) * (x - goalX) + (y - goalY) * (y - goalY));
 }
 
-std::vector<std::pair<int, int>> GridMap::aStar(const int &startX,
-                                                const int &startY,
-                                                const int &goalX,
-                                                const int &goalY)
+auto GridMap::aStar(const int &startX,
+                    const int &startY,
+                    const int &goalX,
+                    const int &goalY) -> std::vector<std::pair<int, int>>
 {
     RCLCPP_INFO(
         rclcpp::get_logger("GridMap::aStar"), "current %d, %d", startX, startY);
@@ -190,7 +190,6 @@ std::vector<std::pair<int, int>> GridMap::aStar(const int &startX,
     int iter           = 0;
     bool found         = false;
     // expand the grid to c-space
-    expandGrid();
 
     while (!openSet.empty() and iter++ < MAX_ITER)
     {
@@ -288,10 +287,10 @@ std::vector<std::pair<int, int>> GridMap::aStar(const int &startX,
     return path;
 }
 
-nav_msgs::msg::Path GridMap::planPath(const double &startX,
-                                      const double &startY,
-                                      const double &goalX,
-                                      const double &goalY)
+auto GridMap::planPath(const double &startX,
+                       const double &startY,
+                       const double &goalX,
+                       const double &goalY) -> nav_msgs::msg::Path
 {
     // just wrap the A* basically
     nav_msgs::msg::Path path;
@@ -305,12 +304,62 @@ nav_msgs::msg::Path GridMap::planPath(const double &startX,
 
     RCLCPP_INFO(rclcpp::get_logger("GridMap::planPath"), "received, planning");
 
+    expandGrid();
     std::vector<std::pair<int, int>> pathVec =
         aStar(startXOnGrid, startYOnGrid, goalXOnGrid, goalYOnGrid);
     if (pathVec.empty())
     {
         return path;
     }
+    for (auto &p : pathVec)
+    {
+        geometry_msgs::msg::PoseStamped pose;
+        pose.header.stamp       = rclcpp::Clock().now();
+        pose.header.frame_id    = "map";
+        pose.pose.position.x    = (p.first - this->startX) * gridSize;
+        pose.pose.position.y    = (p.second - this->startY) * gridSize;
+        pose.pose.position.z    = 0;
+        pose.pose.orientation.x = 1;
+        pose.pose.orientation.y = 0;
+        pose.pose.orientation.z = 0;
+        pose.pose.orientation.w = 0;
+
+        path.poses.push_back(pose);
+    }
+
+    return path;
+}
+
+auto GridMap::planPath(const double &startX,
+                       const double &startY,
+                       const int &goalObjId) -> nav_msgs::msg::Path
+{
+    // just wrap the A* basically
+    nav_msgs::msg::Path path;
+    path.header.frame_id = "map";
+    path.header.stamp    = rclcpp::Clock().now();
+
+    int startXOnGrid = cvFloor(startX / gridSize) + this->startX;
+    int startYOnGrid = cvFloor(startY / gridSize) + this->startY;
+    int goalXOnGrid  = stuffList[goalObjId].first;
+    int goalYOnGrid  = stuffList[goalObjId].second;
+
+    RCLCPP_INFO(rclcpp::get_logger("GridMap::planPath (obj)"),
+                "received target obj %d, goal %d, %d",
+                goalObjId,
+                goalXOnGrid,
+                goalYOnGrid);
+
+    expandGrid();
+
+    std::vector<std::pair<int, int>> pathVec =
+        aStar(startXOnGrid, startYOnGrid, goalXOnGrid, goalYOnGrid);
+
+    if (pathVec.empty())
+    {
+        return path;
+    }
+
     for (auto &p : pathVec)
     {
         geometry_msgs::msg::PoseStamped pose;
@@ -345,6 +394,33 @@ void GridMap::expandGrid(const float &radius)
     RCLCPP_INFO(rclcpp::get_logger("GridMap::expandGrid"), "expanded");
 }
 
+void GridMap::expandGrid(const int &id, const float &radius)
+{
+    expandedGrid.setZero();
+    const int EXPAND_RADIUS     = radius / gridSize;
+    const int EXPAND_OBJ_RADIUS = 0.05 / gridSize;
+    for (int i = 0; i < sizeX; i++)
+    {
+        for (int j = 0; j < sizeY; j++)
+        {
+            setOnesAroundPoint(i, j, EXPAND_RADIUS);
+        }
+    }
+
+    for (const auto &stuff : stuffList)
+    {
+        if (stuff.first == id)
+        {
+            continue;
+        }
+        setOnesAroundPoint(
+            stuff.second.first, stuff.second.second, EXPAND_OBJ_RADIUS);
+    }
+
+    // cv::imshow("expandedGrid", expandedGridCV);
+    RCLCPP_INFO(rclcpp::get_logger("GridMap::expandGrid"), "expanded");
+}
+
 void GridMap::setOnesAroundPoint(const int &x, const int &y, const int &radius)
 {
     const double EXPAND_THRESHOLD = 0.7;
@@ -366,9 +442,15 @@ void GridMap::setOnesAroundPoint(const int &x, const int &y, const int &radius)
                 continue;
             }
 
+            // if (pow(i, 2) + pow(j, 2) <= pow(radius, 2) and
+            //     (gridBeliefLiDAR(x, y) >= EXPAND_THRESHOLD or
+            //      gridBeliefRGBD(x, y) >= EXPAND_THRESHOLD or
+            //      knownGrid(x, y) == 1))
+            // {
+            //     expandedGrid(xOnGrid, yOnGrid) = 1;
+            // }
             if (pow(i, 2) + pow(j, 2) <= pow(radius, 2) and
-                (gridBeliefLiDAR(x, y) >= EXPAND_THRESHOLD or
-                 gridBeliefRGBD(x, y) >= EXPAND_THRESHOLD or
+                (gridBeliefRGBD(x, y) >= EXPAND_THRESHOLD or
                  knownGrid(x, y) == 1))
             {
                 expandedGrid(xOnGrid, yOnGrid) = 1;
@@ -397,4 +479,60 @@ void GridMap::setLineSegmentOccupied(
                       cvFloor((y1 + s * ny) / gridSize) + startY) = 1;
         }
     }
+}
+void GridMap::updateStuffList(
+    const std::map<int, std::pair<double, double>> &stuffList)
+{
+    this->stuffList.clear();
+    for (const auto &stuff : stuffList)
+    {
+        int xOnGrid = cvFloor(stuff.second.first / gridSize) + startX;
+        int yOnGrid = cvFloor(stuff.second.second / gridSize) + startY;
+
+        this->stuffList[stuff.first] = std::make_pair(xOnGrid, yOnGrid);
+    }
+}
+
+auto GridMap::getFrontier() -> std::vector<std::pair<int, int>>
+{
+    // get the frontier for frontier-based exploration
+    std::vector<std::pair<int, int>> frontier;
+
+    for (int i = 0; i < sizeX; i++)
+    {
+        for (int j = 0; j < sizeY; j++)
+        {
+            if (gridBeliefRGBD(i, j) == 0.5)  // unknown
+            {
+                bool isFrontier = false;
+                for (int k = -1; k <= 1; k++)
+                {
+                    for (int l = -1; l <= 1; l++)
+                    {
+                        int x = i + k;
+                        int y = j + l;
+                        if (x < 0 or x >= sizeX or y < 0 or y >= sizeY)
+                        {
+                            continue;
+                        }
+                        if (expandedGrid(x, y) == 1)
+                        {
+                            isFrontier = true;
+                            break;
+                        }
+                    }
+                    if (isFrontier)
+                    {
+                        break;
+                    }
+                }
+                if (isFrontier)
+                {
+                    frontier.emplace_back(i, j);
+                }
+            }
+        }
+    }
+
+    return frontier;
 }

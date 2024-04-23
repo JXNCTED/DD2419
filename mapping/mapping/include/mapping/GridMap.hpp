@@ -83,7 +83,7 @@ class GridMap
      *
      * @return double grid cell size
      */
-    double getGridSize() { return gridSize; }
+    auto getGridSize() -> double { return gridSize; }
     /**
      * @brief Get the log belief
      *
@@ -92,16 +92,16 @@ class GridMap
      * @param type type of the grid, LiDAR or RGBD
      * @return double log probability of occupancy
      */
-    double getGridLogBelief(const double &x,
-                            const double &y,
-                            const GridType &type);
+    auto getGridLogBelief(const double &x,
+                          const double &y,
+                          const GridType &type) -> double;
     // APIs
     /**
      * @brief get the ros message of the occupancy grid
      *
      * @return nav_msgs::msg::OccupancyGrid ros message of the occupancy grid
      */
-    nav_msgs::msg::OccupancyGrid toRosOccGrid();
+    auto toRosOccGrid() -> nav_msgs::msg::OccupancyGrid;
 
     // plan path in map coordinate
     /**
@@ -113,10 +113,14 @@ class GridMap
      * @param goalY goal coordinate in map frame
      * @return nav_msgs::msg::Path
      */
-    nav_msgs::msg::Path planPath(const double &startX,
-                                 const double &startY,
-                                 const double &goalX,
-                                 const double &goalY);
+    auto planPath(const double &startX,
+                  const double &startY,
+                  const double &goalX,
+                  const double &goalY) -> nav_msgs::msg::Path;
+
+    auto planPath(const double &startX,
+                  const double &startY,
+                  const int &goalObjId) -> nav_msgs::msg::Path;
 
     /**
      * @brief Set the occupancy for the workspace
@@ -126,6 +130,11 @@ class GridMap
      */
     void setLineSegmentOccupied(
         const std::vector<std::pair<double, double>> &lineSegments);
+
+    void updateStuffList(
+        const std::map<int, std::pair<double, double>> &stuffList);
+
+    auto getFrontier() -> std::vector<std::pair<int, int>>;
 
    private:
     // a star algorithm
@@ -147,9 +156,12 @@ class GridMap
      *
      */
     void expandGrid(const float &radius = 0.18f);
+
+    void expandGrid(const int &id, const float &radius = 0.09f);
     // helper function for expandGrid, set obstacles around a point
     /**
-     * @brief Set every points within the radius of the given point as occupied
+     * @brief Set every points within the radius of the given point as
+     * occupied
      *
      * @param x point of coordinate on grid
      * @param y point of coordinate on grid
@@ -173,4 +185,8 @@ class GridMap
     Eigen::MatrixXd gridBeliefLiDAR;
     Eigen::MatrixXd gridBeliefRGBD;
     rclcpp::Time lastUpdated;
+
+    //  a map from stuff id in eval_category to its position in grid map frame,
+    //  therefore int
+    std::map<int, std::pair<int, int>> stuffList;
 };
