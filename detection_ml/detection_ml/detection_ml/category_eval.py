@@ -5,7 +5,6 @@ from rclpy.node import Node
 from detection_interfaces.msg import DetectedObj, Object, StuffList
 from detection_interfaces.msg import Stuff as StuffMsg
 from collections import deque
-from dataclasses import dataclass
 from filterpy.kalman import KalmanFilter
 import numpy as np
 from numpy.linalg import norm
@@ -102,7 +101,7 @@ class CategoryEvaluation(Node):
             GetStuff, "get_stuff", self.get_stuff_callback)
 
         self.stuff_pub = self.create_publisher(
-            StuffList, "/category_eval/stuff_point", 10)
+            StuffList, "/category_eval/stuff_list", 10)
 
         self.stuff_pub_timer = self.create_timer(1.0, self.publish_stuff_point)
 
@@ -133,12 +132,13 @@ class CategoryEvaluation(Node):
                 stuff = self.list_of_stuff.pop()
             else:
                 stuff = self.list_of_stuff[-1]
-            _, category, position = stuff.getStuff()
+            id, category, position = stuff.getStuff()
             response.success = True
+            response.stuff_id = id
             response.stuff.position.header.frame_id = "map"
             response.stuff.position.header.stamp = self.last_stamp
             response.stuff.category = category
-            response.stuff.confidence = 1
+            response.stuff.confidence = 1.0
             response.stuff.position.point.x = position[0]
             response.stuff.position.point.y = position[1]
             response.stuff.position.point.z = 0.0
@@ -198,7 +198,7 @@ class CategoryEvaluation(Node):
             marker_text.color.r = 0.0
             marker_text.color.g = 1.0
             marker_text.color.b = 0.0
-            marker_text.text = cls_dict[category]
+            marker_text.text = str(id) + cls_dict[category]
             markers.markers.append(marker_text)
 
             marker = Marker()
@@ -236,8 +236,11 @@ class CategoryEvaluation(Node):
                 continue
             try:
                 # extrapolate into the future??
+                # t = self.tf_buffer.lookup_transform(
+                #     "map", msg.header.frame_id, msg.header.stamp, rclpy.duration.Duration(seconds=3))
                 t = self.tf_buffer.lookup_transform(
-                    "map", msg.header.frame_id, msg.header.stamp, rclpy.duration.Duration(seconds=3))
+                    "map", msg.header.frame_id, rclpy.time.Time())
+
             except Exception as e:
                 self.get_logger().error(str(e))
                 return
