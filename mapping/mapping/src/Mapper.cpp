@@ -7,9 +7,9 @@
 Mapper::Mapper(GridMap *map) : map(map) {}
 
 // occupancy probability
-const double P_FREE  = 0.48;
+const double P_FREE  = 0.4;
 const double P_PRIOR = 0.5;
-const double P_OCC   = 0.52;
+const double P_OCC   = 0.6;
 
 // LiDAR measurement model
 /**
@@ -153,7 +153,7 @@ void Mapper::updateMapRGBD(
     const double &gridSize = map->getGridSize();
 
     // for all LiDAR measurements
-    for (size_t i = 0; i < laserPtr->ranges.size(); i++)
+    for (size_t i = 1; i < laserPtr->ranges.size() - 1; i++)
     {
         double R = laserPtr->ranges.at(i);
         if (R < laserPtr->range_min)

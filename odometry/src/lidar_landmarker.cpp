@@ -22,6 +22,7 @@ class LidarLandmarker : public rclcpp::Node
    public:
     LidarLandmarker() : Node("lidar_landmarker")
     {
+        T_map_odom.setIdentity();
         lidar_sub_ = this->create_subscription<sensor_msgs::msg::LaserScan>(
             "/valid_scan",
             10,
@@ -45,40 +46,40 @@ class LidarLandmarker : public rclcpp::Node
             std::make_unique<tf2_ros::TransformListener>(*tf_buffer_);
 
         timer_ = this->create_wall_timer(
-            500ms, std::bind(&LidarLandmarker::timerCallback, this));
+            250ms, std::bind(&LidarLandmarker::timerCallback, this));
 
         timer_tf_pub_ = this->create_wall_timer(
-            10ms, std::bind(&LidarLandmarker::timerTFPubCallback, this));
-
-        T_map_odom.setIdentity();
+            2ms, std::bind(&LidarLandmarker::timerTFPubCallback, this));
     }
 
    private:
     void timerTFPubCallback()
     {
+        if (lastScanStamp.nanoseconds() == 0)
+        {
+            return;
+        }
         geometry_msgs::msg::TransformStamped tf_map_odom;
-        tf_map_odom.header.stamp            = lastScanStamp;
+        // tf_map_odom.header.stamp            = lastScanStamp;
+        tf_map_odom.header.stamp            = this->now();
         tf_map_odom.header.frame_id         = "map";
         tf_map_odom.child_frame_id          = "odom";
         tf_map_odom.transform.translation.x = T_map_odom(0, 3);
         tf_map_odom.transform.translation.y = T_map_odom(1, 3);
         tf_map_odom.transform.translation.z = T_map_odom(2, 3);
+
         Eigen::Quaterniond q_map_odom(T_map_odom.block<3, 3>(0, 0));
         tf_map_odom.transform.rotation.w = q_map_odom.w();
         tf_map_odom.transform.rotation.x = q_map_odom.x();
         tf_map_odom.transform.rotation.y = q_map_odom.y();
         tf_map_odom.transform.rotation.z = q_map_odom.z();
+
         tf_broadcaster_->sendTransform(tf_map_odom);
     }
 
     void timerCallback()
     {
         std::lock_guard<std::mutex> lock(mutex);
-
-        if (lastCloud.empty() or mapCloud.empty())
-        {
-            return;
-        }
         ready = true;
     }
     void odomCallback(const nav_msgs::msg::Odometry::SharedPtr msg)
@@ -255,7 +256,7 @@ class LidarLandmarker : public rclcpp::Node
 
     std::mutex mutex;
 
-    bool ready = false;
+    bool ready = true;
 };
 
 auto main(int argc, char *argv[]) -> int

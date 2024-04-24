@@ -104,8 +104,9 @@ class MappingNode : public rclcpp::Node
             {
                 break;
             }
-            lineSegments.push_back(std::make_pair(x, y));
+            lineSegments.emplace_back(x, y);
         }
+
         map.setLineSegmentOccupied(lineSegments);
         file.close();
         // tf2
@@ -231,28 +232,6 @@ class MappingNode : public rclcpp::Node
         {
             RCLCPP_ERROR(this->get_logger(), "%s", ex.what());
         }
-
-        // pose_camera.x = transform_stamped_map_camera.transform.translation.x;
-        // pose_camera.y = transform_stamped_map_camera.transform.translation.y;
-        // tf2::Quaternion q(transform_stamped_map_camera.transform.rotation.x,
-        //                   transform_stamped_map_camera.transform.rotation.y,
-        //                   transform_stamped_map_camera.transform.rotation.z,
-        //                   transform_stamped_map_camera.transform.rotation.w);
-        // tf2::Matrix3x3 m(q);
-        // double roll, pitch, yaw;
-        // m.getRPY(roll, pitch, yaw);
-        // pose_camera.theta = yaw;
-
-        // pose_lidar.x = transform_stamped_map_lidar.transform.translation.x;
-        // pose_lidar.y = transform_stamped_map_lidar.transform.translation.y;
-        // tf2::Quaternion q2(transform_stamped_map_lidar.transform.rotation.x,
-        //                    transform_stamped_map_lidar.transform.rotation.y,
-        //                    transform_stamped_map_lidar.transform.rotation.z,
-        //                    transform_stamped_map_lidar.transform.rotation.w);
-        // tf2::Matrix3x3 m2(q2);
-        // double roll, pitch, yaw;
-        // m2.getRPY(roll, pitch, yaw);
-        // pose_lidar.theta = yaw;
     }
 
     // get LIDAR measurement and call the updateMapLaser function

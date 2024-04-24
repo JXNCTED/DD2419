@@ -46,7 +46,7 @@ auto GridMap::toRosOccGrid() -> nav_msgs::msg::OccupancyGrid
             {
                 rosOccGrid.data[i + j * sizeX] = 100;
             }
-            if (gridBeliefRGBD(i, j) == 0.5)
+            else if (gridBeliefRGBD(i, j) == 0.5)
             {
                 rosOccGrid.data[i + j * sizeX] = -1;
             }
@@ -105,7 +105,7 @@ void GridMap::setGridLogBelief(const double &x,
 {
     const double belief = 1.0f - 1.0f / (1 + exp(logBelief));
     // const double beliefClamped = std::clamp(belief, 0.6, 0.9);
-    // const double beliefClamped = std::clamp(belief, 0.1, 0.9);
+    // const double beliefClamped = std::clamp(belief, 0.6, 0.95);
     const double beliefClamped = std::clamp(belief, 0.0, 1.0);
     setGridBelief(x, y, beliefClamped, type);
 }
@@ -459,24 +459,74 @@ void GridMap::setOnesAroundPoint(const int &x, const int &y, const int &radius)
     }
 }
 
+/**
+ * @brief Check if a point is inside a polygon
+ *
+ * @param polygon
+ * @param x
+ * @param y
+ * @return true
+ * @return false
+ */
+inline auto pnPoly(const std::vector<std::pair<int, int>> &polygon,
+                   const int &x,
+                   const int &y) -> bool
+{
+    int n       = polygon.size();
+    int counter = 0;
+    int i, xinters;
+    std::pair<int, int> p1, p2;
+
+    p1 = polygon[0];
+    for (i = 1; i <= n; i++)
+    {
+        p2 = polygon[i % n];
+        if (y > std::min(p1.second, p2.second))
+        {
+            if (y <= std::max(p1.second, p2.second))
+            {
+                if (x <= std::max(p1.first, p2.first))
+                {
+                    if (p1.second != p2.second)
+                    {
+                        xinters = (y - p1.second) * (p2.first - p1.first) /
+                                      (p2.second - p1.second) +
+                                  p1.first;
+                        if (p1.first == p2.first or x <= xinters)
+                        {
+                            counter++;
+                        }
+                    }
+                }
+            }
+        }
+        p1 = p2;
+    }
+
+    return counter % 2 != 0;
+}
+
 void GridMap::setLineSegmentOccupied(
     const std::vector<std::pair<double, double>> &lineSegments)
 {
-    for (size_t i = 0; i < lineSegments.size(); i++)
+    // set everything outside the polygon by lineSegments to occupied
+
+    // map the line segments to grid
+    auto lineSegmentsGrid = std::vector<std::pair<int, int>>();
+    for (const auto &line : lineSegments)
     {
-        const double x1 = lineSegments[i].first;
-        const double y1 = lineSegments[i].second;
-        const double x2 = lineSegments[(i + 1) % lineSegments.size()].first;
-        const double y2 = lineSegments[(i + 1) % lineSegments.size()].second;
-        const double dx = x2 - x1;
-        const double dy = y2 - y1;
-        const double d  = sqrt(dx * dx + dy * dy);
-        const double nx = dx / d;
-        const double ny = dy / d;
-        for (double s = 0; s < d; s += gridSize)
+        lineSegmentsGrid.emplace_back(cvFloor(line.first / gridSize) + startX,
+                                      cvFloor(line.second / gridSize) + startY);
+    }
+
+    for (int i = 0; i < sizeX; i++)
+    {
+        for (int j = 0; j < sizeY; j++)
         {
-            knownGrid(cvFloor((x1 + s * nx) / gridSize) + startX,
-                      cvFloor((y1 + s * ny) / gridSize) + startY) = 1;
+            if (!pnPoly(lineSegmentsGrid, i, j))
+            {
+                knownGrid(i, j) = 1;
+            }
         }
     }
 }
