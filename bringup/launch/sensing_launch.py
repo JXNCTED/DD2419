@@ -17,11 +17,11 @@ def generate_launch_description():
         Node(
             package='odometry', executable='lidar_compensator', name='lidar_compensator',
         ),
-        Node(
-            package='odometry', executable='lidar_landmarker', name='lidar_landmarker', ros_arguments=[
-                '--log-level', 'warn'
-            ],
-        ),
+        # Node(
+        #     package='odometry', executable='lidar_landmarker', name='lidar_landmarker', ros_arguments=[
+        #         '--log-level', 'warn'
+        #     ],
+        # ),
         Node(
             package='odometry', executable='filter_odom', name='filter_odom',
         ),
@@ -36,7 +36,7 @@ def generate_launch_description():
                 'max_height': 0.0,
                 'angle_min': -0.5,  # POV of D435i
                 'angle_max': 0.5,
-                'angle_increment': 0.02,  # M_PI/360.0
+                'angle_increment': 0.025,
                 'scan_time': 0.3333,
                 'range_min': 0.20,
                 'range_max': 1.1,
@@ -59,6 +59,6 @@ def generate_launch_description():
         ),
         Node(
             package='display_markers', executable='display_markers', name='display_markers'),
-        # Node(executable='static_transform_publisher', package='tf2_ros', arguments=[
-        #     '--child-frame-id', 'odom', '--frame-id', 'map']),
+        Node(executable='static_transform_publisher', package='tf2_ros', arguments=[
+            '--child-frame-id', 'odom', '--frame-id', 'map']),
     ])

@@ -212,7 +212,7 @@ class LidarLandmarker : public rclcpp::Node
 
         // update T_map_odom
 
-        if (icp.hasConverged() and icp.getFitnessScore() < 0.5)
+        if (icp.hasConverged() and icp.getFitnessScore() < 0.3)
         {
             T_map_odom =
                 icp.getFinalTransformation().cast<double>() * T_map_odom;

@@ -81,8 +81,9 @@ class PursuitActionServer(Node):
                 goal_handle.canceled()
                 self.get_logger('Goal canceled')
                 return result
-            if np.hypot(self.waypoints[-1].x - self.odom_x, self.waypoints[-1].y - self.odom_y) < 0.30:
+            if np.hypot(self.waypoints[-1].x - self.odom_x, self.waypoints[-1].y - self.odom_y) < 0.35:
                 self.waypoints = []
+                result.success = True
                 break
             for waypoint in self.waypoints:
                 # TODO: make this a parameter to to set
@@ -96,12 +97,6 @@ class PursuitActionServer(Node):
 
                 self.waypoints.pop(0)
             if len(self.waypoints) == 0:
-                break
-
-            if np.hypot(goal_point.x - self.odom_x, goal_point.y - self.odom_y) < 0.8:
-                self.get_logger().info('Reached goal')
-                goal_handle.succeed()
-                result.success = True
                 break
 
             lin, ang, t = self.velocity(self.waypoints[0])
@@ -118,9 +113,12 @@ class PursuitActionServer(Node):
             self._publish_vel.publish(twist)
             self.rate.sleep()
 
-        self.get_logger().info('Reached goal')
-        goal_handle.succeed()
-        result.success = True
+        if result.success:
+            self.get_logger().info('Reached goal')
+            goal_handle.succeed()
+        else:
+            self.get_logger().info('Goal not reached')
+            goal_handle.abort()
 
         return result
 
