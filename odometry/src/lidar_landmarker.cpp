@@ -1,4 +1,4 @@
-#include <chrono>
+#include <mutex>
 #include <vector>
 
 #include "geometry_msgs/msg/transform_stamped.hpp"
@@ -47,84 +47,39 @@ class LidarLandmarker : public rclcpp::Node
         timer_ = this->create_wall_timer(
             500ms, std::bind(&LidarLandmarker::timerCallback, this));
 
+        timer_tf_pub_ = this->create_wall_timer(
+            10ms, std::bind(&LidarLandmarker::timerTFPubCallback, this));
+
         T_map_odom.setIdentity();
     }
 
    private:
+    void timerTFPubCallback()
+    {
+        geometry_msgs::msg::TransformStamped tf_map_odom;
+        tf_map_odom.header.stamp            = lastScanStamp;
+        tf_map_odom.header.frame_id         = "map";
+        tf_map_odom.child_frame_id          = "odom";
+        tf_map_odom.transform.translation.x = T_map_odom(0, 3);
+        tf_map_odom.transform.translation.y = T_map_odom(1, 3);
+        tf_map_odom.transform.translation.z = T_map_odom(2, 3);
+        Eigen::Quaterniond q_map_odom(T_map_odom.block<3, 3>(0, 0));
+        tf_map_odom.transform.rotation.w = q_map_odom.w();
+        tf_map_odom.transform.rotation.x = q_map_odom.x();
+        tf_map_odom.transform.rotation.y = q_map_odom.y();
+        tf_map_odom.transform.rotation.z = q_map_odom.z();
+        tf_broadcaster_->sendTransform(tf_map_odom);
+    }
+
     void timerCallback()
     {
-        auto start_time = std::chrono::steady_clock::now();
+        std::lock_guard<std::mutex> lock(mutex);
+
         if (lastCloud.empty() or mapCloud.empty())
         {
             return;
         }
-        const static double ICP_THRESHOLD = 0.5;
-
-        // inital guess
-        // Eigen::Matrix4d T_map_base_guess = T_map_odom * T_odom_base;
-
-        pcl::PointCloud<pcl::PointXYZ> lastCloudInMap;
-
-        pcl::transformPointCloud(
-            lastCloud, lastCloudInMap, T_map_odom.cast<float>().inverse());
-
-        // ICP
-        pcl::IterativeClosestPoint<pcl::PointXYZ, pcl::PointXYZ> icp;
-        icp.setInputSource(lastCloud.makeShared());
-        icp.setInputTarget(mapCloud.makeShared());
-        icp.setEuclideanFitnessEpsilon(
-            1e-6);  // TODO: test with different values
-        icp.setUseReciprocalCorrespondences(true);
-
-        pcl::PointCloud<pcl::PointXYZ> final;
-        icp.align(final);
-
-        // update T_map_odom
-
-        if (icp.hasConverged() and icp.getFitnessScore() < ICP_THRESHOLD)
-        {
-            T_map_odom =
-                icp.getFinalTransformation().cast<double>() * T_map_odom;
-
-            // publish tf
-            // geometry_msgs::msg::TransformStamped tf_map_odom;
-            // tf_map_odom.header.stamp            = this->now();
-            // tf_map_odom.header.frame_id         = "map";
-            // tf_map_odom.child_frame_id          = "odom";
-            // tf_map_odom.transform.translation.x = T_map_odom(0, 3);
-            // tf_map_odom.transform.translation.y = T_map_odom(1, 3);
-            // tf_map_odom.transform.translation.z = T_map_odom(2, 3);
-            // Eigen::Quaterniond q_map_odom(T_map_odom.block<3, 3>(0, 0));
-            // tf_map_odom.transform.rotation.w = q_map_odom.w();
-            // tf_map_odom.transform.rotation.x = q_map_odom.x();
-            // tf_map_odom.transform.rotation.y = q_map_odom.y();
-            // tf_map_odom.transform.rotation.z = q_map_odom.z();
-            // tf_broadcaster_->sendTransform(tf_map_odom);
-
-            // only add to cloud if icp is good
-
-            // stop adding to map after some time
-            static size_t count = 0;
-            if (icp.getFitnessScore() < 0.1 and count < 240)  // 2 min?
-            {
-                count++;
-                mapCloud += lastCloud;
-                pcl::VoxelGrid<pcl::PointXYZ> voxel_grid;
-                voxel_grid.setInputCloud(mapCloud.makeShared());
-                voxel_grid.setLeafSize(DOWN_SAMPLE_RESOLUTION,
-                                       DOWN_SAMPLE_RESOLUTION,
-                                       DOWN_SAMPLE_RESOLUTION);
-                voxel_grid.filter(mapCloud);
-            }
-        }
-
-        auto end_time = std::chrono::steady_clock::now();
-        auto duration = std::chrono::duration_cast<std::chrono::nanoseconds>(
-            end_time - start_time);
-        RCLCPP_INFO(
-            this->get_logger(), "ICP took %f ms", duration.count() / 1e6);
-
-        RCLCPP_INFO(this->get_logger(), "ICP score: %f", icp.getFitnessScore());
+        ready = true;
     }
     void odomCallback(const nav_msgs::msg::Odometry::SharedPtr msg)
     {
@@ -133,7 +88,7 @@ class LidarLandmarker : public rclcpp::Node
         try
         {
             tf_base_odom = tf_buffer_->lookupTransform(
-                "base_link", "odom", tf2::TimePointZero);
+                "base_link", "odom", msg->header.stamp, 100ms);
         }
         catch (tf2::TransformException &ex)
         {
@@ -156,12 +111,21 @@ class LidarLandmarker : public rclcpp::Node
     void lidarCallback(const sensor_msgs::msg::LaserScan::SharedPtr msg)
     {
         // convert laser_scan to pcl point cloud
+        std::lock_guard<std::mutex> lock(mutex);
         static bool first = true;
         if (first)
         {
             first = false;
             return;
         }
+
+        if (not ready)
+        {
+            return;
+        }
+
+        ready = false;
+
         pcl::PointCloud<pcl::PointXYZ> cloud;
         for (size_t i = 0; i < msg->ranges.size(); i++)
         {
@@ -229,20 +193,44 @@ class LidarLandmarker : public rclcpp::Node
         lastCloud              = cloud;
         map_pub_->publish(mapMsg);
 
-        // broadcast tf
-        geometry_msgs::msg::TransformStamped tf_map_odom;
-        tf_map_odom.header.stamp            = msg->header.stamp;
-        tf_map_odom.header.frame_id         = "map";
-        tf_map_odom.child_frame_id          = "odom";
-        tf_map_odom.transform.translation.x = T_map_odom(0, 3);
-        tf_map_odom.transform.translation.y = T_map_odom(1, 3);
-        tf_map_odom.transform.translation.z = T_map_odom(2, 3);
-        Eigen::Quaterniond q_map_odom(T_map_odom.block<3, 3>(0, 0));
-        tf_map_odom.transform.rotation.w = q_map_odom.w();
-        tf_map_odom.transform.rotation.x = q_map_odom.x();
-        tf_map_odom.transform.rotation.y = q_map_odom.y();
-        tf_map_odom.transform.rotation.z = q_map_odom.z();
-        tf_broadcaster_->sendTransform(tf_map_odom);
+        pcl::PointCloud<pcl::PointXYZ> lastCloudInMap;
+
+        pcl::transformPointCloud(
+            lastCloud, lastCloudInMap, T_map_odom.cast<float>().inverse());
+
+        // ICP
+        pcl::IterativeClosestPoint<pcl::PointXYZ, pcl::PointXYZ> icp;
+        icp.setInputSource(lastCloud.makeShared());
+        icp.setInputTarget(mapCloud.makeShared());
+        icp.setEuclideanFitnessEpsilon(
+            1e-6);  // TODO: test with different values
+        icp.setUseReciprocalCorrespondences(true);
+
+        pcl::PointCloud<pcl::PointXYZ> final;
+        icp.align(final);
+
+        // update T_map_odom
+
+        if (icp.hasConverged() and icp.getFitnessScore() < 0.5)
+        {
+            T_map_odom =
+                icp.getFinalTransformation().cast<double>() * T_map_odom;
+
+            // only add to cloud if icp is good
+
+            if (icp.getFitnessScore() < 0.1)
+            {
+                mapCloud += lastCloud;
+                pcl::VoxelGrid<pcl::PointXYZ> voxel_grid;
+                voxel_grid.setInputCloud(mapCloud.makeShared());
+                voxel_grid.setLeafSize(DOWN_SAMPLE_RESOLUTION,
+                                       DOWN_SAMPLE_RESOLUTION,
+                                       DOWN_SAMPLE_RESOLUTION);
+                voxel_grid.filter(mapCloud);
+            }
+        }
+
+        lastScanStamp = msg->header.stamp;
     }
 
     constexpr static double DOWN_SAMPLE_RESOLUTION = 0.05;
@@ -251,6 +239,7 @@ class LidarLandmarker : public rclcpp::Node
     rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr odom_sub_;
     rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr map_pub_;
     rclcpp::TimerBase::SharedPtr timer_;
+    rclcpp::TimerBase::SharedPtr timer_tf_pub_;
 
     std::unique_ptr<tf2_ros::TransformBroadcaster> tf_broadcaster_;
     std::unique_ptr<tf2_ros::Buffer> tf_buffer_;
@@ -261,6 +250,12 @@ class LidarLandmarker : public rclcpp::Node
 
     pcl::PointCloud<pcl::PointXYZ> mapCloud;
     pcl::PointCloud<pcl::PointXYZ> lastCloud;
+
+    rclcpp::Time lastScanStamp;
+
+    std::mutex mutex;
+
+    bool ready = false;
 };
 
 auto main(int argc, char *argv[]) -> int
