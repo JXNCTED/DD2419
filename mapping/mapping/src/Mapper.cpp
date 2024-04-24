@@ -7,10 +7,9 @@
 Mapper::Mapper(GridMap *map) : map(map) {}
 
 // occupancy probability
-const double P_FREE = 0.4;
-// unknown
+const double P_FREE  = 0.48;
 const double P_PRIOR = 0.5;
-const double P_OCC   = 0.7;
+const double P_OCC   = 0.52;
 
 // LiDAR measurement model
 /**

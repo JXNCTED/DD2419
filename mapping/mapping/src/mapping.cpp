@@ -268,7 +268,7 @@ class MappingNode : public rclcpp::Node
    private:
     GridMap map;
     Mapper mapper;
-    Pose pose_lidar;   // pose lidar in map
+    /* Pose pose_lidar;   // pose lidar in map */
     Pose pose_camera;  // pose camera in map
     rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr odom_sub_;
     nav_msgs::msg::Odometry::SharedPtr odom_msg_;
