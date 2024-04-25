@@ -209,7 +209,6 @@ class ApproachActionServer(Node):
                     self.rate.sleep()
                     cnt += 1
                 if point is None:
-
                     break
 
                 self.rate.sleep()
@@ -219,13 +218,14 @@ class ApproachActionServer(Node):
             self._publish_vel.publish(twist)
             if point is None:
                 self.get_logger().warn("timeout")
-                goal_handle.abort()
-                result.success = False
-                return result
+                # break
+                # goal_handle.abort()
+                # result.success = False
+                # return result
 
         # go forward a bit
         twist = Twist()
-        for _ in range(50):  # 0.5s for 10cm
+        for _ in range(150):  # 0.5s for 10cm
             twist.linear.x = 0.2
             self._publish_vel.publish(twist)
             self.rate.sleep()

@@ -97,7 +97,7 @@ class FinetuneObjectActionServer(Node):
 
         # use chassis to move the robot to the target object
         cnt = 0
-        TIMEOUT = 200
+        TIMEOUT = 1000
         while (cnt < TIMEOUT):
             if self.target_obj_id is None:
                 self.get_logger().warn('No target object id')

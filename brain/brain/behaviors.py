@@ -316,7 +316,8 @@ class ApproachObjectBehavior(TemplateBehaviour):
         if result.success:
             self.state = pt.common.Status.SUCCESS
         else:
-            self.state = pt.common.Status.FAILURE
+            self.state = pt.common.Status.SUCCESS
+            # self.state = pt.common.Status.FAILURE
 
         self.send_goal_future = None
         self.get_result_future = None

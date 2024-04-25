@@ -17,11 +17,9 @@ def generate_launch_description():
         Node(
             package='odometry', executable='lidar_compensator', name='lidar_compensator',
         ),
-        # Node(
-        #     package='odometry', executable='lidar_landmarker', name='lidar_landmarker', ros_arguments=[
-        #         '--log-level', 'warn'
-        #     ],
-        # ),
+        Node(
+            package='odometry', executable='lidar_landmarker', name='lidar_landmarker', ros_arguments=[ ],
+        ),
         Node(
             package='odometry', executable='filter_odom', name='filter_odom',
         ),
@@ -59,6 +57,6 @@ def generate_launch_description():
         ),
         Node(
             package='display_markers', executable='display_markers', name='display_markers'),
-        Node(executable='static_transform_publisher', package='tf2_ros', arguments=[
-            '--child-frame-id', 'odom', '--frame-id', 'map']),
+        # Node(executable='static_transform_publisher', package='tf2_ros', arguments=[
+        #     '--child-frame-id', 'odom', '--frame-id', 'map']),
     ])
