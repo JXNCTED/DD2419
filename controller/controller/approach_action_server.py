@@ -122,7 +122,7 @@ class ApproachActionServer(Node):
                 delta = self.get_clock().now().nanoseconds - \
                     rclpy.time.Time().from_msg(self.aruco_stamp).nanoseconds
                 self.get_logger().info(f'delta: {delta}')
-                if f"aruco_{id}" == self.target and delta < 1e9:
+                if f"aruco_{id}" == self.target and delta < 3e9:
                     pose = pose_det
                     break
 
@@ -143,7 +143,7 @@ class ApproachActionServer(Node):
                     for (pose_det, id) in self.markers:
                         delta = self.get_clock().now().nanoseconds - \
                             rclpy.time.Time().from_msg(self.aruco_stamp).nanoseconds
-                        if f"aruco_{id}" == self.target and delta < 1e9:
+                        if f"aruco_{id}" == self.target and delta < 3e9:
                             pose = pose_det
                             break
                     if pose is not None:
@@ -201,7 +201,7 @@ class ApproachActionServer(Node):
                 while (cnt < TIMEOUT):
                     for (point_det, category) in self.objects:
                         # if str(category) == self.target and rclpy.time.Time().nanoseconds - self.object_stamp.nanoseconds < 5e8:
-                        if str(category) == self.target and rclpy.time.Time().nanoseconds - rclpy.time.Time().from_msg(self.object_stamp).nanoseconds < 1e9:
+                        if str(category) == self.target and rclpy.time.Time().nanoseconds - rclpy.time.Time().from_msg(self.object_stamp).nanoseconds < 3e9:
                             point = point_det
                             break
                     if point is not None:
@@ -225,12 +225,12 @@ class ApproachActionServer(Node):
 
         # go forward a bit
         twist = Twist()
-        for _ in range(150):  # 0.5s for 10cm
+        for _ in range(150):  # 30cm
             twist.linear.x = 0.2
             self._publish_vel.publish(twist)
             self.rate.sleep()
 
-        for _ in range(50):  # 0.5s
+        for _ in range(50):
             twist.linear.x = 0.0
             self._publish_vel.publish(twist)
             self.rate.sleep()

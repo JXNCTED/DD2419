@@ -135,7 +135,7 @@ class FinetuneObjectActionServer(Node):
             # debug display
             if self.last_valid_measurement_stamp is None:
                 continue
-            if self.get_clock().now().nanoseconds - self.last_valid_measurement_stamp.nanoseconds > 1e9:
+            if self.get_clock().now().nanoseconds - self.last_valid_measurement_stamp.nanoseconds > 4e9:
                 self.get_logger().warn('No valid measurement. timeout')
                 twist = Twist()
                 twist.linear.x = 0.0
@@ -158,7 +158,7 @@ class FinetuneObjectActionServer(Node):
             # cv2.imshow('image', display_img)
             # cv2.waitKey(1)
 
-            if abs(self.filter.x[0] - CENTER[0]) < 20 and abs(self.filter.x[2] - CENTER[1]) < 40:
+            if abs(self.filter.x[0] - CENTER[0]) < 80 and abs(self.filter.x[2] - CENTER[1]) < 40:
                 self.get_logger().info('reached')
                 break
             theta_normalized = atan2(
