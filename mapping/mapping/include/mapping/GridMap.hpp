@@ -157,7 +157,7 @@ class GridMap
      */
     void expandGrid(const float &radius = 0.18f);
 
-    void expandGrid(const int &id, const float &radius = 0.09f);
+    void expandGrid(const int &id, const float &radius = 0.18f);
     // helper function for expandGrid, set obstacles around a point
     /**
      * @brief Set every points within the radius of the given point as
@@ -168,6 +168,8 @@ class GridMap
      * @param radius radius of the circle
      */
     void setOnesAroundPoint(const int &x, const int &y, const int &radius);
+
+    void setZeroAroundPoint(const int &x, const int &y, const int &radius);
     // ros message of the occupancy grid
     nav_msgs::msg::OccupancyGrid rosOccGrid;
     // size of the grid

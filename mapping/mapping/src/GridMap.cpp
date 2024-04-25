@@ -354,7 +354,7 @@ auto GridMap::planPath(const double &startX,
                 goalXOnGrid,
                 goalYOnGrid);
 
-    expandGrid();
+    expandGrid(goalObjId);
 
     std::vector<std::pair<int, int>> pathVec =
         aStar(startXOnGrid, startYOnGrid, goalXOnGrid, goalYOnGrid);
@@ -402,7 +402,7 @@ void GridMap::expandGrid(const int &id, const float &radius)
 {
     expandedGrid.setZero();
     const int EXPAND_RADIUS     = radius / gridSize;
-    const int EXPAND_OBJ_RADIUS = 0.05 / gridSize;
+    const int EXPAND_OBJ_RADIUS = 0.1 / gridSize;
     for (int i = 0; i < sizeX; i++)
     {
         for (int j = 0; j < sizeY; j++)
@@ -415,14 +415,40 @@ void GridMap::expandGrid(const int &id, const float &radius)
     {
         if (stuff.first == id)
         {
-            continue;
+            setZeroAroundPoint(
+                stuff.second.first, stuff.second.second, EXPAND_OBJ_RADIUS);
+            RCLCPP_INFO(rclcpp::get_logger("GridMap::expandGrid"),
+                        "clearing %d", stuff.first);
         }
-        setOnesAroundPoint(
-            stuff.second.first, stuff.second.second, EXPAND_OBJ_RADIUS);
+        else
+        {
+            setOnesAroundPoint(
+                stuff.second.first, stuff.second.second, EXPAND_OBJ_RADIUS);
+            RCLCPP_INFO(rclcpp::get_logger("GridMap::expandGrid"),
+                        "expanding %d", stuff.first);
+        }
     }
 
     // cv::imshow("expandedGrid", expandedGridCV);
     RCLCPP_INFO(rclcpp::get_logger("GridMap::expandGrid"), "expanded");
+}
+
+void GridMap::setZeroAroundPoint(const int &x, const int &y, const int &radius)
+{
+    for (int i = -radius; i <= radius; i++)
+    {
+        for (int j = -radius; j <= radius; j++)
+        {
+            int xOnGrid = x + i;
+            int yOnGrid = y + j;
+            if (xOnGrid < 0 or xOnGrid >= sizeX or yOnGrid < 0 or
+                yOnGrid >= sizeY)
+            {
+                continue;
+            }
+            expandedGrid(xOnGrid, yOnGrid) = 0;
+        }
+    }
 }
 
 void GridMap::setOnesAroundPoint(const int &x, const int &y, const int &radius)

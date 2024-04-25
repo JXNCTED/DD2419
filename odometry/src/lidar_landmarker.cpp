@@ -214,6 +214,11 @@ class LidarLandmarker : public rclcpp::Node
 
         if (icp.hasConverged() and icp.getFitnessScore() < 0.3)
         {
+            // reject if norm of translation is too large
+            if (icp.getFinalTransformation().block<3, 1>(0, 3).norm() > 0.5)
+            {
+                return;
+            }
             T_map_odom =
                 icp.getFinalTransformation().cast<double>() * T_map_odom;
 
