@@ -139,7 +139,7 @@ class DetectionMLNode(Node):
         if self.mode == "arm-camera":
             return
 
-        K = np.array(msg.depth_camera_info.k).reshape(3, 3)
+        K = np.array(msg.rgb_camera_info.k).reshape(3, 3)
 
         bridge = cv_bridge.CvBridge()
         img = bridge.imgmsg_to_cv2(msg.rgb, "rgb8")
