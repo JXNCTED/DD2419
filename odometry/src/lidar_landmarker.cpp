@@ -46,7 +46,7 @@ class LidarLandmarker : public rclcpp::Node
             std::make_unique<tf2_ros::TransformListener>(*tf_buffer_);
 
         timer_ = this->create_wall_timer(
-            250ms, std::bind(&LidarLandmarker::timerCallback, this));
+            500ms, std::bind(&LidarLandmarker::timerCallback, this));
 
         timer_tf_pub_ = this->create_wall_timer(
             2ms, std::bind(&LidarLandmarker::timerTFPubCallback, this));
