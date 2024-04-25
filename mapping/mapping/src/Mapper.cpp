@@ -7,9 +7,9 @@
 Mapper::Mapper(GridMap *map) : map(map) {}
 
 // occupancy probability
-const double P_FREE  = 0.4;
+const double P_FREE  = 0.3;
 const double P_PRIOR = 0.5;
-const double P_OCC   = 0.6;
+const double P_OCC   = 0.7;
 
 // LiDAR measurement model
 /**
@@ -29,13 +29,13 @@ static auto laserInvModel(const double &r,
     {
         return P_FREE;
     }
-    if (r < (R - 0.5 * gridSize))
+    if (r < (R - gridSize))
     {
         return P_FREE;
     }
 
     // for all point greater than ray measurement R, believe it's unknown
-    if (r > (R + 0.5 * gridSize))
+    if (r > (R + gridSize))
     {
         return P_PRIOR;
     }
@@ -109,10 +109,10 @@ void Mapper::updateMapLiDAR(
     pcl::fromROSMsg(*laserPtr, *cloud);
 
     // for all points in the point cloud
-    for (size_t i = 0; i < cloud->points.size(); i++)
+    for (auto &point : cloud->points)
     {
-        const double x = cloud->points[i].x;
-        const double y = cloud->points[i].y;
+        const double x = point.x;
+        const double y = point.y;
 
         // get the distance of the point
         const double R      = sqrt(x * x + y * y);
@@ -213,10 +213,6 @@ void Mapper::updateGrid(const Eigen::Vector2d coor,
 {
     // get the log belief of the grid
     double logBelief = map->getGridLogBelief(coor(0), coor(1), type);
-    if (logBelief < 0)
-    {
-        return;  // error
-    }
     // update the log belief
     logBelief += log(pOcc / (1 - pOcc));
     // set belief back

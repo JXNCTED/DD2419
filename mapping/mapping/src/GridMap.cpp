@@ -98,15 +98,19 @@ void GridMap::setGridBelief(const double &x,
     rosOccGrid.header.stamp = rclcpp::Clock().now();
 }
 
+static auto logit(const double &p) -> double { return log(p / (1 - p)); }
+static auto sigmoid(const double &x) -> double { return 1.0 / (1 + exp(-x)); }
+
 void GridMap::setGridLogBelief(const double &x,
                                const double &y,
                                const double &logBelief,
                                const GridType &type)
 {
-    const double belief = 1.0f - 1.0f / (1 + exp(logBelief));
+    const double belief = sigmoid(logBelief);
+
     // const double beliefClamped = std::clamp(belief, 0.6, 0.9);
-    // const double beliefClamped = std::clamp(belief, 0.6, 0.95);
-    const double beliefClamped = std::clamp(belief, 0.0, 1.0);
+    const double beliefClamped = std::clamp(belief, 0.1, 0.9);
+    // const double beliefClamped = std::clamp(belief, 0.0, 1.0);
     setGridBelief(x, y, beliefClamped, type);
 }
 
@@ -133,7 +137,7 @@ auto GridMap::getGridLogBelief(const double &x,
     default:
         assert(false);
     }
-    return log(belief / (1.0 - belief));
+    return logit(belief);
 }
 
 /**
