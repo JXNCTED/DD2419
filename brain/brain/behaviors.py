@@ -72,7 +72,7 @@ class Pick(pt.composites.Sequence):
         self.add_children([
             GetObjectPositionBehavior(),
             PlanToObjectBehavior(),
-            ApproachObjectBehavior(),
+            # ApproachObjectBehavior(),
             FineTuneObjectPositionBehavior(),
             PickObjectBehavior(),
             Done(),

@@ -7,6 +7,7 @@ from rclpy.callback_groups import ReentrantCallbackGroup
 from nav_msgs.msg import Odometry
 from geometry_msgs.msg import Twist
 from robp_interfaces.action import Pursuit
+from tf2_ros import Buffer, TransformListener
 
 
 class PursuitActionServer(Node):
@@ -19,6 +20,10 @@ class PursuitActionServer(Node):
         self._cb_group = ReentrantCallbackGroup()
         self.waypoints = []
         self.rate = self.create_rate(100, self.get_clock())
+
+        self.tf_buffer = Buffer()
+        self.tf_listener = TransformListener(
+            self.tf_buffer, self, spin_thread=True)
 
         self._action_server = ActionServer(
             self,
@@ -81,7 +86,7 @@ class PursuitActionServer(Node):
                 goal_handle.canceled()
                 self.get_logger('Goal canceled')
                 return result
-            if np.hypot(self.waypoints[-1].x - self.odom_x, self.waypoints[-1].y - self.odom_y) < 0.35:
+            if np.hypot(self.waypoints[-1].x - self.odom_x, self.waypoints[-1].y - self.odom_y) < 0.18  :
                 self.waypoints = []
                 result.success = True
                 break
@@ -154,6 +159,23 @@ class PursuitActionServer(Node):
         Extract the x, y and yaw from the odometry.
         https://robotics.stackexchange.com/questions/16471/get-yaw-from-quaternion
         """
+        # get base_link in map
+        # try:
+        #     t = self.tf_buffer.lookup_transform(
+        #         'map', 'base_link', msg.header.stamp, rclpy.duration.Duration(seconds=1))
+        # except Exception as e:
+        #     self.get_logger().error(str(e))
+        #     return
+
+        # self.odom_x = t.transform.translation.x
+        # self.odom_y = t.transform.translation.y
+        # x = t.transform.rotation.x
+        # y = t.transform.rotation.y
+        # z = t.transform.rotation.z
+        # w = t.transform.rotation.w
+        # self.odom_yaw = np.arctan2(
+        #     2.0 * (w * z + x * y), w * w + x * x - y * y - z * z)
+
         self.odom_x = msg.pose.pose.position.x
         self.odom_y = msg.pose.pose.position.y
         x = msg.pose.pose.orientation.x

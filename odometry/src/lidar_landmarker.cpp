@@ -211,8 +211,12 @@ class LidarLandmarker : public rclcpp::Node
         icp.align(final);
 
         // update T_map_odom
+        RCLCPP_INFO(this->get_logger(),
+                    "ICP converged: %d, score: %f",
+                    icp.hasConverged(),
+                    icp.getFitnessScore());
 
-        if (icp.hasConverged() and icp.getFitnessScore() < 0.3)
+        if (icp.hasConverged() and icp.getFitnessScore() < 0.5)
         {
             // reject if norm of translation is too large
             if (icp.getFinalTransformation().block<3, 1>(0, 3).norm() > 0.5)
@@ -224,8 +228,10 @@ class LidarLandmarker : public rclcpp::Node
 
             // only add to cloud if icp is good
 
-            if (icp.getFitnessScore() < 0.1)
+            if (icp.getFitnessScore() < 0.2)
             {
+                pcl::transformPointCloud(
+                    lastCloud, lastCloud, icp.getFinalTransformation());
                 mapCloud += lastCloud;
                 pcl::VoxelGrid<pcl::PointXYZ> voxel_grid;
                 voxel_grid.setInputCloud(mapCloud.makeShared());

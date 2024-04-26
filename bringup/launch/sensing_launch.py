@@ -18,7 +18,7 @@ def generate_launch_description():
             package='odometry', executable='lidar_compensator', name='lidar_compensator',
         ),
         Node(
-            package='odometry', executable='lidar_landmarker', name='lidar_landmarker', ros_arguments=[ ],
+            package='odometry', executable='lidar_landmarker', name='lidar_landmarker', ros_arguments=[],
         ),
         Node(
             package='odometry', executable='filter_odom', name='filter_odom',
