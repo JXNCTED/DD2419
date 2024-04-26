@@ -4,4 +4,5 @@ bool pop
 # Ignore the confidence score.
 bool success
 int32 stuff_id
+string super_category
 Object stuff

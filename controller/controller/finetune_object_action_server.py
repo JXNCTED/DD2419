@@ -15,12 +15,31 @@ from filterpy.kalman import KalmanFilter
 from threading import Lock
 from rclpy.callback_groups import ReentrantCallbackGroup
 
+super_cls_dict = {
+    0: "none",
+    1: "cube",
+    2: "animal",
+    3: "none",
+    4: "sphere",
+    5: "cube",
+    6: "sphere",
+    7: "animal",
+    8: "animal",
+    9: "animal",
+    10: "animal",
+    11: "cube",
+    12: "sphere",
+    13: "animal",
+    14: "cube",
+}
+
 
 class FinetuneObjectActionServer(Node):
     def __init__(self):
         super().__init__('finetune_object_action_server')
         self.detected_obj_lock = Lock()
-        self.target_obj_id = None
+        # self.target_obj_id = None
+        self.target_super_cls = "none"
         self.detected_pos = None
         self.index = None
 
@@ -72,11 +91,12 @@ class FinetuneObjectActionServer(Node):
         self.last_valid_measurement_stamp = self.get_clock().now()
         self.detected_pos = msg.data
         with self.detected_obj_lock:
-            if self.target_obj_id is None:
+            if self.target_super_cls == 'none':
                 return
             self.index = None
             for i in range(0, len(msg.data), 6):
-                if int(msg.data[i+5]) == int(self.target_obj_id):
+                # if int(msg.data[i+5]) == int(self.target_obj_id):
+                if super_cls_dict[int(msg.data[i+5])] == self.target_super_cls:
                     self.index = i
                     break
             if self.index is None:
@@ -99,7 +119,7 @@ class FinetuneObjectActionServer(Node):
         cnt = 0
         TIMEOUT = 1000
         while (cnt < TIMEOUT):
-            if self.target_obj_id is None:
+            if self.target_super_cls == 'none':
                 self.get_logger().warn('No target object id')
                 goal_handle.abort()
                 return result
@@ -110,7 +130,8 @@ class FinetuneObjectActionServer(Node):
                 self.rate.sleep()
                 continue
             for i in range(0, len(self.detected_pos), 6):
-                if int(self.detected_pos[i+5]) == int(self.target_obj_id):
+                # if int(self.detected_pos[i+5]) == int(self.target_obj_id):
+                if super_cls_dict[int(self.detected_pos[i+5])] == self.target_super_cls:
                     self.index = i
                     break
             if self.index is None:
@@ -252,9 +273,10 @@ class FinetuneObjectActionServer(Node):
 
     def goal_callback(self, goal_request):
         with self.detected_obj_lock:
-            self.target_obj_id = goal_request.object_id
+            # self.target_obj_id = goal_request.object_id
+            self.target_super_cls = goal_request.super_category
             self.get_logger().info(
-                f'Received goal request: {goal_request.object_id}')
+                f'Received goal request: {goal_request.super_category}')
         return rclpy.action.server.GoalResponse.ACCEPT
 
     def cancel_callback(self, goal_handle):

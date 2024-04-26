@@ -1,4 +1,4 @@
-string object_id
+string super_category
 ---
 bool success
 float32 angle

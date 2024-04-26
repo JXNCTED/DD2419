@@ -40,6 +40,25 @@ cls_dict = {
     14: "wc",
 }
 
+super_cls_dict = {
+    "none": "none",
+    "bc": "cube",
+    "binky": "animal",
+    "box": "none",
+    "bs": "sphere",
+    "gc": "cube",
+    "gs": "sphere",
+    "hugo": "animal",
+    "kiki": "animal",
+    "muddles": "animal",
+    "oakie": "animal",
+    "rc": "cube",
+    "rs": "sphere",
+    "slush": "animal",
+    "wc": "cube",
+
+}
+
 rv_dict = {v: k for k, v in cls_dict.items()}
 
 cls_dict.update(rv_dict)
@@ -58,16 +77,31 @@ class Stuff:
         self.gaussian.R = np.eye(2) * R
         self.gaussian.Q = np.eye(2) * Q
 
+        self.valid = False
+
         self.id = Stuff.id
         Stuff.id += 1
 
         self.gaussian.predict()
         self.category.append(category)
 
+        self.super_category = super_cls_dict[cls_dict[category]]
+
     def update(self, category, position):
         self.category.append(category)
+
         self.gaussian.predict()
         self.gaussian.update(position)
+
+        ret = not self.valid and self.category.count(
+            max(self.category, key=self.category.count)) > 5
+        self.valid = self.category.count(
+            max(self.category, key=self.category.count)) > 5
+
+        self.super_category = super_cls_dict[cls_dict[max(
+            self.category, key=self.category.count)]]
+
+        return ret
 
     def residual(self, position):
         return norm(self.gaussian.residual_of(position))
@@ -76,9 +110,9 @@ class Stuff:
         # get stuff if the category has more than 5 votes
         max_category = max(self.category, key=self.category.count)
         if self.category.count(max_category) > 5:
-            return self.id, max_category, self.gaussian.x
+            return self.id, max_category, self.super_category, self.gaussian.x
         else:  # return none if the category has less than 5 votes
-            return self.id, 0, self.gaussian.x
+            return self.id, 0, "none", self.gaussian.x
 
 
 class CategoryEvaluation(Node):
@@ -115,7 +149,7 @@ class CategoryEvaluation(Node):
         stuff_list = StuffList()
         for stuff in self.list_of_stuff:
             stuff_msg = StuffMsg()
-            id, category, position = stuff.getStuff()
+            id, category, _, position = stuff.getStuff()
             stuff_msg.id = id
             stuff_msg.category = category
 
@@ -140,9 +174,11 @@ class CategoryEvaluation(Node):
             else:
                 self.get_logger().info("peek stuff")
                 stuff = self.list_of_stuff[-1]
-            id, category, position = stuff.getStuff()
+            id, category, super_category, position = stuff.getStuff()
             response.success = True
             response.stuff_id = id
+            print(super_category)
+            response.super_category = super_category
             response.stuff.position.header.frame_id = "map"
             response.stuff.position.header.stamp = self.last_stamp
             response.stuff.category = category
@@ -158,7 +194,7 @@ class CategoryEvaluation(Node):
 
     def prune_none(self):
         for stuff in self.list_of_stuff:
-            _, category, _ = stuff.getStuff()
+            _, category, _, _ = stuff.getStuff()
             if category == 0:
                 self.list_of_stuff.remove(stuff)
                 # delete the marker
@@ -179,11 +215,13 @@ class CategoryEvaluation(Node):
                 markers.markers.append(text_marker)
                 self.marker_publisher.publish(markers)
 
+        self.publish_markers()
+
     def publish_markers(self):
         markers = MarkerArray()
         for i, stuff in enumerate(self.list_of_stuff):
 
-            id, category, position = stuff.getStuff()
+            id, category, _, position = stuff.getStuff()
             marker_text = Marker()
             marker_text.header.frame_id = "map"
             marker_text.header.stamp = self.last_stamp
@@ -265,26 +303,24 @@ class CategoryEvaluation(Node):
                     min_residule_index = i
 
             if min_residule < 0.15:
-                self.list_of_stuff[min_residule_index].update(
-                    obj.category, (position.point.x, position.point.y))
+                if (self.list_of_stuff[min_residule_index].update(
+                        obj.category, (position.point.x, position.point.y))):
+                    self.get_logger().info(
+                        f"new stuff: {cls_dict[obj.category]} at {position.point.x, position.point.y}"
+                    )
+
+                    talk_request = Talk.Request()
+                    sound_string = String()
+                    sound_string.data = cls_dict[obj.category]
+                    talk_request.sound = sound_string
+
+                    self.talk_client.call_async(talk_request)
+
             else:
-                self.get_logger().info(
-                    f"new stuff: {cls_dict[obj.category]} at {position.point.x, position.point.y}"
-                )
-
-                talk_request = Talk.Request()
-                sound_string = String()
-                sound_string.data = cls_dict[obj.category]
-                talk_request.sound = sound_string
-
-                self.talk_client.call_async(talk_request)
-
                 self.list_of_stuff.append(
                     Stuff(
                         np.array([position.point.x, position.point.y]), obj.category)
                 )
-
-        self.publish_markers()
 
 
 def main():
