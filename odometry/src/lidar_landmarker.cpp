@@ -211,10 +211,10 @@ class LidarLandmarker : public rclcpp::Node
         icp.align(final);
 
         // update T_map_odom
-        RCLCPP_INFO(this->get_logger(),
-                    "ICP converged: %d, score: %f",
-                    icp.hasConverged(),
-                    icp.getFitnessScore());
+        // RCLCPP_INFO(this->get_logger(),
+        //             "ICP converged: %d, score: %f",
+        //             icp.hasConverged(),
+        //             icp.getFitnessScore());
 
         if (icp.hasConverged() and icp.getFitnessScore() < 0.5)
         {

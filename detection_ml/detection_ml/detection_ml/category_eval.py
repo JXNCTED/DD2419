@@ -2,6 +2,8 @@ import rclpy
 import rclpy.duration
 from rclpy.node import Node
 
+from std_msgs.msg import String
+
 from detection_interfaces.msg import DetectedObj, Object, StuffList
 from detection_interfaces.msg import Stuff as StuffMsg
 from collections import deque
@@ -16,6 +18,8 @@ from visualization_msgs.msg import Marker, MarkerArray
 from detection_interfaces.srv import GetStuff
 
 from geometry_msgs.msg import PointStamped
+
+from robp_interfaces.srv import Talk
 
 
 cls_dict = {
@@ -104,6 +108,8 @@ class CategoryEvaluation(Node):
             StuffList, "/category_eval/stuff_list", 10)
 
         self.stuff_pub_timer = self.create_timer(1.0, self.publish_stuff_point)
+
+        self.talk_client = self.create_client(Talk, "talk")
 
     def publish_stuff_point(self):
         stuff_list = StuffList()
@@ -265,6 +271,14 @@ class CategoryEvaluation(Node):
                 self.get_logger().info(
                     f"new stuff: {cls_dict[obj.category]} at {position.point.x, position.point.y}"
                 )
+
+                talk_request = Talk.Request()
+                sound_string = String()
+                sound_string.data = cls_dict[obj.category]
+                talk_request.sound = sound_string
+
+                self.talk_client.call_async(talk_request)
+
                 self.list_of_stuff.append(
                     Stuff(
                         np.array([position.point.x, position.point.y]), obj.category)
