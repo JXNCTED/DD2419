@@ -77,16 +77,25 @@ class PursuitActionServer(Node):
         result.success = False
 
         goal_point = self.waypoints[-1]
+        twist = Twist()
+        # align the robot with start point
+        angle = np.arctan2(goal_point.y - self.odom_y,
+                           goal_point.x - self.odom_x)
+        while abs(angle - self.odom_yaw) > 0.1:
+            twist.linear.x = 0.0
+            twist.angular.z = 0.2 * np.sign(angle - self.odom_yaw)
+            self._publish_vel.publish(twist)
+            self.rate.sleep()
+
         while (len(self.waypoints) > 0):
             if goal_handle.is_cancel_requested:
-                twist = Twist()
                 twist.linear.x = 0.0
                 twist.angular.z = 0.0
                 self._publish_vel.publish(twist)
                 goal_handle.canceled()
                 self.get_logger('Goal canceled')
                 return result
-            if np.hypot(self.waypoints[-1].x - self.odom_x, self.waypoints[-1].y - self.odom_y) < 0.18  :
+            if np.hypot(self.waypoints[-1].x - self.odom_x, self.waypoints[-1].y - self.odom_y) < 0.18:
                 self.waypoints = []
                 result.success = True
                 break
@@ -112,6 +121,17 @@ class PursuitActionServer(Node):
             self.rate.sleep()
 
         twist = Twist()
+
+        # align with the goal point
+        angle = np.arctan2(goal_point.y - self.odom_y,
+                           goal_point.x - self.odom_x)
+        while abs(angle - self.odom_yaw) > 0.1:
+            twist.linear.x = 0.0
+            twist.angular.z = 0.2 * np.sign(angle - self.odom_yaw)
+            self._publish_vel.publish(twist)
+            self.rate.sleep()
+
+        # stop the robot
         for _ in range(10):
             twist.linear.x = 0.0
             twist.angular.z = 0.0
@@ -159,23 +179,6 @@ class PursuitActionServer(Node):
         Extract the x, y and yaw from the odometry.
         https://robotics.stackexchange.com/questions/16471/get-yaw-from-quaternion
         """
-        # get base_link in map
-        # try:
-        #     t = self.tf_buffer.lookup_transform(
-        #         'map', 'base_link', msg.header.stamp, rclpy.duration.Duration(seconds=1))
-        # except Exception as e:
-        #     self.get_logger().error(str(e))
-        #     return
-
-        # self.odom_x = t.transform.translation.x
-        # self.odom_y = t.transform.translation.y
-        # x = t.transform.rotation.x
-        # y = t.transform.rotation.y
-        # z = t.transform.rotation.z
-        # w = t.transform.rotation.w
-        # self.odom_yaw = np.arctan2(
-        #     2.0 * (w * z + x * y), w * w + x * x - y * y - z * z)
-
         self.odom_x = msg.pose.pose.position.x
         self.odom_y = msg.pose.pose.position.y
         x = msg.pose.pose.orientation.x

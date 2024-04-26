@@ -330,6 +330,8 @@ auto GridMap::planPath(const double &startX,
 
         path.poses.push_back(pose);
     }
+    path.header.stamp = rclcpp::Clock().now();
+    path.header.frame_id = "map";
 
     return path;
 }
@@ -379,6 +381,9 @@ auto GridMap::planPath(const double &startX,
 
         path.poses.push_back(pose);
     }
+
+    path.header.stamp = rclcpp::Clock().now();
+    path.header.frame_id = "map";
 
     return path;
 }

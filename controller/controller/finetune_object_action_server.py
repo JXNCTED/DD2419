@@ -67,6 +67,7 @@ class FinetuneObjectActionServer(Node):
         self.last_valid_measurement_stamp = None
 
         self.rate = self.create_rate(100)
+        self.wiggle_rate = self.create_rate(5)
 
         cb_group = ReentrantCallbackGroup()
 
@@ -117,7 +118,8 @@ class FinetuneObjectActionServer(Node):
 
         # use chassis to move the robot to the target object
         cnt = 0
-        TIMEOUT = 1000
+        TIMEOUT = 5
+        twist = Twist()
         while (cnt < TIMEOUT):
             if self.target_super_cls == 'none':
                 self.get_logger().warn('No target object id')
@@ -127,16 +129,32 @@ class FinetuneObjectActionServer(Node):
             self.index = None
             if self.detected_pos is None:
                 cnt += 1
-                self.rate.sleep()
+                twist.linear.x = 0.0
+                twist.angular.z = 0.2
+                self.twist_pub.publish(twist)
+                self.wiggle_rate.sleep()
+                twist.angular.z = -0.2
+                self.twist_pub.publish(twist)
+                self.wiggle_rate.sleep()
+                twist.angular.z = 0.0
+                self.twist_pub.publish(twist)
+
                 continue
             for i in range(0, len(self.detected_pos), 6):
-                # if int(self.detected_pos[i+5]) == int(self.target_obj_id):
                 if super_cls_dict[int(self.detected_pos[i+5])] == self.target_super_cls:
                     self.index = i
                     break
             if self.index is None:
                 cnt += 1
-                self.rate.sleep()
+                twist.linear.x = 0.0
+                twist.angular.z = 0.2
+                self.twist_pub.publish(twist)
+                self.wiggle_rate.sleep()
+                twist.angular.z = -0.2
+                self.twist_pub.publish(twist)
+                self.wiggle_rate.sleep()
+                twist.angular.z = 0.0
+                self.twist_pub.publish(twist)
                 continue
             else:
                 # reset the kalman filter state
@@ -149,13 +167,7 @@ class FinetuneObjectActionServer(Node):
             return result
 
         while rclpy.ok():
-            # find the object with the target id in field x, y, w, h, confidence, category
 
-            # calculate the center point
-
-            # debug display
-            if self.last_valid_measurement_stamp is None:
-                continue
             if self.get_clock().now().nanoseconds - self.last_valid_measurement_stamp.nanoseconds > 4e9:
                 self.get_logger().warn('No valid measurement. timeout')
                 twist = Twist()
@@ -175,7 +187,7 @@ class FinetuneObjectActionServer(Node):
 
             CENTER = (320, 300)  # center camera coordinate
 
-            cv2.circle(display_img, CENTER, 5, (0, 255, 255), -1)
+            # cv2.circle(display_img, CENTER, 5, (0, 255, 255), -1)
             # cv2.imshow('image', display_img)
             # cv2.waitKey(1)
 
