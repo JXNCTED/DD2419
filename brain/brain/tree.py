@@ -17,10 +17,7 @@ class BehaviorTree(ptr.trees.BehaviourTree):
         self.root.add_children([
             Initializer(),
             Exploration(),
-            Pick(),
-            # Done(),
-            # Place(),
-            # Peek(),
+            PPPP(),
         ])
 
         super(BehaviorTree, self).__init__(

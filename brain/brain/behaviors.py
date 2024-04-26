@@ -22,6 +22,8 @@ from detection_interfaces.srv import GetStuff
 from tf2_ros import Buffer, TransformListener
 from geometry_msgs.msg import Point
 
+import tf2_geometry_msgs
+
 
 from mapping_interfaces.srv import PathPlanObject
 
@@ -62,6 +64,32 @@ class Exploration(pt.composites.Sequence):
         ])
 
 
+class PPPP(pt.composites.Sequence):
+    '''
+    pick, place, pop, peek, last peek to check if task done
+    '''
+
+    def __init__(self, name="PPPPP"):
+        super(PPPP, self).__init__(name=name, memory=True)
+        self.add_children([
+            Pick(),
+            # Place(),
+            PopPeek(),
+        ])
+
+
+class PopPeek(pt.composites.Sequence):
+    '''
+    pop the picked object from stuff list, and peek the next object, return failure is there is a object
+    '''
+
+    def __init__(self, name="PopPeek"):
+        super(PopPeek, self).__init__(name=name, memory=True)
+        self.add_children([
+            Done(),
+        ])
+
+
 class Pick(pt.composites.Sequence):
     """
     for select object, go to object, fine tune object position, and pick up
@@ -75,7 +103,6 @@ class Pick(pt.composites.Sequence):
             # ApproachObjectBehavior(),
             FineTuneObjectPositionBehavior(),
             PickObjectBehavior(),
-            Done(),
         ])
 
 
@@ -173,6 +200,7 @@ class GetObjectPositionBehavior(TemplateBehaviour):
         current_obj = ObjectDict()
         current_obj['stuff_id'] = response.stuff_id
         current_obj['category'] = str(response.stuff.category)
+        current_obj['super_category'] = response.super_category
         current_obj['position'] = response.stuff.position.point
         self.blackboard.current_target_object = current_obj
         self.future = None
@@ -201,6 +229,10 @@ class PlanToObjectBehavior(TemplateBehaviour):
 
         self.state = pt.common.Status.RUNNING
 
+        # self.tf_buffer = Buffer()
+        # self.tf_listener = TransformListener(
+        #     self.tf_buffer, self, spin_thread=False)
+
     def initialise(self) -> None:
         super().initialise()
 
@@ -222,14 +254,29 @@ class PlanToObjectBehavior(TemplateBehaviour):
             return
 
         waypoints = []
+        # transfrom waypoints from map to odom
+        # try:
+        #     t = self.tf_buffer.lookup_transform(
+        #         'odom', 'map', self.get_clock().now(), timeout=rclpy.time.Duration(seconds=5))
+        # except Exception as e:
+        #     self.get_logger().error(str(e))
+        #     self.state = pt.common.Status.FAILURE
+        #     self.path_plan_future = None
+        #     return
+        
+        # for pose in result.path.poses:
+        #     pose_odom = tf2_geometry_msgs.do_transform_pose(pose, t)
+        #     waypoints.insert(0, Point(
+        #         x=pose_odom.pose.position.x, y=pose_odom.pose.position.y))
+            
         for pose in result.path.poses:
             waypoints.insert(0, Point(
                 x=pose.pose.position.x, y=pose.pose.position.y))
 
+        self.path_plan_future = None
         goal_msg = Pursuit.Goal()
         goal_msg.waypoints = waypoints
 
-        self.path_plan_future = None
 
         self.pursuit_future = self.pursuit_client.send_goal_async(goal_msg)
         self.pursuit_future.add_done_callback(self.pursuit_future_callback)
@@ -259,7 +306,6 @@ class PlanToObjectBehavior(TemplateBehaviour):
 
     def update(self):
         # global current_object
-
         rclpy.spin_once(self, timeout_sec=0.01)
         return self.state
 
@@ -360,7 +406,8 @@ class FineTuneObjectPositionBehavior(TemplateBehaviour):
         self.action_client.wait_for_server()
 
         goal_msg = Finetune.Goal()
-        goal_msg.object_id = self.blackboard.current_target_object['category']
+        # goal_msg.object_id = self.blackboard.current_target_object['category']
+        goal_msg.super_category = self.blackboard.current_target_object['super_category']
         self.send_goal_future = self.action_client.send_goal_async(goal_msg)
         self.send_goal_future.add_done_callback(self.goal_response_callback)
 
@@ -580,4 +627,5 @@ class PickPosDict(TypedDict):
 class ObjectDict(TypedDict):
     stuff_id: int
     category: str
+    super_category: str
     position: Point
