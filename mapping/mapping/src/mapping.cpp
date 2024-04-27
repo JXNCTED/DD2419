@@ -124,6 +124,7 @@ class MappingNode : public rclcpp::Node
         RCLCPP_INFO(rclcpp::get_logger("planPath"), "Incoming request");
 
         geometry_msgs::msg::TransformStamped transform_stamped_map_odom;
+        geometry_msgs::msg::TransformStamped transform_stamped_odom_map;
         tf2::TimePoint time_point = tf2::TimePoint(
             std::chrono::seconds(odom_msg_->header.stamp.sec) +
             std::chrono::nanoseconds(odom_msg_->header.stamp.nanosec));
@@ -131,6 +132,8 @@ class MappingNode : public rclcpp::Node
         {
             transform_stamped_map_odom = tfBuffer->lookupTransform(
                 "map", "odom", time_point, tf2::durationFromSec(0.8));
+            transform_stamped_odom_map = tfBuffer->lookupTransform(
+                "odom", "map", time_point, tf2::durationFromSec(0.8));
         }
         catch (tf2::TransformException &ex)
         {
@@ -141,10 +144,28 @@ class MappingNode : public rclcpp::Node
         tf2::doTransform(
             odom_msg_->pose.pose, start_pose, transform_stamped_map_odom);
 
-        response->path = map.planPath(start_pose.position.x,
-                                      start_pose.position.y,
-                                      request->goal_pose.pose.position.x,
-                                      request->goal_pose.pose.position.y);
+        // response->path = map.planPath(start_pose.position.x,
+        //                               start_pose.position.y,
+        //                               request->goal_pose.pose.position.x,
+        //                               request->goal_pose.pose.position.y);
+        auto path = map.planPath(start_pose.position.x,
+                                 start_pose.position.y,
+                                 request->goal_pose.pose.position.x,
+                                 request->goal_pose.pose.position.y);
+        // transform to odom frame
+        for (auto &p : path.poses)
+        {
+            // transform  to odom frame
+            geometry_msgs::msg::PoseStamped pose_odom;
+            tf2::doTransform(
+                p.pose, pose_odom.pose, transform_stamped_odom_map);
+            pose_odom.header.frame_id = "odom";
+            pose_odom.header.stamp    = this->now();
+            response->path.poses.push_back(pose_odom);
+        }
+
+        response->path.header.frame_id = "map";
+        response->path.header.stamp    = this->now();
     }
 
     void planPathObject(
@@ -156,6 +177,7 @@ class MappingNode : public rclcpp::Node
         RCLCPP_INFO(rclcpp::get_logger("planPathObject"), "Incoming request");
 
         geometry_msgs::msg::TransformStamped transform_stamped_map_odom;
+        geometry_msgs::msg::TransformStamped transform_stamped_odom_map;
         tf2::TimePoint time_point = tf2::TimePoint(
             std::chrono::seconds(odom_msg_->header.stamp.sec) +
             std::chrono::nanoseconds(odom_msg_->header.stamp.nanosec));
@@ -163,6 +185,8 @@ class MappingNode : public rclcpp::Node
         {
             transform_stamped_map_odom = tfBuffer->lookupTransform(
                 "map", "odom", time_point, tf2::durationFromSec(0.8));
+            transform_stamped_odom_map = tfBuffer->lookupTransform(
+                "odom", "map", time_point, tf2::durationFromSec(0.8));
         }
         catch (tf2::TransformException &ex)
         {
@@ -173,9 +197,27 @@ class MappingNode : public rclcpp::Node
         tf2::doTransform(
             odom_msg_->pose.pose, start_pose, transform_stamped_map_odom);
 
-        response->path = map.planPath(start_pose.position.x,
-                                      start_pose.position.y,
-                                      request->target_object_id);
+        // response->path = map.planPath(start_pose.position.x,
+        //                               start_pose.position.y,
+        //                               request->target_object_id);
+
+        auto path = map.planPath(start_pose.position.x,
+                                 start_pose.position.y,
+                                 request->target_object_id);
+        // transform to odom frame
+        for (auto &p : path.poses)
+        {
+            // transform  to odom frame
+            geometry_msgs::msg::PoseStamped pose_odom;
+            tf2::doTransform(
+                p.pose, pose_odom.pose, transform_stamped_odom_map);
+            pose_odom.header.frame_id = "odom";
+            pose_odom.header.stamp    = this->now();
+            response->path.poses.push_back(pose_odom);
+        }
+
+        response->path.header.frame_id = "map";
+        response->path.header.stamp    = this->now();
     }
 
     void stuffListCallback(

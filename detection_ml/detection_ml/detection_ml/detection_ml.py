@@ -89,6 +89,9 @@ class DetectionMLNode(Node):
         self.image_sub = self.create_subscription(
             Image, "/image_raw", self.arm_img_callback, 10)
 
+        self.arm_timeout_timer = self.create_timer(
+            5, self.arm_timeout_callback)
+
         self.rgbd_sub = self.create_subscription(
             RGBD, "/camera/rgbd", self.realsense_rbgd_callback, 10)
 
@@ -199,7 +202,11 @@ class DetectionMLNode(Node):
         cv2.imshow("detections", show_img)
         cv2.waitKey(1)
 
+    def arm_timeout_callback(self):
+        self.get_logger().warn("Arm camera does not receive image for 5 seconds")
+
     def arm_img_callback(self, msg: Image):
+        self.arm_timeout_timer.reset()
         if self.mode == "front-camera":
             return
         if self.K_arm is None:

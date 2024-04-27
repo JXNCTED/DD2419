@@ -1,5 +1,7 @@
 # Use pop=false within Peek() and pop=true within Pick().
 bool pop
+# only used when pop=true
+int32 pop_id
 ---
 # Ignore the confidence score.
 bool success

@@ -93,10 +93,9 @@ class Stuff:
         self.gaussian.predict()
         self.gaussian.update(position)
 
-        ret = not self.valid and self.category.count(
-            max(self.category, key=self.category.count)) > 5
-        self.valid = self.category.count(
-            max(self.category, key=self.category.count)) > 5
+        ret = not self.valid and len(self.category) > 5
+
+        self.valid = len(self.category) > 5
 
         self.super_category = super_cls_dict[cls_dict[max(
             self.category, key=self.category.count)]]
@@ -170,7 +169,16 @@ class CategoryEvaluation(Node):
         if self.list_of_stuff:
             if request.pop:
                 self.get_logger().info("pop stuff")
-                stuff = self.list_of_stuff.pop()
+                pop_id = request.pop_id
+                stuff = None
+                for i, s in enumerate(self.list_of_stuff):
+                    if s.id == pop_id:
+                        stuff = self.list_of_stuff.pop(i)
+                        break
+                if stuff is None:
+                    response.success = False
+                    response.stuff = Object()
+                    return response
             else:
                 self.get_logger().info("peek stuff")
                 stuff = self.list_of_stuff[-1]

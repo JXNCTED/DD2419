@@ -18,4 +18,6 @@ def generate_launch_description():
             package='controller', executable='finetune_object_action_server', name='finetune_object_action_server'),
         Node(
             package='controller', executable='pursuit_action_server', name='pursuit_action_server'),
+        Node(
+            package='talking', executable='talking', name='talking'),
     ])

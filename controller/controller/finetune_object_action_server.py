@@ -128,6 +128,7 @@ class FinetuneObjectActionServer(Node):
 
             self.index = None
             if self.detected_pos is None:
+                self.get_logger().info('No valid measurement, wiggling...')
                 cnt += 1
                 twist.linear.x = 0.0
                 twist.angular.z = 0.2
@@ -145,6 +146,7 @@ class FinetuneObjectActionServer(Node):
                     self.index = i
                     break
             if self.index is None:
+                self.get_logger().info('No valid measurement, wiggling...')
                 cnt += 1
                 twist.linear.x = 0.0
                 twist.angular.z = 0.2
@@ -191,8 +193,9 @@ class FinetuneObjectActionServer(Node):
             # cv2.imshow('image', display_img)
             # cv2.waitKey(1)
 
-            if abs(self.filter.x[0] - CENTER[0]) < 80 and abs(self.filter.x[2] - CENTER[1]) < 40:
-                self.get_logger().info('reached')
+            if abs(self.filter.x[0] - CENTER[0]) < 50 and abs(self.filter.x[2] - CENTER[1]) < 40:
+                self.get_logger().info(
+                    f'\033[92mReached!\033[0m')
                 break
             theta_normalized = atan2(
                 CENTER[1] - self.filter.x[2], CENTER[0] - self.filter.x[0]) / pi

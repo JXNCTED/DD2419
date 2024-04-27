@@ -126,6 +126,8 @@ class PursuitActionServer(Node):
         angle = np.arctan2(goal_point.y - self.odom_y,
                            goal_point.x - self.odom_x)
         while abs(angle - self.odom_yaw) > 0.1:
+            angle = np.arctan2(goal_point.y - self.odom_y,
+                               goal_point.x - self.odom_x)
             twist.linear.x = 0.0
             twist.angular.z = 0.2 * np.sign(angle - self.odom_yaw)
             self._publish_vel.publish(twist)
