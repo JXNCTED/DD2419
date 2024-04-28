@@ -179,9 +179,9 @@ class CategoryEvaluation(Node):
                     response.success = False
                     response.stuff = Object()
                     return response
-            else:
-                self.get_logger().info("peek stuff")
+            else:   
                 stuff = self.list_of_stuff[-1]
+                self.get_logger().info(f"peeking {stuff.id}")
             id, category, super_category, position = stuff.getStuff()
             response.success = True
             response.stuff_id = id

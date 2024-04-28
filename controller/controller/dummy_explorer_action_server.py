@@ -87,7 +87,7 @@ class DummyExplorer(Node):
         result.success = True
         goal_handle.succeed()
 
-        self.get_logger().info('Goal completed')
+        self.get_logger().info('\033[92mGoal succeeded\033[0m')
 
         return result
 

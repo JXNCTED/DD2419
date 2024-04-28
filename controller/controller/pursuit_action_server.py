@@ -141,10 +141,10 @@ class PursuitActionServer(Node):
             self.rate.sleep()
 
         if result.success:
-            self.get_logger().info('Reached goal')
+            self.get_logger().info('\033[92mGoal succeeded\033[0m')
             goal_handle.succeed()
         else:
-            self.get_logger().info('Goal not reached')
+            self.get_logger().warn('Goal not succeeded, aborting...')
             goal_handle.abort()
 
         return result
@@ -181,14 +181,20 @@ class PursuitActionServer(Node):
         Extract the x, y and yaw from the odometry.
         https://robotics.stackexchange.com/questions/16471/get-yaw-from-quaternion
         """
-        self.odom_x = msg.pose.pose.position.x
-        self.odom_y = msg.pose.pose.position.y
         x = msg.pose.pose.orientation.x
         y = msg.pose.pose.orientation.y
         z = msg.pose.pose.orientation.z
         w = msg.pose.pose.orientation.w
         self.odom_yaw = np.arctan2(
             2.0 * (w * z + x * y), w * w + x * x - y * y - z * z)
+
+        # for simplicty, let the arm center for approach center
+        CAMERA_ARM_OFFSET = 0.04
+
+        self.odom_x = msg.pose.pose.position.x + \
+            np.cos(self.odom_yaw) * CAMERA_ARM_OFFSET
+        self.odom_y = msg.pose.pose.position.y + \
+            np.sin(self.odom_yaw) * CAMERA_ARM_OFFSET
 
 
 def main(args=None):

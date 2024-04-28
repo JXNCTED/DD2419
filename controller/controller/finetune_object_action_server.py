@@ -14,7 +14,6 @@ import numpy as np
 from filterpy.kalman import KalmanFilter
 from threading import Lock
 from rclpy.callback_groups import ReentrantCallbackGroup
-
 super_cls_dict = {
     0: "none",
     1: "cube",
@@ -101,6 +100,7 @@ class FinetuneObjectActionServer(Node):
                     self.index = i
                     break
             if self.index is None:
+                self.filter.predict()
                 return
         x, y, w, h = msg.data[self.index:self.index+4]
         center_x = x + w / 2
@@ -118,33 +118,13 @@ class FinetuneObjectActionServer(Node):
 
         # use chassis to move the robot to the target object
         cnt = 0
-        TIMEOUT = 5
+        TIMEOUT = 10
         twist = Twist()
         while (cnt < TIMEOUT):
-            if self.target_super_cls == 'none':
-                self.get_logger().warn('No target object id')
-                goal_handle.abort()
-                return result
-
-            self.index = None
-            if self.detected_pos is None:
-                self.get_logger().info('No valid measurement, wiggling...')
-                cnt += 1
-                twist.linear.x = 0.0
-                twist.angular.z = 0.2
-                self.twist_pub.publish(twist)
-                self.wiggle_rate.sleep()
-                twist.angular.z = -0.2
-                self.twist_pub.publish(twist)
-                self.wiggle_rate.sleep()
-                twist.angular.z = 0.0
-                self.twist_pub.publish(twist)
-
-                continue
-            for i in range(0, len(self.detected_pos), 6):
-                if super_cls_dict[int(self.detected_pos[i+5])] == self.target_super_cls:
-                    self.index = i
-                    break
+            # if self.target_super_cls == 'none':
+            #     self.get_logger().warn('No target object id')
+            #     goal_handle.abort()
+            #     return result
             if self.index is None:
                 self.get_logger().info('No valid measurement, wiggling...')
                 cnt += 1
@@ -159,9 +139,6 @@ class FinetuneObjectActionServer(Node):
                 self.twist_pub.publish(twist)
                 continue
             else:
-                # reset the kalman filter state
-                self.filter.x = np.array(
-                    [self.detected_pos[self.index], 0, self.detected_pos[self.index+2], 0])
                 break
         else:
             self.get_logger().warn('No valid measurement')
@@ -170,22 +147,22 @@ class FinetuneObjectActionServer(Node):
 
         while rclpy.ok():
 
-            if self.get_clock().now().nanoseconds - self.last_valid_measurement_stamp.nanoseconds > 4e9:
-                self.get_logger().warn('No valid measurement. timeout')
-                twist = Twist()
-                twist.linear.x = 0.0
-                twist.angular.z = 0.0
-                self.twist_pub.publish(twist)
-                result.success = False
-                goal_handle.abort()
-                return result
-            if self.img is None:
-                self.get_logger().warn('No image received')
-                goal_handle.abort()
-                return result
-            display_img = self.img.copy()
-            cv2.circle(display_img, (int(self.filter.x[0]), int(self.filter.x[2])),
-                       5, (255, 0, 0), -1)
+            # if self.get_clock().now().nanoseconds - self.last_valid_measurement_stamp.nanoseconds > 4e9:
+            #     self.get_logger().warn('No valid measurement. timeout')
+            #     twist = Twist()
+            #     twist.linear.x = 0.0
+            #     twist.angular.z = 0.0
+            #     self.twist_pub.publish(twist)
+            #     result.success = False
+            #     goal_handle.abort()
+            #     return result
+            # if self.img is None:
+            #     self.get_logger().warn('No image received')
+            #     goal_handle.abort()
+            #     return result
+            # display_img = self.img.copy()
+            # cv2.circle(display_img, (int(self.filter.x[0]), int(self.filter.x[2])),
+            #            5, (255, 0, 0), -1)
 
             CENTER = (320, 300)  # center camera coordinate
 
@@ -278,7 +255,7 @@ class FinetuneObjectActionServer(Node):
         self.get_logger().info(
             f'world_x: {world_x}, world_y: {world_y}, angle: {rect[2]}')
 
-        self.get_logger().info('Finetune object succeeded')
+        self.get_logger().info('\033[92mFinetune succeeded\033[0m')
         result.success = True
         result.position = [world_x, world_y]  # not sure if this is correct
         result.angle = rect[2] / 180.0 * pi

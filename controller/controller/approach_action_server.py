@@ -235,7 +235,8 @@ class ApproachActionServer(Node):
             self._publish_vel.publish(twist)
             self.rate.sleep()
 
-        self.get_logger().info('Goal succeeded')
+        self.get_logger().info('\033[92mGoal succeeded\033[0m')
+
         goal_handle.succeed()
         result.success = True
         self.objects.clear()

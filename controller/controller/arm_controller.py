@@ -112,8 +112,6 @@ class ArmController(Node):
                 elif self.command_list[i] <= -1:
                     self.command_list[i] = -1
 
-            self.get_logger().info(f'command list: {self.command_list}')
-
             move_time = [1000 for _ in range(6)]
 
             msg = Int16MultiArray()
@@ -147,6 +145,8 @@ class ArmController(Node):
 
             self.arm_pub_.publish(msg)
 
+            self.get_logger().info("\033[92mPicked the object\033[0m")
+
         elif self.current_command == "place":
             self.rate_place.sleep()
             z = 0.05
@@ -175,8 +175,6 @@ class ArmController(Node):
                     self.command_list[i] = 24000
                 elif self.command_list[i] <= -1:
                     self.command_list[i] = -1
-
-            self.get_logger().info(f'command list: {self.command_list}')
 
             move_time = [1000 for _ in range(6)]
 

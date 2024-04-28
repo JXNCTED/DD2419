@@ -5,6 +5,7 @@ Used in `tree.py`.
 """
 
 import py_trees as pt
+from py_trees import decorators
 from py_trees.common import Status
 import py_trees_ros as ptr
 import rclpy.action
@@ -62,7 +63,8 @@ class PPPP(pt.composites.Selector):
     def __init__(self, name="PPPP"):
         super(PPPP, self).__init__(name=name, memory=True)
         self.add_children([
-            Peek(),
+            # Peek(),
+            pt.decorators.Inverter(name="inverter", child=Peek()),
             PPP()
         ])
 
@@ -134,9 +136,7 @@ class Pick(pt.composites.Sequence):
     def __init__(self, name="Pick"):
         super(Pick, self).__init__(name=name, memory=True)
         self.add_children([
-            GetObjectPositionBehavior(),
             PlanToObjectBehavior(),
-            # ApproachObjectBehavior(),
             FineTuneObjectPositionBehavior(),
             PickObjectBehavior(),
         ])
@@ -160,7 +160,43 @@ class Place(pt.composites.Sequence):
 class Peek(TemplateBehaviour):
     def __init__(self, name="Peek"):
         super(Peek, self).__init__(name=name)
+
+        self.client = self.create_client(GetStuff, '/get_stuff')
+
+        self.register_bb('current_target_object',
+                         read_access=False, write_access=True)
+
         self.state = pt.common.Status.RUNNING
+
+    def initialise(self) -> None:
+        super().initialise()
+        self.client.wait_for_service()
+        self.state = pt.common.Status.RUNNING
+
+        request = GetStuff.Request()
+        request.pop = False  # peek
+
+        self.future = self.client.call_async(request)
+        self.future.add_done_callback(self.future_callback)
+
+    def future_callback(self, future):
+        response = future.result()
+        if response is None:
+            self.state = pt.common.Status.FAILURE
+            return
+
+        self.state = pt.common.Status.SUCCESS
+        self.future = None
+
+        # self.blackboard.current_target_object = str(response.stuff_id)
+        current_obj = ObjectDict()
+        current_obj['stuff_id'] = response.stuff_id
+        current_obj['category'] = str(response.stuff.category)
+        current_obj['super_category'] = response.super_category
+        current_obj['position'] = response.stuff.position.point
+        self.blackboard.current_target_object = current_obj
+        self.future = None
+        self.state = pt.common.Status.SUCCESS
 
     def update(self):
         rclpy.spin_once(self, timeout_sec=0.01)
@@ -213,55 +249,6 @@ class ArmToHome(TemplateBehaviour):
 
         return pt.common.Status.SUCCESS
 
-
-class GetObjectPositionBehavior(TemplateBehaviour):
-    """
-    select one object from the object list and get the position of the object
-    use peek
-    """
-
-    def __init__(self, name="GetObjectPositionBehavior"):
-        super(GetObjectPositionBehavior, self).__init__(name=name)
-        self.client = self.create_client(GetStuff, '/get_stuff')
-
-        self.register_bb('current_target_object',
-                         read_access=False, write_access=True)
-
-        self.state = pt.common.Status.RUNNING
-
-    def initialise(self) -> None:
-        super().initialise()
-        self.client.wait_for_service()
-        self.state = pt.common.Status.RUNNING
-
-        request = GetStuff.Request()
-        request.pop = False  # peek
-
-        self.future = self.client.call_async(request)
-        self.future.add_done_callback(self.future_callback)
-
-    def future_callback(self, future):
-        response = future.result()
-        if response is None:
-            self.state = pt.common.Status.FAILURE
-            return
-
-        self.state = pt.common.Status.SUCCESS
-        self.future = None
-
-        # self.blackboard.current_target_object = str(response.stuff_id)
-        current_obj = ObjectDict()
-        current_obj['stuff_id'] = response.stuff_id
-        current_obj['category'] = str(response.stuff.category)
-        current_obj['super_category'] = response.super_category
-        current_obj['position'] = response.stuff.position.point
-        self.blackboard.current_target_object = current_obj
-        self.future = None
-        self.state = pt.common.Status.SUCCESS
-
-    def update(self):
-        rclpy.spin_once(self, timeout_sec=0.01)
-        return self.state
 
 
 class PlanToBoxBehavior(TemplateBehaviour):
