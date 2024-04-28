@@ -17,6 +17,7 @@ set(msg_files
 
 set(action_files
   "action/Pursuit.action"
+  "action/NavGoal.action"
   "action/Arm.action"
   "action/Finetune.action"
   "action/Approach.action"
