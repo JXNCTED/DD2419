@@ -143,7 +143,10 @@ class FinetuneObjectActionServer(Node):
                 break
         else:
             self.get_logger().warn('No valid measurement')
+            self.index = None
             goal_handle.abort()
+            self.filter.x = np.array([0, 0, 0, 0])
+            self.filter.predict()
             return result
         cnt = 0
 
@@ -192,16 +195,16 @@ class FinetuneObjectActionServer(Node):
                 CENTER[1] - self.filter.x[2], CENTER[0] - self.filter.x[0]) / pi
 
             twist = Twist()
-            KP = -0.4
-            LINEAR_VEL = 0.05
+            KP = -0.6
+            LINEAR_VEL = 0.08
 
-            if (0 < theta_normalized <= 0.4):
-                twist.linear.x = LINEAR_VEL
+            if (0 < theta_normalized <= 0.25):
+                twist.linear.x = -LINEAR_VEL
                 twist.angular.z = -(0.5 - theta_normalized) * KP
-            elif (0.6 < theta_normalized <= 1):
-                twist.linear.x = LINEAR_VEL
+            elif (0.75 < theta_normalized <= 1):
+                twist.linear.x = -LINEAR_VEL
                 twist.angular.z = (theta_normalized - 0.5) * KP
-            elif (0.4 < theta_normalized <= 0.6):
+            elif (0.25 < theta_normalized <= 0.75):
                 twist.linear.x = LINEAR_VEL
                 twist.angular.z = 0.0
             elif (-0.6 < theta_normalized <= -0.4):
@@ -252,7 +255,7 @@ class FinetuneObjectActionServer(Node):
         if len(contours) > 0:
             length_mask = [cv2.arcLength(c, True) > 100 for c in contours]
             dist_mask = [abs(cv2.pointPolygonTest(
-                c, (self.filter.x[0], self.filter.x[2]), True)) < 70 for c in contours]
+                c, (self.filter.x[0], self.filter.x[2]), True)) < 50 for c in contours]
 
             valid_contours = [c for c, a, b in zip(
                 contours, length_mask, dist_mask) if a and b]
@@ -281,6 +284,9 @@ class FinetuneObjectActionServer(Node):
         result.success = True
         result.position = [world_x, world_y]  # not sure if this is correct
         result.angle = rect[2] / 180.0 * pi
+
+        self.filter.x = np.array([0, 0, 0, 0])
+        self.filter.predict()
 
         goal_handle.succeed()
         return result

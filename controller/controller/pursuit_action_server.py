@@ -1,13 +1,16 @@
 import numpy as np
 import rclpy
+import rclpy.duration
 from rclpy.node import Node
 from rclpy.action import ActionServer, GoalResponse, CancelResponse
 from rclpy.callback_groups import ReentrantCallbackGroup
 
 from nav_msgs.msg import Odometry
-from geometry_msgs.msg import Twist
+from geometry_msgs.msg import Twist, Pose
+import rclpy.time
 from robp_interfaces.action import Pursuit
 from tf2_ros import Buffer, TransformListener
+from tf2_geometry_msgs import do_transform_pose
 
 
 class PursuitActionServer(Node):
@@ -129,7 +132,7 @@ class PursuitActionServer(Node):
             angle = np.arctan2(goal_point.y - self.odom_y,
                                goal_point.x - self.odom_x)
             twist.linear.x = 0.0
-            twist.angular.z = 0.2 * np.sign(angle - self.odom_yaw)
+            twist.angular.z = 0.4 * np.sign(angle - self.odom_yaw)
             self._publish_vel.publish(twist)
             self.rate.sleep()
 
@@ -176,24 +179,51 @@ class PursuitActionServer(Node):
         t = arc_length / lin_v  # time to move to the waypoint, not used atm
         return lin_v, ang_v, t
 
-    def odom_callback(self, msg):
+    def odom_callback(self, msg: Odometry):
         """
         Extract the x, y and yaw from the odometry.
         https://robotics.stackexchange.com/questions/16471/get-yaw-from-quaternion
         """
-        x = msg.pose.pose.orientation.x
-        y = msg.pose.pose.orientation.y
-        z = msg.pose.pose.orientation.z
-        w = msg.pose.pose.orientation.w
-        self.odom_yaw = np.arctan2(
-            2.0 * (w * z + x * y), w * w + x * x - y * y - z * z)
+        # x = msg.pose.pose.orientation.x
+        # y = msg.pose.pose.orientation.y
+        # z = msg.pose.pose.orientation.z
+        # w = msg.pose.pose.orientation.w
+        # self.odom_yaw = np.arctan2(
+        #     2.0 * (w * z + x * y), w * w + x * x - y * y - z * z)
 
         # for simplicty, let the arm center for approach center
         CAMERA_ARM_OFFSET = 0.04
 
-        self.odom_x = msg.pose.pose.position.x + \
+        # self.odom_x = msg.pose.pose.position.x + \
+        #     np.cos(self.odom_yaw) * CAMERA_ARM_OFFSET
+        # self.odom_y = msg.pose.pose.position.y + \
+        #     np.sin(self.odom_yaw) * CAMERA_ARM_OFFSET
+
+        try:
+            # odom_to_map_tf = self.tf_buffer.lookup_transform(
+            #     'odom', 'map', msg.header.stamp, timeout=rclpy.duration.Duration(seconds=1.0))
+            odom_to_map_tf = self.tf_buffer.lookup_transform(
+                'odom', 'map', rclpy.time.Time().to_msg(), timeout=rclpy.duration.Duration(seconds=1.0))
+        except Exception as e:
+            self.get_logger().error(
+                f"Failed to lookup transform: {str(e)}")
+            return
+
+        odom_pose = msg.pose.pose
+        map_pose: Pose
+        map_pose = do_transform_pose(
+            odom_pose, odom_to_map_tf)
+
+        x = map_pose.orientation.x
+        y = map_pose.orientation.y
+        z = map_pose.orientation.z
+        w = map_pose.orientation.w
+        self.odom_yaw = np.arctan2(
+            2.0 * (w * z + x * y), w * w + x * x - y * y - z * z)
+
+        self.odom_x = map_pose.position.x + \
             np.cos(self.odom_yaw) * CAMERA_ARM_OFFSET
-        self.odom_y = msg.pose.pose.position.y + \
+        self.odom_y = map_pose.position.y + \
             np.sin(self.odom_yaw) * CAMERA_ARM_OFFSET
 
 

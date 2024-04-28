@@ -139,6 +139,7 @@ class Pick(pt.composites.Sequence):
             PlanToObjectBehavior(),
             FineTuneObjectPositionBehavior(),
             PickObjectBehavior(),
+            Done(),  # placeholder, stuck here
         ])
 
 

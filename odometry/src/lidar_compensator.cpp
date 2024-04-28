@@ -5,7 +5,7 @@
 #include "sensor_msgs/msg/laser_scan.hpp"
 
 const double YAW_THRESHOLD =
-    0.15;  // only publish the lidar if yaw velocity is below this threshold
+    0.25;  // only publish the lidar if yaw velocity is below this threshold
 // only publish the lidar if yaw velocity is below this threshold
 class LidarPassThrough : public rclcpp::Node
 {

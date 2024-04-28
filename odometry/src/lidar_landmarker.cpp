@@ -216,6 +216,7 @@ class LidarLandmarker : public rclcpp::Node
         //             icp.hasConverged(),
         //             icp.getFitnessScore());
 
+        static size_t addMapCnt = 0;
         if (icp.hasConverged() and icp.getFitnessScore() < 0.5)
         {
             // reject if norm of translation is too large
@@ -228,7 +229,8 @@ class LidarLandmarker : public rclcpp::Node
 
             // only add to cloud if icp is good
 
-            if (icp.getFitnessScore() < 0.2)
+            if (icp.getFitnessScore() < 0.2 and
+                addMapCnt++ < 120)  // stop adding to map after 2 minutes?
             {
                 pcl::transformPointCloud(
                     lastCloud, lastCloud, icp.getFinalTransformation());
