@@ -21,6 +21,8 @@ from geometry_msgs.msg import PointStamped
 
 from robp_interfaces.srv import Talk
 
+import csv
+
 
 cls_dict = {
     0: "none",
@@ -63,6 +65,31 @@ rv_dict = {v: k for k, v in cls_dict.items()}
 
 cls_dict.update(rv_dict)
 
+file_path = "/home/group7/workspace_2_tsv.tsv"
+points_list = []
+with open(file_path, "r") as file:
+    reader = csv.reader(file, delimiter="\t")
+    next(reader)
+    for row in reader:
+        points_list.append([float(row[0]), float(row[1])])
+
+
+def pnPoly(x, y, poly=points_list):
+    n = len(poly)
+    inside = False
+    p1x, p1y = poly[0]
+    for i in range(n + 1):
+        p2x, p2y = poly[i % n]
+        if y > min(p1y, p2y):
+            if y <= max(p1y, p2y):
+                if x <= max(p1x, p2x):
+                    if p1y != p2y:
+                        xinters = (y - p1y) * (p2x - p1x) / (p2y - p1y) + p1x
+                    if p1x == p2x or x <= xinters:
+                        inside = not inside
+        p1x, p1y = p2x, p2y
+    return inside
+
 
 class Stuff:
     id = 0
@@ -87,6 +114,8 @@ class Stuff:
 
         self.super_category = super_cls_dict[cls_dict[category]]
 
+        self.in_workspace = False
+
     def update(self, category, position):
         self.category.append(category)
 
@@ -100,6 +129,8 @@ class Stuff:
         self.super_category = super_cls_dict[cls_dict[max(
             self.category, key=self.category.count)]]
 
+        self.in_workspace = pnPoly(position[0], position[1])
+
         return ret
 
     def residual(self, position):
@@ -109,9 +140,9 @@ class Stuff:
         # get stuff if the category has more than 5 votes
         max_category = max(self.category, key=self.category.count)
         if self.category.count(max_category) > 5:
-            return self.id, max_category, self.super_category, self.gaussian.x
+            return self.id, max_category, self.super_category, self.gaussian.x, self.in_workspace
         else:  # return none if the category has less than 5 votes
-            return self.id, 0, "none", self.gaussian.x
+            return self.id, 0, "none", self.gaussian.x, self.in_workspace
 
 
 class CategoryEvaluation(Node):
@@ -148,7 +179,7 @@ class CategoryEvaluation(Node):
         stuff_list = StuffList()
         for stuff in self.list_of_stuff:
             stuff_msg = StuffMsg()
-            id, category, _, position = stuff.getStuff()
+            id, category, _, position, _ = stuff.getStuff()
             stuff_msg.id = id
             stuff_msg.category = category
 
@@ -163,6 +194,8 @@ class CategoryEvaluation(Node):
             stuff_list.data.append(stuff_msg)
         self.stuff_pub.publish(stuff_list)
 
+    # TODO: only peek and pop within workspace
+    # TODO: pick different stuff on different peek
     def get_stuff_callback(
         self, request: GetStuff.Request, response: GetStuff.Response
     ):
@@ -179,10 +212,10 @@ class CategoryEvaluation(Node):
                     response.success = False
                     response.stuff = Object()
                     return response
-            else:   
+            else:
                 stuff = self.list_of_stuff[-1]
                 self.get_logger().info(f"peeking {stuff.id}")
-            id, category, super_category, position = stuff.getStuff()
+            id, category, super_category, position, _ = stuff.getStuff()
             response.success = True
             response.stuff_id = id
             print(super_category)
@@ -202,7 +235,7 @@ class CategoryEvaluation(Node):
 
     def prune_none(self):
         for stuff in self.list_of_stuff:
-            _, category, _, _ = stuff.getStuff()
+            _, category, _, _, _ = stuff.getStuff()
             if category == 0:
                 self.list_of_stuff.remove(stuff)
                 # delete the marker
@@ -229,7 +262,7 @@ class CategoryEvaluation(Node):
         markers = MarkerArray()
         for i, stuff in enumerate(self.list_of_stuff):
 
-            id, category, _, position = stuff.getStuff()
+            id, category, _, position, in_workspace = stuff.getStuff()
             marker_text = Marker()
             marker_text.header.frame_id = "map"
             marker_text.header.stamp = self.last_stamp
@@ -274,9 +307,14 @@ class CategoryEvaluation(Node):
             marker.scale.y = 0.1
             marker.scale.z = 0.1
             marker.color.a = 1.0
-            marker.color.r = 1.0
-            marker.color.g = 0.0
-            marker.color.b = 0.0
+            if in_workspace:
+                marker.color.r = 0.0
+                marker.color.g = 1.0
+                marker.color.b = 0.0
+            else:
+                marker.color.r = 1.0
+                marker.color.g = 0.0
+                marker.color.b = 0.0
             markers.markers.append(marker)
 
         self.marker_publisher.publish(markers)
