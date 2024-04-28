@@ -578,7 +578,7 @@ class PickObjectBehavior(TemplateBehaviour):
         goal_msg = Arm.Goal()
         goal_msg.command = "pick"
         goal_msg.position = [float(self.blackboard.pick_pos['x']),
-                             float(self.blackboard.pick_pos['y']) + 0.20]  # offset from arm_base to gripper
+                             -float(self.blackboard.pick_pos['y']) + 0.20]  # offset from arm_base to gripper
         goal_msg.angle = -self.blackboard.pick_pos['angle']
 
         self.action_client.wait_for_server()

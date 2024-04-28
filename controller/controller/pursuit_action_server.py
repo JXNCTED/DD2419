@@ -83,7 +83,7 @@ class PursuitActionServer(Node):
                            goal_point.x - self.odom_x)
         while abs(angle - self.odom_yaw) > 0.1:
             twist.linear.x = 0.0
-            twist.angular.z = 0.2 * np.sign(angle - self.odom_yaw)
+            twist.angular.z = 0.4 * np.sign(angle - self.odom_yaw)
             self._publish_vel.publish(twist)
             self.rate.sleep()
 
@@ -95,13 +95,13 @@ class PursuitActionServer(Node):
                 goal_handle.canceled()
                 self.get_logger('Goal canceled')
                 return result
-            if np.hypot(self.waypoints[-1].x - self.odom_x, self.waypoints[-1].y - self.odom_y) < 0.18:
+            if np.hypot(self.waypoints[-1].x - self.odom_x, self.waypoints[-1].y - self.odom_y) < 0.22:
                 self.waypoints = []
                 result.success = True
                 break
             for waypoint in self.waypoints:
                 # TODO: make this a parameter to to set
-                LOOK_AHEAD = 0.2
+                LOOK_AHEAD = 0.15
                 # if current waypoint is beyond LOOK_AHEAD, use it as waypoint
                 # I imagine this could cause a problem if the last waypoint is
                 # beyond 0.1 but within 0.2 could check for this case and move
@@ -149,7 +149,7 @@ class PursuitActionServer(Node):
 
         return result
 
-    def velocity(self, target, lin_v=0.2):
+    def velocity(self, target, lin_v=0.1):
         """
         Calculate the angular velocity from the constant linear velocity,
         the position of the robot and the waypoint using a circle.
