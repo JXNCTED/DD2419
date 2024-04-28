@@ -63,7 +63,7 @@ class PPPP(pt.composites.Selector):
     def __init__(self, name="PPPP"):
         super(PPPP, self).__init__(name=name, memory=True)
         self.add_children([
-            # Peek(),
+            # if peek fails, that means no more objects to pick, which indicates the task is done
             pt.decorators.Inverter(name="inverter", child=Peek()),
             PPP()
         ])
@@ -248,7 +248,6 @@ class ArmToHome(TemplateBehaviour):
     def update(self):
 
         return pt.common.Status.SUCCESS
-
 
 
 class PlanToBoxBehavior(TemplateBehaviour):
