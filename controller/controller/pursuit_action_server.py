@@ -10,7 +10,7 @@ from geometry_msgs.msg import Twist, Pose
 import rclpy.time
 from robp_interfaces.action import Pursuit
 from tf2_ros import Buffer, TransformListener
-from tf2_geometry_msgs import do_transform_pose
+from tf2_geometry_msgs import do_transform_pose, TransformStamped
 
 
 class PursuitActionServer(Node):
@@ -27,6 +27,8 @@ class PursuitActionServer(Node):
         self.tf_buffer = Buffer()
         self.tf_listener = TransformListener(
             self.tf_buffer, self, spin_thread=True)
+        
+        self.odom_to_map_tf = TransformStamped()
 
         self._action_server = ActionServer(
             self,
@@ -202,17 +204,17 @@ class PursuitActionServer(Node):
         try:
             # odom_to_map_tf = self.tf_buffer.lookup_transform(
             #     'odom', 'map', msg.header.stamp, timeout=rclpy.duration.Duration(seconds=1.0))
-            odom_to_map_tf = self.tf_buffer.lookup_transform(
+            self.odom_to_map_tf = self.tf_buffer.lookup_transform(
                 'odom', 'map', rclpy.time.Time().to_msg(), timeout=rclpy.duration.Duration(seconds=1.0))
         except Exception as e:
             self.get_logger().error(
                 f"Failed to lookup transform: {str(e)}")
-            return
-
+            # return
+        
         odom_pose = msg.pose.pose
         map_pose: Pose
         map_pose = do_transform_pose(
-            odom_pose, odom_to_map_tf)
+            odom_pose, self.odom_to_map_tf)
 
         x = map_pose.orientation.x
         y = map_pose.orientation.y

@@ -14,6 +14,7 @@ import numpy as np
 from filterpy.kalman import KalmanFilter
 from threading import Lock
 from rclpy.callback_groups import ReentrantCallbackGroup
+from threading import Lock
 super_cls_dict = {
     0: "none",
     1: "cube",
@@ -68,6 +69,8 @@ class FinetuneObjectActionServer(Node):
         self.rate = self.create_rate(100)
         self.wiggle_rate = self.create_rate(5)
 
+        self.lock = Lock()
+
         cb_group = ReentrantCallbackGroup()
 
         self.coeffs_arm = np.array(
@@ -117,42 +120,63 @@ class FinetuneObjectActionServer(Node):
         result = Finetune.Result()
 
         # use chassis to move the robot to the target object
+        # cnt = 0
+        # TIMEOUT = 10
+        # twist = Twist()
+        # while (cnt < TIMEOUT and rclpy.ok() and self.index is None):
+        #     self.get_logger().warn('No valid measurement, wiggling...')
+        #     cnt += 1
+        #     twist.linear.x = 0.0
+        #     twist.angular.z = 0.2
+        #     self.twist_pub.publish(twist)
+        #     self.wiggle_rate.sleep()
+        #     twist.angular.z = -0.2
+        #     self.twist_pub.publish(twist)
+        #     self.wiggle_rate.sleep()
+        #     twist.angular.z = 0.0
+        #     self.twist_pub.publish(twist)
+
+        # if cnt >= TIMEOUT:
+        #     self.get_logger().warn('No valid measurement. timeout')
+        #     twist.linear.x = 0.0
+        #     twist.angular.z = 0.0
+        #     self.twist_pub.publish(twist)
+        #     result.success = False
+        #     goal_handle.abort()
+        #     return result
+
         cnt = 0
         TIMEOUT = 10
-        twist = Twist()
-        while (cnt < TIMEOUT):
-            # if self.target_super_cls == 'none':
-            #     self.get_logger().warn('No target object id')
-            #     goal_handle.abort()
-            #     return result
-            if self.index is None:
+
+        CENTER = (320, 330)  # center camera coordinate
+        THRES = (80, 60)
+        while rclpy.ok():
+            if (self.index is None):
                 self.get_logger().warn('No valid measurement, wiggling...')
                 cnt += 1
+                self.wiggle_rate.sleep()
+                twist = Twist()
                 twist.linear.x = 0.0
-                twist.angular.z = 0.2
+                twist.angular.z = 0.1
                 self.twist_pub.publish(twist)
                 self.wiggle_rate.sleep()
-                twist.angular.z = -0.2
+                twist.angular.z = -0.1
                 self.twist_pub.publish(twist)
                 self.wiggle_rate.sleep()
                 twist.angular.z = 0.0
                 self.twist_pub.publish(twist)
+                if (cnt > 10):
+                    self.get_logger().warn('No valid measurement. timeout')
+                    twist = Twist()
+                    twist.linear.x = 0.0
+                    twist.angular.z = 0.0
+                    self.twist_pub.publish(twist)
+                    result.success = False
+                    goal_handle.abort()
+                    return result
                 continue
             else:
-                self.get_logger().info("Valid measurement")
-                break
-        else:
-            self.get_logger().warn('No valid measurement')
-            self.index = None
-            goal_handle.abort()
-            self.filter.x = np.array([0, 0, 0, 0])
-            self.filter.predict()
-            return result
-        cnt = 0
-
-        CENTER = (320, 350)  # center camera coordinate
-        THRES = (80, 60)
-        while rclpy.ok():
+                cnt = 0
 
             # if self.get_clock().now().nanoseconds - self.last_valid_measurement_stamp.nanoseconds > 4e9:
             #     self.get_logger().warn('No valid measurement. timeout')
@@ -170,16 +194,16 @@ class FinetuneObjectActionServer(Node):
             display_img = self.img.copy()
             cv2.circle(display_img, (int(self.filter.x[0]), int(self.filter.x[2])),
                        5, (255, 0, 0), -1)
-            if (self.index is None):
-                twist.linear.x = -0.05
-                twist.angular.z = 0.0
-                self.get_logger().warn("Backing up")
-                self.wiggle_rate.sleep()
-                cnt += 1
-            if (cnt > TIMEOUT):
-                goal_handle.abort()
-                result.success = False
-                return result
+            # if (self.index is None):
+            #     twist.linear.x = -0.05
+            #     twist.angular.z = 0.0
+            #     self.get_logger().warn("Backing up")
+            #     self.wiggle_rate.sleep()
+            #     cnt += 1
+            # if (cnt > TIMEOUT):
+            #     goal_handle.abort()
+            #     result.success = False
+            #     return result
 
             cv2.circle(display_img, CENTER, 5, (0, 255, 255), -1)
             cv2.rectangle(display_img, (int(CENTER[0] - THRES[0]), int(CENTER[1] - THRES[1])),
@@ -269,14 +293,13 @@ class FinetuneObjectActionServer(Node):
         cv2.drawContours(img, valid_contours, -1, (0, 255, 0), 2)
         box = cv2.boxPoints(rect)
         box = np.int0(box)
-        # cv2.drawContours(img, [box], 0, (0, 0, 255), 2)
-        # cv2.circle(img, (int(self.filter.x[0]), int(self.filter.x[2])),
-        #            5, (255, 0, 0), -1)
-        # cv2.circle(img, CENTER, 5, (0, 255, 255), -1)
-        # cv2.imshow('image', img)
+        cv2.drawContours(img, [box], 0, (0, 0, 255), 2)
+        cv2.circle(img, (int(self.filter.x[0]), int(self.filter.x[2])),
+                   5, (255, 0, 0), -1)
+        cv2.circle(img, CENTER, 5, (0, 255, 255), -1)
+        cv2.imshow('finetune', img)
 
-        # cv2.waitKey(0)
-        # cv2.destroyAllWindows()
+        cv2.waitKey(0)
         self.get_logger().info(
             f'world_x: {world_x}, world_y: {world_y}, angle: {rect[2]}')
 
