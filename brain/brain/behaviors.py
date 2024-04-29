@@ -139,7 +139,7 @@ class Pick(pt.composites.Sequence):
             PlanToObjectBehavior(),
             FineTuneObjectPositionBehavior(),
             PickObjectBehavior(),
-            Done(),  # placeholder, stuck here
+            # Done(),  # placeholder, stuck here
         ])
 
 
@@ -577,7 +577,7 @@ class PickObjectBehavior(TemplateBehaviour):
         super().initialise()
         goal_msg = Arm.Goal()
         goal_msg.command = "pick"
-        goal_msg.position = [float(self.blackboard.pick_pos['x']),
+        goal_msg.position = [-float(self.blackboard.pick_pos['x']),
                              -float(self.blackboard.pick_pos['y']) + 0.20]  # offset from arm_base to gripper
         goal_msg.angle = -self.blackboard.pick_pos['angle']
 
@@ -634,7 +634,9 @@ class GetBoxPositionBehavior(TemplateBehaviour):
         self.state = pt.common.Status.RUNNING
 
         request = GetBox.Request()
-        request.box_id = super_category_to_box_id[self.blackboard.current_target_object['super_category']]
+        box_string = String()
+        box_string.data = super_category_to_box_id[self.blackboard.current_target_object['super_category']]
+        request.box_id = box_string
 
         self.future = self.client.call_async(request)
         self.future.add_done_callback(self.future_callback)
@@ -802,7 +804,7 @@ class BoxDict(TypedDict):
 
 # TODO: not sure if this is correct
 super_category_to_box_id = {
-    "cube": 1,
-    "sphere": 2,
-    "animal": 3,
+    "cube": '1',
+    "sphere": '2',
+    "animal": '3',
 }
