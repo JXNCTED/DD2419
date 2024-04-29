@@ -11,13 +11,16 @@
 #include <fstream>
 #include <geometry_msgs/msg/detail/pose_stamped__struct.hpp>
 #include <geometry_msgs/msg/detail/transform_stamped__struct.hpp>
+#include <rclcpp/subscription.hpp>
 
 #include "detection_interfaces/msg/stuff_list.hpp"
+#include "detection_interfaces/msg/box_list.hpp"
 #include "geometry_msgs/msg/transform_stamped.hpp"
 #include "mapping/GridMap.hpp"
 #include "mapping/Mapper.hpp"
 #include "mapping_interfaces/srv/path_plan.hpp"
 #include "mapping_interfaces/srv/path_plan_object.hpp"
+#include "mapping_interfaces/srv/path_plan_box.hpp"
 #include "nav_msgs/msg/odometry.hpp"
 #include "rclcpp/qos.hpp"
 #include "rclcpp/rclcpp.hpp"
@@ -66,6 +69,13 @@ class MappingNode : public rclcpp::Node
                 std::bind(&MappingNode::stuffListCallback,
                           this,
                           std::placeholders::_1));
+        box_list_sub_ =
+            this->create_subscription<detection_interfaces::msg::BoxList>(
+                "/box_list",
+                10,
+                std::bind(&MappingNode::stuffBoxCallback,
+                          this,
+                          std::placeholders::_1));
 
         timer_ = this->create_wall_timer(500ms,
                                          [this]()
@@ -87,6 +97,14 @@ class MappingNode : public rclcpp::Node
             this->create_service<mapping_interfaces::srv::PathPlanObject>(
                 "path_plan_object",
                 std::bind(&MappingNode::planPathObject,
+                          this,
+                          std::placeholders::_1,
+                          std::placeholders::_2));
+
+        servicePlanPathBox =
+            this->create_service<mapping_interfaces::srv::PathPlanBox>(
+                "path_plan_box",
+                std::bind(&MappingNode::planPathBox,
                           this,
                           std::placeholders::_1,
                           std::placeholders::_2));
@@ -173,6 +191,43 @@ class MappingNode : public rclcpp::Node
         // response->path.header.stamp    = this->now();
     }
 
+    void planPathBox(
+        const std::shared_ptr<mapping_interfaces::srv::PathPlanBox::Request>
+            request,
+        std::shared_ptr<mapping_interfaces::srv::PathPlanBox::Response>
+            response)
+    {
+        RCLCPP_INFO(rclcpp::get_logger("planPathBox"), "Incoming request");
+
+        geometry_msgs::msg::TransformStamped transform_stamped_map_odom;
+        // geometry_msgs::msg::TransformStamped transform_stamped_odom_map;
+        tf2::TimePoint time_point = tf2::TimePoint(
+            std::chrono::seconds(odom_msg_->header.stamp.sec) +
+            std::chrono::nanoseconds(odom_msg_->header.stamp.nanosec));
+        try
+        {
+            transform_stamped_map_odom = tfBuffer->lookupTransform(
+                "map", "odom", time_point, tf2::durationFromSec(0.8));
+            // transform_stamped_odom_map = tfBuffer->lookupTransform(
+            //     "odom", "map", time_point, tf2::durationFromSec(0.8));
+        }
+        catch (tf2::TransformException &ex)
+        {
+            RCLCPP_ERROR(this->get_logger(), "%s", ex.what());
+        }
+
+        geometry_msgs::msg::Pose start_pose;
+        tf2::doTransform(
+            odom_msg_->pose.pose, start_pose, transform_stamped_map_odom);
+
+        response->path                 = map.planPathBox(start_pose.position.x,
+                                      start_pose.position.y,
+                                      request->target_box_id);
+        response->path.header.frame_id = "map";
+        response->path.header.stamp    = this->now();
+
+    }
+
     void planPathObject(
         const std::shared_ptr<mapping_interfaces::srv::PathPlanObject::Request>
             request,
@@ -202,7 +257,7 @@ class MappingNode : public rclcpp::Node
         tf2::doTransform(
             odom_msg_->pose.pose, start_pose, transform_stamped_map_odom);
 
-        response->path                 = map.planPath(start_pose.position.x,
+        response->path                 = map.planPathBox(start_pose.position.x,
                                       start_pose.position.y,
                                       request->target_object_id);
         response->path.header.frame_id = "map";
@@ -231,6 +286,12 @@ class MappingNode : public rclcpp::Node
         const detection_interfaces::msg::StuffList::SharedPtr msg)
     {
         mapper.updateMapStuffList(msg);
+    }
+
+    void stuffBoxCallback(
+        const detection_interfaces::msg::BoxList::SharedPtr msg)
+    {
+        mapper.updateMapBoxList(msg);
     }
 
     void pointCloudCallback(const sensor_msgs::msg::LaserScan::SharedPtr msg)
@@ -306,6 +367,9 @@ class MappingNode : public rclcpp::Node
         point_cloud_sub_;
     rclcpp::Subscription<detection_interfaces::msg::StuffList>::SharedPtr
         stuff_list_sub_;
+    rclcpp::Subscription<detection_interfaces::msg::BoxList>::SharedPtr
+        box_list_sub_;
+    
 
     rclcpp::Publisher<nav_msgs::msg::OccupancyGrid>::SharedPtr occu_pub_;
     rclcpp::TimerBase::SharedPtr timer_;
@@ -320,6 +384,8 @@ class MappingNode : public rclcpp::Node
         servicePlanPath;
     rclcpp::Service<mapping_interfaces::srv::PathPlanObject>::SharedPtr
         servicePlanPathObject;
+    rclcpp::Service<mapping_interfaces::srv::PathPlanBox>::SharedPtr
+        servicePlanPathBox;
 };
 
 std::shared_ptr<MappingNode> node;

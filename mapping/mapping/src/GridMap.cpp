@@ -336,6 +336,59 @@ auto GridMap::planPath(const double &startX,
     return path;
 }
 
+
+auto GridMap::planPathBox(const double &startX,
+                          const double &startY,
+                          const int &goalBoxId) -> nav_msgs::msg::Path
+{
+    // just wrap the A* basically
+    nav_msgs::msg::Path path;
+    path.header.frame_id = "map";
+    path.header.stamp    = rclcpp::Clock().now();
+
+    int startXOnGrid = cvFloor(startX / gridSize) + this->startX;
+    int startYOnGrid = cvFloor(startY / gridSize) + this->startY;
+    int goalXOnGrid  = boxList[goalBoxId].first;
+    int goalYOnGrid  = boxList[goalBoxId].second;
+
+    RCLCPP_INFO(rclcpp::get_logger("GridMap::planPath (box)"),
+                "received target box %d, goal %d, %d",
+                goalBoxId,
+                goalXOnGrid,
+                goalYOnGrid);
+
+    expandGridBox(goalBoxId);
+
+    std::vector<std::pair<int, int>> pathVec =
+        aStar(startXOnGrid, startYOnGrid, goalXOnGrid, goalYOnGrid);
+
+    if (pathVec.empty())
+    {
+        return path;
+    }
+
+    for (auto &p : pathVec)
+    {
+        geometry_msgs::msg::PoseStamped pose;
+        pose.header.stamp       = rclcpp::Clock().now();
+        pose.header.frame_id    = "map";
+        pose.pose.position.x    = (p.first - this->startX) * gridSize;
+        pose.pose.position.y    = (p.second - this->startY) * gridSize;
+        pose.pose.position.z    = 0;
+        pose.pose.orientation.x = 1;
+        pose.pose.orientation.y = 0;
+        pose.pose.orientation.z = 0;
+        pose.pose.orientation.w = 0;
+
+        path.poses.push_back(pose);
+    }
+
+    path.header.stamp = rclcpp::Clock().now();
+    path.header.frame_id = "map";
+
+    return path;
+}
+
 auto GridMap::planPath(const double &startX,
                        const double &startY,
                        const int &goalObjId) -> nav_msgs::msg::Path
@@ -401,6 +454,23 @@ void GridMap::expandGrid(const float &radius)
     }
     // cv::imshow("expandedGrid", expandedGridCV);
     RCLCPP_INFO(rclcpp::get_logger("GridMap::expandGrid"), "expanded");
+}
+
+void GridMap::expandGridBox(const int& id, const float& radius)
+{
+    expandedGrid.setZero();
+    const int EXPAND_RADIUS = radius / gridSize;
+    const int EXPAND_BOX_RADIUS = 0.2 / gridSize;
+    for (int i = 0; i < sizeX; i++)
+    {
+        for (int j = 0; j < sizeY; j++)
+        {
+            setOnesAroundPoint(i, j, EXPAND_RADIUS);
+        }
+    }
+    const auto& box = boxList.at(id);
+    setZeroAroundPoint(box.first, box.second, EXPAND_BOX_RADIUS);
+    RCLCPP_INFO(rclcpp::get_logger("GridMap::expandGridBox"), "clearing %d", box.first);
 }
 
 void GridMap::expandGrid(const int &id, const float &radius)
@@ -575,6 +645,19 @@ void GridMap::updateStuffList(
         int yOnGrid = cvFloor(stuff.second.second / gridSize) + startY;
 
         this->stuffList[stuff.first] = std::make_pair(xOnGrid, yOnGrid);
+    }
+}
+
+void GridMap::updateBoxList(
+    const std::map<int, std::pair<double, double>> &boxList)
+{
+    this->boxList.clear();
+    for (const auto &box : boxList)
+    {
+        int xOnGrid = cvFloor(box.second.first / gridSize) + startX;
+        int yOnGrid = cvFloor(box.second.second / gridSize) + startY;
+
+        this->boxList[box.first] = std::make_pair(xOnGrid, yOnGrid);
     }
 }
 

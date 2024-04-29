@@ -121,6 +121,11 @@ class GridMap
     auto planPath(const double &startX,
                   const double &startY,
                   const int &goalObjId) -> nav_msgs::msg::Path;
+    
+    auto planPathBox(const double& startX, 
+        const double &startY,
+        const int& goalBoxId
+        ) -> nav_msgs::msg::Path;
 
     /**
      * @brief Set the occupancy for the workspace
@@ -133,6 +138,9 @@ class GridMap
 
     void updateStuffList(
         const std::map<int, std::pair<double, double>> &stuffList);
+    
+    void updateBoxList(
+        const std::map<int, std::pair<double, double>> &boxList);
 
     auto getFrontier() -> std::vector<std::pair<int, int>>;
 
@@ -158,6 +166,8 @@ class GridMap
     void expandGrid(const float &radius = 0.18f);
 
     void expandGrid(const int &id, const float &radius = 0.18f);
+
+    void expandGridBox(const int &id, const float &radius = 0.18f);
     // helper function for expandGrid, set obstacles around a point
     /**
      * @brief Set every points within the radius of the given point as
@@ -191,4 +201,5 @@ class GridMap
     //  a map from stuff id in eval_category to its position in grid map frame,
     //  therefore int
     std::map<int, std::pair<int, int>> stuffList;
+    std::map<int, std::pair<int, int>> boxList;
 };

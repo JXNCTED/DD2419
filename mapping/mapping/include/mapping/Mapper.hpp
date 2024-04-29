@@ -9,6 +9,7 @@
  *
  */
 #pragma once
+#include <detection_interfaces/msg/detail/box_list__struct.hpp>
 #include "detection_interfaces/msg/stuff_list.hpp"
 #include "mapping/GridMap.hpp"
 #include "sensor_msgs/msg/laser_scan.hpp"
@@ -60,6 +61,9 @@ class Mapper
 
     void updateMapStuffList(
         const detection_interfaces::msg::StuffList::SharedPtr stuffListPtr);
+    
+    void updateMapBoxList(
+        const detection_interfaces::msg::BoxList::SharedPtr boxListPtr);
 
    private:
     /**
@@ -75,4 +79,5 @@ class Mapper
     // pointer to the grid map, initialized in the constructor
     GridMap *map;
     std::map<int, std::pair<double, double>> stuffList;
+    std::map<int, std::pair<double, double>> boxList;
 };
