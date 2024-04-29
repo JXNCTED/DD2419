@@ -175,6 +175,7 @@ class DisplayMarkers(Node):
 
     def visualize_box(self):
         marker_array = VisMarkerArray()
+        box_list = BoxList()
         for box in self.boxes.values():
             position = box.get_position()
             if position[0] == 0 and position[1] == 0:
@@ -203,6 +204,7 @@ class DisplayMarkers(Node):
             marker.color.g = 1.0
             marker.color.b = 0.0
             marker_array.markers.append(marker)
+            box_list.boxes.append(marker.pose)
 
             text_marker = VisMarker()
             text_marker.header.frame_id = "map"
