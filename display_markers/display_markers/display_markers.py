@@ -15,6 +15,7 @@ import tf2_geometry_msgs
 
 from aruco_msgs.msg import MarkerArray, Marker
 from geometry_msgs.msg import TransformStamped
+from detection_interfaces.msg import BoxList
 from typing import Final
 
 from visualization_msgs.msg import MarkerArray as VisMarkerArray
@@ -78,8 +79,13 @@ class DisplayMarkers(Node):
         self.srv = self.create_service(
             GetBox, 'get_box', self.get_box_callback)
 
+        self.box_list_pub = self.create_publisher(
+            BoxList, '/box_list', 10)
+
+        self.viz_box_timer = self.create_timer(0.1, self.visualize_box)
+
     def get_box_callback(self, request: GetBox.Request, response: GetBox.Response):
-        box_id = int(request.box_id)
+        box_id = int(request.box_id.data)
         if box_id not in self.ACCEPTABLE_MARKER_IDS:
             response.success = False
             response.box_pose.header.frame_id = "map"
@@ -165,7 +171,7 @@ class DisplayMarkers(Node):
             except Exception as e:
                 self.get_logger().warn(str(e))
         # display the box in rviz
-        self.visualize_box()
+        # self.visualize_box()
 
     def visualize_box(self):
         marker_array = VisMarkerArray()
