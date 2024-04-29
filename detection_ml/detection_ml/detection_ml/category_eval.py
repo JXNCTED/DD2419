@@ -104,7 +104,7 @@ class Stuff:
         self.gaussian.R = np.eye(2) * R
         self.gaussian.Q = np.eye(2) * Q
 
-        self.valid = False
+        self.valid = 0
 
         self.id = Stuff.id
         Stuff.id += 1
@@ -122,16 +122,16 @@ class Stuff:
         self.gaussian.predict()
         self.gaussian.update(position)
 
-        ret = not self.valid and len(self.category) > 5
+        # ret = not self.valid and len(self.category) > 5
 
-        self.valid = len(self.category) > 5
+        self.valid += 1
 
         self.super_category = super_cls_dict[cls_dict[max(
             self.category, key=self.category.count)]]
 
         self.in_workspace = pnPoly(position[0], position[1])
 
-        return ret
+        return self.valid == 5
 
     def residual(self, position):
         return norm(self.gaussian.residual_of(position))
