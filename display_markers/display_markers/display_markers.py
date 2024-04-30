@@ -104,18 +104,31 @@ class DisplayMarkers(Node):
 
         box = self.boxes[box_id]
         position = box.get_position()
-        response.success = True
-        response.box_pose.header.frame_id = "map"
-        response.box_pose.header.stamp = self.get_clock().now().to_msg()
-        response.box_pose.pose.position.x = position[0]
-        response.box_pose.pose.position.y = position[1]
-        response.box_pose.pose.position.z = 0
-        q = quaternion_from_euler(0, 0, position[2])
-        response.box_pose.pose.orientation.x = q[0]
-        response.box_pose.pose.orientation.y = q[1]
-        response.box_pose.pose.orientation.z = q[2]
-        response.box_pose.pose.orientation.w = q[3]
-        return response
+        if position[0] == 0 and position[1] == 0:
+            response.success = False
+            response.box_pose.header.frame_id = "map"
+            response.box_pose.header.stamp = self.get_clock().now().to_msg()
+            response.box_pose.pose.position.x = 0
+            response.box_pose.pose.position.y = 0
+            response.box_pose.pose.position.z = 0
+            response.box_pose.pose.orientation.x = 0
+            response.box_pose.pose.orientation.y = 0
+            response.box_pose.pose.orientation.z = 0
+            response.box_pose.pose.orientation.w = 1
+            return response
+        else:
+            response.success = True
+            response.box_pose.header.frame_id = "map"
+            response.box_pose.header.stamp = self.get_clock().now().to_msg()
+            response.box_pose.pose.position.x = position[0]
+            response.box_pose.pose.position.y = position[1]
+            response.box_pose.pose.position.z = 0
+            q = quaternion_from_euler(0, 0, position[2])
+            response.box_pose.pose.orientation.x = q[0]
+            response.box_pose.pose.orientation.y = q[1]
+            response.box_pose.pose.orientation.z = q[2]
+            response.box_pose.pose.orientation.w = q[3]
+            return response
 
     def aruco_callback(self, msg: MarkerArray):
 
@@ -228,6 +241,7 @@ class DisplayMarkers(Node):
             text_marker.color.b = 1.0
             marker_array.markers.append(text_marker)
         self.viz_publisher.publish(marker_array)
+        self.box_list_pub.publish(box_list)
 
 
 def main():
