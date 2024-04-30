@@ -194,7 +194,6 @@ class CategoryEvaluation(Node):
             stuff_list.data.append(stuff_msg)
         self.stuff_pub.publish(stuff_list)
 
-    # TODO: only peek and pop within workspace
     # TODO: pick different stuff on different peek
     def get_stuff_callback(
         self, request: GetStuff.Request, response: GetStuff.Response
@@ -213,12 +212,20 @@ class CategoryEvaluation(Node):
                     response.stuff = Object()
                     return response
             else:
-                stuff = self.list_of_stuff[-1]
+                stuff = None
+                # only peek the stuff in workspace
+                for s in self.list_of_stuff:
+                    if s.in_workspace:
+                        stuff = s
+                        break
+                if stuff is None:
+                    response.success = False
+                    response.stuff = Object()
+                    return response
                 self.get_logger().info(f"peeking {stuff.id}")
             id, category, super_category, position, _ = stuff.getStuff()
             response.success = True
             response.stuff_id = id
-            print(super_category)
             response.super_category = super_category
             response.stuff.position.header.frame_id = "map"
             response.stuff.position.header.stamp = self.last_stamp
