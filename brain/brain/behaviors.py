@@ -23,7 +23,6 @@ from typing import TypedDict
 from detection_interfaces.srv import GetStuff, GetBox
 from geometry_msgs.msg import Point, Pose
 
-import tf2_geometry_msgs
 
 from mapping_interfaces.srv import PathPlanObject, PathPlan
 
@@ -64,8 +63,8 @@ class PPPP(pt.composites.Selector):
         super(PPPP, self).__init__(name=name, memory=True)
         self.add_children([
             # if peek fails, that means no more objects to pick, which indicates the task is done
-            pt.decorators.Inverter(name="inverter", child=Peek()),
-            PPP()
+            pt.decorators.Inverter(name="invert_peek", child=Peek()),
+            PPP(),
         ])
 
 
@@ -79,7 +78,7 @@ class PPP(pt.composites.Sequence):
         self.add_children([
             Pick(),
             Place(),
-            Pop(),
+            pt.decorators.Inverter(name="invert_pop", child=Pop()),
         ])
 
 

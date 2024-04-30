@@ -17,7 +17,9 @@ class BehaviorTree(ptr.trees.BehaviourTree):
         self.root.add_children([
             Initializer(),
             Exploration(),
-            PPPP(),
+            # PPPP(),
+            pt.decorators.FailureIsRunning(
+                name="PPPP failure is running", child=PPPP()),
         ])
 
         super(BehaviorTree, self).__init__(
