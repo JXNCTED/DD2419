@@ -13,14 +13,14 @@
 #include <geometry_msgs/msg/detail/transform_stamped__struct.hpp>
 #include <rclcpp/subscription.hpp>
 
-#include "detection_interfaces/msg/stuff_list.hpp"
 #include "detection_interfaces/msg/box_list.hpp"
+#include "detection_interfaces/msg/stuff_list.hpp"
 #include "geometry_msgs/msg/transform_stamped.hpp"
 #include "mapping/GridMap.hpp"
 #include "mapping/Mapper.hpp"
 #include "mapping_interfaces/srv/path_plan.hpp"
-#include "mapping_interfaces/srv/path_plan_object.hpp"
 #include "mapping_interfaces/srv/path_plan_box.hpp"
+#include "mapping_interfaces/srv/path_plan_object.hpp"
 #include "nav_msgs/msg/odometry.hpp"
 #include "rclcpp/qos.hpp"
 #include "rclcpp/rclcpp.hpp"
@@ -169,26 +169,6 @@ class MappingNode : public rclcpp::Node
                                       request->goal_pose.pose.position.y);
         response->path.header.frame_id = "map";
         response->path.header.stamp    = this->now();
-
-        // if want to transform to odom frame
-        // auto path = map.planPath(start_pose.position.x,
-        //                          start_pose.position.y,
-        //                          request->goal_pose.pose.position.x,
-        //                          request->goal_pose.pose.position.y);
-        // // transform to odom frame
-        // for (auto &p : path.poses)
-        // {
-        //     // transform  to odom frame
-        //     geometry_msgs::msg::PoseStamped pose_odom;
-        //     tf2::doTransform(
-        //         p.pose, pose_odom.pose, transform_stamped_odom_map);
-        //     pose_odom.header.frame_id = "odom";
-        //     pose_odom.header.stamp    = this->now();
-        //     response->path.poses.push_back(pose_odom);
-        // }
-
-        // response->path.header.frame_id = "odom";
-        // response->path.header.stamp    = this->now();
     }
 
     void planPathBox(
@@ -221,11 +201,10 @@ class MappingNode : public rclcpp::Node
             odom_msg_->pose.pose, start_pose, transform_stamped_map_odom);
 
         response->path                 = map.planPathBox(start_pose.position.x,
-                                      start_pose.position.y,
-                                      request->target_box_id);
+                                         start_pose.position.y,
+                                         request->target_box_id);
         response->path.header.frame_id = "map";
         response->path.header.stamp    = this->now();
-
     }
 
     void planPathObject(
@@ -257,29 +236,11 @@ class MappingNode : public rclcpp::Node
         tf2::doTransform(
             odom_msg_->pose.pose, start_pose, transform_stamped_map_odom);
 
-        response->path                 = map.planPathBox(start_pose.position.x,
+        response->path                 = map.planPath(start_pose.position.x,
                                       start_pose.position.y,
                                       request->target_object_id);
         response->path.header.frame_id = "map";
         response->path.header.stamp    = this->now();
-
-        // auto path = map.planPath(start_pose.position.x,
-        //                          start_pose.position.y,
-        //                          request->target_object_id);
-        // // transform to odom frame
-        // for (auto &p : path.poses)
-        // {
-        //     // transform  to odom frame
-        //     geometry_msgs::msg::PoseStamped pose_odom;
-        //     tf2::doTransform(
-        //         p.pose, pose_odom.pose, transform_stamped_odom_map);
-        //     pose_odom.header.frame_id = "odom";
-        //     pose_odom.header.stamp    = this->now();
-        //     response->path.poses.push_back(pose_odom);
-        // }
-
-        // response->path.header.frame_id = "odom";
-        // response->path.header.stamp    = this->now();
     }
 
     void stuffListCallback(
@@ -369,7 +330,6 @@ class MappingNode : public rclcpp::Node
         stuff_list_sub_;
     rclcpp::Subscription<detection_interfaces::msg::BoxList>::SharedPtr
         box_list_sub_;
-    
 
     rclcpp::Publisher<nav_msgs::msg::OccupancyGrid>::SharedPtr occu_pub_;
     rclcpp::TimerBase::SharedPtr timer_;
