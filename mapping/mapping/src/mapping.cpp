@@ -9,8 +9,6 @@
  *
  */
 #include <fstream>
-#include <geometry_msgs/msg/detail/pose_stamped__struct.hpp>
-#include <geometry_msgs/msg/detail/transform_stamped__struct.hpp>
 #include <rclcpp/subscription.hpp>
 
 #include "detection_interfaces/msg/box_list.hpp"
