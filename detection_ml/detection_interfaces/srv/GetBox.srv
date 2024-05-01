@@ -1,5 +1,5 @@
 # id of the box 1, 2, or 3
 std_msgs/String box_id
 ---
-std_msgs/Bool success
+bool success
 geometry_msgs/PoseStamped box_pose

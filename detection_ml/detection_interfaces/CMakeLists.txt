@@ -16,6 +16,7 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   "msg/Object.msg"
   "msg/Stuff.msg"
   "msg/StuffList.msg"
+  "msg/Box.msg"
   "msg/BoxList.msg"
   "srv/GetStuff.srv"
   "srv/GetBox.srv"

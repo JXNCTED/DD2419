@@ -1,0 +1,3 @@
+int32 aruco_id
+string super_category
+geometry_msgs/Pose pose

@@ -16,6 +16,7 @@ import tf2_geometry_msgs
 from aruco_msgs.msg import MarkerArray, Marker
 from geometry_msgs.msg import TransformStamped
 from detection_interfaces.msg import BoxList
+from detection_interfaces.msg import Box as BoxMsg
 from typing import Final
 
 from visualization_msgs.msg import MarkerArray as VisMarkerArray
@@ -85,6 +86,7 @@ class DisplayMarkers(Node):
         self.viz_box_timer = self.create_timer(0.1, self.visualize_box)
 
     def get_box_callback(self, request: GetBox.Request, response: GetBox.Response):
+        self.get_logger().info(f"Received request for box ID {request.box_id}")
         box_id = int(request.box_id.data)
         if box_id not in self.ACCEPTABLE_MARKER_IDS:
             response.success = False
@@ -105,16 +107,18 @@ class DisplayMarkers(Node):
         box = self.boxes[box_id]
         position = box.get_position()
         if position[0] == 0 and position[1] == 0:
+            self.get_logger().warn(
+                f"Box ID {box_id} not found in the map")
             response.success = False
             response.box_pose.header.frame_id = "map"
             response.box_pose.header.stamp = self.get_clock().now().to_msg()
-            response.box_pose.pose.position.x = 0
-            response.box_pose.pose.position.y = 0
-            response.box_pose.pose.position.z = 0
-            response.box_pose.pose.orientation.x = 0
-            response.box_pose.pose.orientation.y = 0
-            response.box_pose.pose.orientation.z = 0
-            response.box_pose.pose.orientation.w = 1
+            response.box_pose.pose.position.x = 0.0
+            response.box_pose.pose.position.y = 0.0
+            response.box_pose.pose.position.z = 0.0
+            response.box_pose.pose.orientation.x = 0.0
+            response.box_pose.pose.orientation.y = 0.0
+            response.box_pose.pose.orientation.z = 0.0
+            response.box_pose.pose.orientation.w = 1.0
             return response
         else:
             response.success = True
@@ -122,12 +126,14 @@ class DisplayMarkers(Node):
             response.box_pose.header.stamp = self.get_clock().now().to_msg()
             response.box_pose.pose.position.x = position[0]
             response.box_pose.pose.position.y = position[1]
-            response.box_pose.pose.position.z = 0
+            response.box_pose.pose.position.z = 0.0
             q = quaternion_from_euler(0, 0, position[2])
             response.box_pose.pose.orientation.x = q[0]
             response.box_pose.pose.orientation.y = q[1]
             response.box_pose.pose.orientation.z = q[2]
             response.box_pose.pose.orientation.w = q[3]
+            self.get_logger().info(
+                f"Box ID {box_id} found at position {position}")
             return response
 
     def aruco_callback(self, msg: MarkerArray):
@@ -217,8 +223,11 @@ class DisplayMarkers(Node):
             marker.color.g = 1.0
             marker.color.b = 0.0
             marker_array.markers.append(marker)
-            box_list.boxes.append(marker.pose)
-
+            # box_list.boxes.append(marker.pose)
+            box_msg = BoxMsg()
+            box_msg.aruco_id = box.aruco_id
+            box_msg.pose = marker.pose
+            box_list.boxes.append(box_msg)
             text_marker = VisMarker()
             text_marker.header.frame_id = "map"
             text_marker.header.stamp = self.get_clock().now().to_msg()

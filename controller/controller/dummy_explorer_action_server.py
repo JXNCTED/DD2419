@@ -7,8 +7,17 @@ from rclpy.action import ActionServer, GoalResponse, CancelResponse
 from robp_interfaces.action import Explore
 from rclpy.callback_groups import ReentrantCallbackGroup
 from geometry_msgs.msg import Twist
+from detection_interfaces.msg import BoxList, StuffList, Stuff, Box
 
 from sensor_msgs.msg import Joy
+
+
+super_category_to_box_id = {
+    "none": 0,
+    "cube": 1,
+    "sphere": 2,
+    "animal": 3,
+}
 
 
 class DummyExplorer(Node):
@@ -18,6 +27,9 @@ class DummyExplorer(Node):
         self.done = False
         self.v = 0.0
         self.w = 0.0
+
+        self.stuff_set = set()
+        self.box_set = set()
 
         self.cb_group = ReentrantCallbackGroup()
         self._action_server = ActionServer(
@@ -40,6 +52,23 @@ class DummyExplorer(Node):
             callback_group=self.cb_group
 
         )
+
+        self._stuff_sub = self.create_subscription(
+            StuffList,
+            '/category_eval/stuff_list',
+            self.stuff_callback,
+            10,
+            callback_group=self.cb_group
+        )
+
+        self._box_sub = self.create_subscription(
+            BoxList,
+            '/box_list',
+            self.box_callback,
+            10,
+            callback_group=self.cb_group
+        )
+
 
         self.twist_pub_ = self.create_publisher(
             Twist,
@@ -95,8 +124,25 @@ class DummyExplorer(Node):
         self.v = 0.5 * msg.axes[1]
         self.w = 1.0 * msg.axes[3]
 
-        if msg.buttons[1] == 1:
-            self.done = True
+    def stuff_callback(self, msg: StuffList):
+        stuff: Stuff
+        if len(msg.data) == 0:
+            return
+        for stuff in msg.data:
+            if stuff is not None:
+                self.stuff_set.add(super_category_to_box_id[stuff.super_category])
+        
+        # if the intersection is not empty, then we are done with the exploration
+        self.done = len(self.stuff_set.intersection(self.box_set)) > 0
+    
+    def box_callback(self, msg: BoxList):
+        if len(msg.boxes) == 0:
+            return
+        box: Box
+        for box in msg.boxes:
+            if box is not None:
+                self.box_set.add(box.aruco_id)
+
 
 
 def main():
@@ -113,3 +159,5 @@ def main():
 
 if __name__ == '__main__':
     main()
+
+

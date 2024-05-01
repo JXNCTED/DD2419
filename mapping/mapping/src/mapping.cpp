@@ -9,6 +9,8 @@
  *
  */
 #include <fstream>
+#include <nav_msgs/msg/detail/path__struct.hpp>
+#include <rclcpp/publisher.hpp>
 #include <rclcpp/subscription.hpp>
 
 #include "detection_interfaces/msg/box_list.hpp"
@@ -20,6 +22,7 @@
 #include "mapping_interfaces/srv/path_plan_box.hpp"
 #include "mapping_interfaces/srv/path_plan_object.hpp"
 #include "nav_msgs/msg/odometry.hpp"
+#include "nav_msgs/msg/path.hpp"
 #include "rclcpp/qos.hpp"
 #include "rclcpp/rclcpp.hpp"
 #include "tf2/LinearMath/Matrix3x3.h"
@@ -59,6 +62,9 @@ class MappingNode : public rclcpp::Node
 
         occu_pub_ = this->create_publisher<nav_msgs::msg::OccupancyGrid>(
             "/occupancy", 10);
+
+        plan_path_pub_ =
+            this->create_publisher<nav_msgs::msg::Path>("/plan_path", 10);
 
         stuff_list_sub_ =
             this->create_subscription<detection_interfaces::msg::StuffList>(
@@ -167,6 +173,8 @@ class MappingNode : public rclcpp::Node
                                       request->goal_pose.pose.position.y);
         response->path.header.frame_id = "map";
         response->path.header.stamp    = this->now();
+
+        plan_path_pub_->publish(response->path);
     }
 
     void planPathBox(
@@ -203,6 +211,8 @@ class MappingNode : public rclcpp::Node
                                          request->target_box_id);
         response->path.header.frame_id = "map";
         response->path.header.stamp    = this->now();
+
+        plan_path_pub_->publish(response->path);
     }
 
     void planPathObject(
@@ -239,6 +249,8 @@ class MappingNode : public rclcpp::Node
                                       request->target_object_id);
         response->path.header.frame_id = "map";
         response->path.header.stamp    = this->now();
+
+        plan_path_pub_->publish(response->path);
     }
 
     void stuffListCallback(
@@ -330,6 +342,7 @@ class MappingNode : public rclcpp::Node
         box_list_sub_;
 
     rclcpp::Publisher<nav_msgs::msg::OccupancyGrid>::SharedPtr occu_pub_;
+    rclcpp::Publisher<nav_msgs::msg::Path>::SharedPtr plan_path_pub_;
     rclcpp::TimerBase::SharedPtr timer_;
 
     geometry_msgs::msg::TransformStamped transform_stamped_map_lidar;

@@ -182,6 +182,7 @@ class CategoryEvaluation(Node):
             id, category, _, position, _ = stuff.getStuff()
             stuff_msg.id = id
             stuff_msg.category = category
+            stuff_msg.super_category = super_cls_dict[cls_dict[category]]
 
             stuff_point = PointStamped()
             stuff_point.header.frame_id = "map"

@@ -24,7 +24,7 @@ from detection_interfaces.srv import GetStuff, GetBox
 from geometry_msgs.msg import Point, Pose
 
 
-from mapping_interfaces.srv import PathPlanObject, PathPlan
+from mapping_interfaces.srv import PathPlanObject, PathPlan, PathPlanBox
 
 
 class TemplateBehaviour(pt.behaviour.Behaviour, Node):
@@ -53,7 +53,17 @@ class Exploration(pt.composites.Sequence):
         super(Exploration, self).__init__(name=name, memory=True)
         self.add_children([
             ExplorePointBehavior(),
-            # CheckExplorationCompletion(),
+        ])
+
+class MainSequence(pt.composites.Sequence):
+    def __init__(self, name="MainSequence"):
+        super(MainSequence, self).__init__(name=name, memory=True)
+        self.add_children([
+            Exploration(),
+            pt.decorators.FailureIsRunning(
+                name="PPPP failure is running", child=PPPP()),
+            CheckExplorationCompletion(),
+            Done(),
         ])
 
 
@@ -118,7 +128,7 @@ class Pop(TemplateBehaviour):
         current_obj['category'] = str(response.stuff.category)
         current_obj['super_category'] = response.super_category
         current_obj['position'] = response.stuff.position.point
-        self.blackboard.current_target_object = current_obj
+        # self.blackboard.current_target_object = current_obj
         self.future = None
         self.state = pt.common.Status.SUCCESS
 
@@ -257,7 +267,7 @@ class PlanToBoxBehavior(TemplateBehaviour):
                          read_access=True, write_access=False)
 
         self.path_plan_client = self.create_client(
-            PathPlan, 'path_plan')
+            PathPlanBox, 'path_plan_box')
 
         self.pursuit_client = ActionClient(self, Pursuit, 'pursuit')
 
@@ -268,9 +278,10 @@ class PlanToBoxBehavior(TemplateBehaviour):
 
         self.path_plan_client.wait_for_service()
         self.pursuit_client.wait_for_server()
-        path_plan_request = PathPlan.Request()
-        # path_plan_request.target_box_id = self.blackboard.current_target_box['box_id']
-        path_plan_request.goal_pose = self.blackboard.current_target_box['pose']
+
+        path_plan_request = PathPlanBox.Request()
+        path_plan_request.target_box_id = int(self.blackboard.current_target_box['box_id'])
+
 
         self.path_plan_future = self.path_plan_client.call_async(
             path_plan_request)
@@ -566,7 +577,9 @@ class PickObjectBehavior(TemplateBehaviour):
     def __init__(self, name="PickObjectBehavior"):
         super().__init__(name=name)
 
-        self.register_bb('pick_pos', read_access=True, write_access=True)
+        self.register_bb('pick_pos', read_access=True, write_access=False)
+        self.register_bb('current_target_object',
+                            read_access=True, write_access=False)
 
         self.action_client = ActionClient(self, Arm, 'arm')
 
@@ -578,7 +591,11 @@ class PickObjectBehavior(TemplateBehaviour):
         goal_msg.command = "pick"
         goal_msg.position = [-float(self.blackboard.pick_pos['x']),
                              -float(self.blackboard.pick_pos['y']) + 0.20]  # offset from arm_base to gripper
-        goal_msg.angle = -self.blackboard.pick_pos['angle']
+        # goal_msg.angle = -self.blackboard.pick_pos['angle']
+        if self.blackboard.current_target_object['super_category'] == 'cube' or self.blackboard.current_target_object['super_category'] == 'sphere':
+            goal_msg.angle = 0.0
+        else:
+            goal_msg.angle = -self.blackboard.pick_pos['angle']
 
         self.action_client.wait_for_server()
 
@@ -646,12 +663,11 @@ class GetBoxPositionBehavior(TemplateBehaviour):
             self.state = pt.common.Status.FAILURE
             return
 
-        self.state = pt.common.Status.SUCCESS
-        self.future = None
-
         current_box = BoxDict()
         current_box['box_id'] = super_category_to_box_id[self.blackboard.current_target_object['super_category']]
         current_box['pose'] = response.box_pose.pose
+
+        self.blackboard.current_target_box = current_box
 
         self.future = None
         self.state = pt.common.Status.SUCCESS
@@ -766,7 +782,7 @@ class CheckExplorationCompletion(pt.behaviour.Behaviour):
 
     def update(self):
         # place holder for the check exploration completion behavior
-        return pt.common.Status.SUCCESS
+        return pt.common.Status.RUNNING
 
 
 class Done(pt.behaviour.Behaviour):
@@ -801,7 +817,6 @@ class BoxDict(TypedDict):
     pose: Pose
 
 
-# TODO: not sure if this is correct
 super_category_to_box_id = {
     "cube": '1',
     "sphere": '2',

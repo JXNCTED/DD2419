@@ -1,4 +1,5 @@
 #include <mutex>
+#include <rclcpp/logging.hpp>
 #include <vector>
 
 #include "geometry_msgs/msg/transform_stamped.hpp"
@@ -57,7 +58,7 @@ class LidarLandmarker : public rclcpp::Node
     {
         if (lastScanStamp.nanoseconds() == 0)
         {
-            return;
+            RCLCPP_WARN(this->get_logger(), "No scan received yet");
         }
         geometry_msgs::msg::TransformStamped tf_map_odom;
         // tf_map_odom.header.stamp            = lastScanStamp;

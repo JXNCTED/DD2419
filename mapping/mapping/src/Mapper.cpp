@@ -219,8 +219,6 @@ void Mapper::updateGrid(const Eigen::Vector2d coor,
     map->setGridLogBelief(coor(0), coor(1), logBelief, type);
 }
 
-
-
 void Mapper::updateMapStuffList(
     const detection_interfaces::msg::StuffList::SharedPtr stuffListPtr)
 {
@@ -237,10 +235,10 @@ void Mapper::updateMapBoxList(
     const detection_interfaces::msg::BoxList::SharedPtr boxListPtr)
 {
     std::map<int, std::pair<double, double>> boxList;
-    for (size_t i = 0; i < boxListPtr->boxes.size(); i++)
+    for (const auto &box : boxListPtr->boxes)
     {
-        const auto &box = boxListPtr->boxes[i];
-        boxList[i] = std::make_pair(box.position.x, box.position.y);
+        boxList[box.aruco_id] =
+            std::make_pair(box.pose.position.x, box.pose.position.y);
     }
     map->updateBoxList(boxList);
 }

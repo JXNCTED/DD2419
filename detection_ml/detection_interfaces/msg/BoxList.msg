@@ -1,1 +1,1 @@
-geometry_msgs/Pose[] boxes
+Box[] boxes

@@ -85,6 +85,9 @@ class FinetuneObjectActionServer(Node):
 
         self.twist_pub = self.create_publisher(
             Twist, '/motor_controller/twist', 10, callback_group=cb_group)
+        
+        self.fine_tune_pub = self.create_publisher(
+            Image, '/finetune', 10)
 
         self.action_server_ = ActionServer(
             self, Finetune, 'finetune', execute_callback=self.execute_callback, goal_callback=self.goal_callback, cancel_callback=self.cancel_callback, callback_group=cb_group
@@ -148,7 +151,7 @@ class FinetuneObjectActionServer(Node):
         cnt = 0
         TIMEOUT = 10
 
-        CENTER = (320, 330)  # center camera coordinate
+        CENTER = (320, 300)  # center camera coordinate
         THRES = (80, 60)
         while rclpy.ok():
             if (self.index is None):
@@ -208,8 +211,9 @@ class FinetuneObjectActionServer(Node):
             cv2.circle(display_img, CENTER, 5, (0, 255, 255), -1)
             cv2.rectangle(display_img, (int(CENTER[0] - THRES[0]), int(CENTER[1] - THRES[1])),
                           (int(CENTER[0] + THRES[0]), int(CENTER[1] + THRES[1])), (0, 255, 255), 2)
-            cv2.imshow('finetune', display_img)
-            cv2.waitKey(1)
+            # cv2.imshow('finetune', display_img)
+            # cv2.waitKey(1)
+            self.fine_tune_pub.publish(CvBridge().cv2_to_imgmsg(display_img))
 
             if abs(self.filter.x[0] - CENTER[0]) < THRES[0] and abs(self.filter.x[2] - CENTER[1]) < THRES[1]:
                 self.get_logger().info(
@@ -220,7 +224,7 @@ class FinetuneObjectActionServer(Node):
 
             twist = Twist()
             KP = -0.6
-            LINEAR_VEL = 0.08
+            LINEAR_VEL = 0.05
 
             if (0 < theta_normalized <= 0.25):
                 twist.linear.x = -LINEAR_VEL
@@ -253,7 +257,8 @@ class FinetuneObjectActionServer(Node):
                        5, (255, 0, 0), -1)
             cv2.rectangle(display_img, (int(CENTER[0] - THRES[0]), int(CENTER[1] - THRES[1])),
                           (int(CENTER[0] + THRES[0]), int(CENTER[1] + THRES[1])), (0, 255, 255), 2)
-            cv2.imshow('finetune', display_img)
+            # cv2.imshow('finetune', display_img)
+            self.fine_tune_pub.publish(CvBridge().cv2_to_imgmsg(display_img))
             twist.linear.x = 0.0
             twist.angular.z = 0.0
             self.twist_pub.publish(twist)
@@ -297,9 +302,11 @@ class FinetuneObjectActionServer(Node):
         cv2.circle(img, (int(self.filter.x[0]), int(self.filter.x[2])),
                    5, (255, 0, 0), -1)
         cv2.circle(img, CENTER, 5, (0, 255, 255), -1)
-        cv2.imshow('finetune', img)
-
-        cv2.waitKey(0)
+        # cv2.imshow('finetune', img)
+        cv2.rectangle(display_img, (int(CENTER[0] - THRES[0]), int(CENTER[1] - THRES[1])),
+                          (int(CENTER[0] + THRES[0]), int(CENTER[1] + THRES[1])), (0, 255, 255), 2)
+        self.fine_tune_pub.publish(CvBridge().cv2_to_imgmsg(img))
+        # cv2.waitKey(0)
         self.get_logger().info(
             f'world_x: {world_x}, world_y: {world_y}, angle: {rect[2]}')
 

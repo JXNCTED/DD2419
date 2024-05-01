@@ -224,6 +224,9 @@ class ArmController(Node):
             self.current_command = goal_request.command
             self.object_angle = goal_request.angle
             self.object_position = goal_request.position
+            if (self.object_position[1] < 0.14):
+                self.get_logger().warn("increase y position")
+                self.object_position[1] = 0.14
             self.get_logger().info(
                 f'Accepting {goal_request.command, goal_request.angle, goal_request.position}')
             return rclpy.action.GoalResponse.ACCEPT

@@ -101,6 +101,9 @@ class DetectionMLNode(Node):
         # see the detection_interfaces package for the message definition
         self.detected_obj_pub = self.create_publisher(
             DetectedObj, "/detection_ml/detected_obj", 10)
+        
+        self.detection_img_pub = self.create_publisher(
+            Image, "/detection_ml/detection_img", 10)
 
         # publish the bounding box just as an multiarray
 
@@ -199,8 +202,9 @@ class DetectionMLNode(Node):
         status_str = f"FPS: {fps}"
         cv2.putText(show_img, status_str, (10, 30),
                     cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
-        cv2.imshow("detections", show_img)
-        cv2.waitKey(1)
+        self.detection_img_pub.publish(bridge.cv2_to_imgmsg(show_img))
+        # cv2.imshow("detections", show_img)
+        # cv2.waitKey(1)
 
     def arm_timeout_callback(self):
         self.get_logger().warn("Arm camera does not receive image for 5 seconds")
@@ -255,8 +259,9 @@ class DetectionMLNode(Node):
         status_str = f"FPS: {fps}"
         cv2.putText(show_img, status_str, (10, 30),
                     cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
-        cv2.imshow("detections", show_img)
-        cv2.waitKey(1)
+        self.detection_img_pub.publish(bridge.cv2_to_imgmsg(show_img))
+        # cv2.imshow("detections", show_img)
+        # cv2.waitKey(1)
 
 
 def non_max_suppression(boxes, threshold):

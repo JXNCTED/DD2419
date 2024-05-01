@@ -85,12 +85,15 @@ class PursuitActionServer(Node):
         twist = Twist()
         # align the robot with start point
         angle = np.arctan2(goal_point.y - self.odom_y,
-                           goal_point.x - self.odom_x)
+                           goal_point.x - self.odom_x) 
         while abs(angle - self.odom_yaw) > 0.1:
+            self.rate.sleep()
+            angle = np.arctan2(goal_point.y - self.odom_y,
+                                 goal_point.x - self.odom_x) 
+            # self.get_logger().info(f"Aligning with start point: {angle - self.odom_yaw}")
             twist.linear.x = 0.0
             twist.angular.z = 0.4 * np.sign(angle - self.odom_yaw)
             self._publish_vel.publish(twist)
-            self.rate.sleep()
 
         while (len(self.waypoints) > 0):
             if goal_handle.is_cancel_requested:
@@ -100,13 +103,13 @@ class PursuitActionServer(Node):
                 goal_handle.canceled()
                 self.get_logger('Goal canceled')
                 return result
-            if np.hypot(self.waypoints[-1].x - self.odom_x, self.waypoints[-1].y - self.odom_y) < 0.22:
+            if np.hypot(self.waypoints[-1].x - self.odom_x, self.waypoints[-1].y - self.odom_y) < 0.19:
                 self.waypoints = []
                 result.success = True
                 break
             for waypoint in self.waypoints:
                 # TODO: make this a parameter to to set
-                LOOK_AHEAD = 0.15
+                LOOK_AHEAD = 0.13
                 # if current waypoint is beyond LOOK_AHEAD, use it as waypoint
                 # I imagine this could cause a problem if the last waypoint is
                 # beyond 0.1 but within 0.2 could check for this case and move
@@ -128,15 +131,17 @@ class PursuitActionServer(Node):
         twist = Twist()
 
         # align with the goal point
+        self.rate.sleep()
         angle = np.arctan2(goal_point.y - self.odom_y,
-                           goal_point.x - self.odom_x)
+                           goal_point.x - self.odom_x) 
         while abs(angle - self.odom_yaw) > 0.1:
+            # self.get_logger().info(f"Aligning with goal point: {angle - self.odom_yaw}")
+            self.rate.sleep()
             angle = np.arctan2(goal_point.y - self.odom_y,
                                goal_point.x - self.odom_x)
             twist.linear.x = 0.0
             twist.angular.z = 0.4 * np.sign(angle - self.odom_yaw)
             self._publish_vel.publish(twist)
-            self.rate.sleep()
 
         # stop the robot
         for _ in range(10):
