@@ -330,12 +330,11 @@ auto GridMap::planPath(const double &startX,
 
         path.poses.push_back(pose);
     }
-    path.header.stamp = rclcpp::Clock().now();
+    path.header.stamp    = rclcpp::Clock().now();
     path.header.frame_id = "map";
 
     return path;
 }
-
 
 auto GridMap::planPathBox(const double &startX,
                           const double &startY,
@@ -383,7 +382,7 @@ auto GridMap::planPathBox(const double &startX,
         path.poses.push_back(pose);
     }
 
-    path.header.stamp = rclcpp::Clock().now();
+    path.header.stamp    = rclcpp::Clock().now();
     path.header.frame_id = "map";
 
     return path;
@@ -435,7 +434,7 @@ auto GridMap::planPath(const double &startX,
         path.poses.push_back(pose);
     }
 
-    path.header.stamp = rclcpp::Clock().now();
+    path.header.stamp    = rclcpp::Clock().now();
     path.header.frame_id = "map";
 
     return path;
@@ -456,10 +455,10 @@ void GridMap::expandGrid(const float &radius)
     RCLCPP_INFO(rclcpp::get_logger("GridMap::expandGrid"), "expanded");
 }
 
-void GridMap::expandGridBox(const int& id, const float& radius)
+void GridMap::expandGridBox(const int &id, const float &radius)
 {
     expandedGrid.setZero();
-    const int EXPAND_RADIUS = radius / gridSize;
+    const int EXPAND_RADIUS     = radius / gridSize;
     const int EXPAND_BOX_RADIUS = 0.2 / gridSize;
     for (int i = 0; i < sizeX; i++)
     {
@@ -468,9 +467,10 @@ void GridMap::expandGridBox(const int& id, const float& radius)
             setOnesAroundPoint(i, j, EXPAND_RADIUS);
         }
     }
-    const auto& box = boxList.at(id);
+    const auto &box = boxList.at(id);
     setZeroAroundPoint(box.first, box.second, EXPAND_BOX_RADIUS);
-    RCLCPP_INFO(rclcpp::get_logger("GridMap::expandGridBox"), "clearing %d", box.first);
+    RCLCPP_INFO(
+        rclcpp::get_logger("GridMap::expandGridBox"), "clearing %d", box.first);
 }
 
 void GridMap::expandGrid(const int &id, const float &radius)
@@ -493,14 +493,16 @@ void GridMap::expandGrid(const int &id, const float &radius)
             setZeroAroundPoint(
                 stuff.second.first, stuff.second.second, EXPAND_OBJ_RADIUS);
             RCLCPP_INFO(rclcpp::get_logger("GridMap::expandGrid"),
-                        "clearing %d", stuff.first);
+                        "clearing %d",
+                        stuff.first);
         }
         else
         {
             setOnesAroundPoint(
                 stuff.second.first, stuff.second.second, EXPAND_OBJ_RADIUS);
             RCLCPP_INFO(rclcpp::get_logger("GridMap::expandGrid"),
-                        "expanding %d", stuff.first);
+                        "expanding %d",
+                        stuff.first);
         }
     }
 
@@ -661,18 +663,21 @@ void GridMap::updateBoxList(
     }
 }
 
-auto GridMap::getFrontier() -> std::vector<std::pair<int, int>>
+auto GridMap::getFrontier() -> std::vector<std::pair<double, double>>
 {
     // get the frontier for frontier-based exploration
-    std::vector<std::pair<int, int>> frontier;
+    std::vector<std::pair<double, double>> frontier;
 
+    // for every grid point
     for (int i = 0; i < sizeX; i++)
     {
         for (int j = 0; j < sizeY; j++)
         {
-            if (gridBeliefRGBD(i, j) == 0.5)  // unknown
+            // for every unknown grid
+            if (gridBeliefRGBD(i, j) != 0.5)  // known
             {
                 bool isFrontier = false;
+                // for every neighbor
                 for (int k = -1; k <= 1; k++)
                 {
                     for (int l = -1; l <= 1; l++)
@@ -683,7 +688,7 @@ auto GridMap::getFrontier() -> std::vector<std::pair<int, int>>
                         {
                             continue;
                         }
-                        if (expandedGrid(x, y) == 1)
+                        if (gridBeliefRGBD(x, y) == 0.5)  // unknown
                         {
                             isFrontier = true;
                             break;
@@ -696,7 +701,9 @@ auto GridMap::getFrontier() -> std::vector<std::pair<int, int>>
                 }
                 if (isFrontier)
                 {
-                    frontier.emplace_back(i, j);
+                    // i and j in map coordinate
+                    frontier.emplace_back((i - startX) * gridSize,
+                                          (j - startY) * gridSize);
                 }
             }
         }

@@ -59,8 +59,8 @@ class ArmController(Node):
         self.arm_pos_sub_ = self.create_subscription(
             JointState, '/servo_pos_publisher', self.arm_pos_callback, 10)
 
-        self.rate = self.create_rate(1/3)
-        self.rate_place = self.create_rate(1/4)  # sleep
+        self.rate = self.create_rate(1/2)
+        self.rate_place = self.create_rate(1/2)  # sleep
 
         self.action_server_ = ActionServer(
             self, Arm, 'arm', execute_callback=self.execute_callback, goal_callback=self.goal_callback, cancel_callback=self.cancel_callback
@@ -71,12 +71,21 @@ class ArmController(Node):
 
     def execute_callback(self, goal_handle) -> Arm.Result:
         self.get_logger().info(f'executing {self.current_command}')
+        self.rate.sleep()
 
         if self.current_command == "pick":
-            # open the gripper
-            self.command_list[0] = 0
-            for i in range(5):
-                self.command_list[i+1] = -1
+            # open and raise the arm
+
+            x, y = self.object_position
+            angle = self.object_angle
+
+            self.command_list[0] = 2000
+            self.command_list[1] = 12000 - \
+                int((angle - atan2(x, y)) * 18000 / pi)
+            self.command_list[2] = 2000
+            self.command_list[3] = 16000
+            self.command_list[4] = 16000
+            self.command_list[5] = 12000
 
             msg = Int16MultiArray()
             msg.data.extend(self.command_list)
@@ -88,8 +97,6 @@ class ArmController(Node):
 
             z = 0.02  # compensate for the gravity
 
-            x, y = self.object_position
-            angle = self.object_angle
             q1, q2, q3 = j12_ik(sqrt(x**2 + y**2), z)
             if q1 == 0 and q2 == 0 and q3 == 0:
                 self.get_logger().warn("Invalid position")
@@ -200,8 +207,12 @@ class ArmController(Node):
 
             self.rate_place.sleep()
 
-            for i in range(6):
-                self.command_list[i] = 12000
+            self.command_list[0] = 3000
+            self.command_list[1] = 12000
+            self.command_list[2] = 2000
+            self.command_list[3] = 16000
+            self.command_list[4] = 8000
+            self.command_list[5] = 12000
 
             msg = Int16MultiArray()
             msg.data.extend(self.command_list)
@@ -224,9 +235,9 @@ class ArmController(Node):
             self.current_command = goal_request.command
             self.object_angle = goal_request.angle
             self.object_position = goal_request.position
-            if (self.object_position[1] < 0.14):
+            if (self.object_position[1] < 0.148):
                 self.get_logger().warn("increase y position")
-                self.object_position[1] = 0.14
+                self.object_position[1] = 0.148
             self.get_logger().info(
                 f'Accepting {goal_request.command, goal_request.angle, goal_request.position}')
             return rclpy.action.GoalResponse.ACCEPT

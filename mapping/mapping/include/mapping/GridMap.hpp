@@ -121,11 +121,10 @@ class GridMap
     auto planPath(const double &startX,
                   const double &startY,
                   const int &goalObjId) -> nav_msgs::msg::Path;
-    
-    auto planPathBox(const double& startX, 
-        const double &startY,
-        const int& goalBoxId
-        ) -> nav_msgs::msg::Path;
+
+    auto planPathBox(const double &startX,
+                     const double &startY,
+                     const int &goalBoxId) -> nav_msgs::msg::Path;
 
     /**
      * @brief Set the occupancy for the workspace
@@ -138,11 +137,10 @@ class GridMap
 
     void updateStuffList(
         const std::map<int, std::pair<double, double>> &stuffList);
-    
-    void updateBoxList(
-        const std::map<int, std::pair<double, double>> &boxList);
 
-    auto getFrontier() -> std::vector<std::pair<int, int>>;
+    void updateBoxList(const std::map<int, std::pair<double, double>> &boxList);
+
+    auto getFrontier() -> std::vector<std::pair<double, double>>;
 
    private:
     // a star algorithm
@@ -163,11 +161,11 @@ class GridMap
      * @brief Expand the grid to c-space
      *
      */
-    void expandGrid(const float &radius = 0.18f);
+    void expandGrid(const float &radius = 0.21f);
 
-    void expandGrid(const int &id, const float &radius = 0.18f);
+    void expandGrid(const int &id, const float &radius = 0.21f);
 
-    void expandGridBox(const int &id, const float &radius = 0.18f);
+    void expandGridBox(const int &id, const float &radius = 0.21f);
     // helper function for expandGrid, set obstacles around a point
     /**
      * @brief Set every points within the radius of the given point as

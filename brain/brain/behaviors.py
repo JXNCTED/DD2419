@@ -237,6 +237,7 @@ class ArmToHome(TemplateBehaviour):
         self.HOME_POSITION[2] = 2000
         self.HOME_POSITION[3] = 16000
         self.HOME_POSITION[4] = 8000
+        self.HOME_POSITION[5] = 12000
 
     def initialise(self):
         self.publisher_.publish(Int16MultiArray(data=self.HOME_POSITION))

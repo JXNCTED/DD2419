@@ -109,7 +109,7 @@ class PursuitActionServer(Node):
                 break
             for waypoint in self.waypoints:
                 # TODO: make this a parameter to to set
-                LOOK_AHEAD = 0.13
+                LOOK_AHEAD = 0.10
                 # if current waypoint is beyond LOOK_AHEAD, use it as waypoint
                 # I imagine this could cause a problem if the last waypoint is
                 # beyond 0.1 but within 0.2 could check for this case and move
@@ -210,7 +210,7 @@ class PursuitActionServer(Node):
             # odom_to_map_tf = self.tf_buffer.lookup_transform(
             #     'odom', 'map', msg.header.stamp, timeout=rclpy.duration.Duration(seconds=1.0))
             self.odom_to_map_tf = self.tf_buffer.lookup_transform(
-                'odom', 'map', rclpy.time.Time().to_msg(), timeout=rclpy.duration.Duration(seconds=1.0))
+                'map', 'odom', rclpy.time.Time().to_msg(), timeout=rclpy.duration.Duration(seconds=1.0))
         except Exception as e:
             self.get_logger().error(
                 f"Failed to lookup transform: {str(e)}")

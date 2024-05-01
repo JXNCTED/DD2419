@@ -9,7 +9,7 @@
  *
  */
 #include <fstream>
-#include <nav_msgs/msg/detail/path__struct.hpp>
+#include <memory>
 #include <rclcpp/publisher.hpp>
 #include <rclcpp/subscription.hpp>
 
@@ -18,6 +18,7 @@
 #include "geometry_msgs/msg/transform_stamped.hpp"
 #include "mapping/GridMap.hpp"
 #include "mapping/Mapper.hpp"
+#include "mapping_interfaces/srv/get_frontier.hpp"
 #include "mapping_interfaces/srv/path_plan.hpp"
 #include "mapping_interfaces/srv/path_plan_box.hpp"
 #include "mapping_interfaces/srv/path_plan_object.hpp"
@@ -113,6 +114,14 @@ class MappingNode : public rclcpp::Node
                           std::placeholders::_1,
                           std::placeholders::_2));
 
+        serviceGetFrontier =
+            this->create_service<mapping_interfaces::srv::GetFrontier>(
+                "get_frontier",
+                std::bind(&MappingNode::getFrontier,
+                          this,
+                          std::placeholders::_1,
+                          std::placeholders::_2));
+
         // read from /home/group7/workspace_2_tsv.tsv
         std::ifstream file("/home/group7/workspace_2_tsv.tsv", std::ios::in);
         std::string line;
@@ -177,6 +186,30 @@ class MappingNode : public rclcpp::Node
         plan_path_pub_->publish(response->path);
     }
 
+    void getFrontier(
+        const std::shared_ptr<mapping_interfaces::srv::GetFrontier::Request>
+            request,
+        std::shared_ptr<mapping_interfaces::srv::GetFrontier::Response>
+            response)
+    {
+        (void)request;
+        RCLCPP_INFO(rclcpp::get_logger("getFrontier"), "Incoming request");
+
+        auto frontier = map.getFrontier();
+        // pick a random frontier
+        if (frontier.size() > 0)
+        {
+            auto randomIndex  = rand() % frontier.size();
+            response->success = true;
+            response->p.x     = frontier[randomIndex].first;
+            response->p.y     = frontier[randomIndex].second;
+            response->p.z     = 0.0;
+        }
+        else
+        {
+            response->success = false;
+        }
+    }
     void planPathBox(
         const std::shared_ptr<mapping_interfaces::srv::PathPlanBox::Request>
             request,
@@ -357,6 +390,8 @@ class MappingNode : public rclcpp::Node
         servicePlanPathObject;
     rclcpp::Service<mapping_interfaces::srv::PathPlanBox>::SharedPtr
         servicePlanPathBox;
+    rclcpp::Service<mapping_interfaces::srv::GetFrontier>::SharedPtr
+        serviceGetFrontier;
 };
 
 std::shared_ptr<MappingNode> node;
