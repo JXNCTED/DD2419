@@ -4,7 +4,7 @@ from rclpy.node import Node
 
 from std_msgs.msg import String
 
-from detection_interfaces.msg import DetectedObj, Object, StuffList
+from detection_interfaces.msg import DetectedObj, Object, StuffList, Box, BoxList
 from detection_interfaces.msg import Stuff as StuffMsg
 from collections import deque
 from filterpy.kalman import KalmanFilter
@@ -61,6 +61,13 @@ super_cls_dict = {
 
 }
 
+super_category_aruco_dict = {
+    "cube": 1,
+    "sphere": 2,
+    "animal": 3,
+    "none": 0
+}
+
 rv_dict = {v: k for k, v in cls_dict.items()}
 
 cls_dict.update(rv_dict)
@@ -93,9 +100,10 @@ def pnPoly(x, y, poly=points_list):
 
 class Stuff:
     id = 0
+    QUEUE_SIZE = 30
 
     def __init__(self, position, category, P=100, R=1, Q=0.1):
-        self.category = deque(maxlen=10)
+        self.category = deque(maxlen=self.QUEUE_SIZE)
         self.gaussian = KalmanFilter(dim_x=2, dim_z=2)
         self.gaussian.x = np.array([position[0], position[1]])
         self.gaussian.F = np.eye(2)
@@ -122,7 +130,6 @@ class Stuff:
         self.gaussian.predict()
         self.gaussian.update(position)
 
-        # ret = not self.valid and len(self.category) > 5
 
         self.valid += 1
 
@@ -131,7 +138,7 @@ class Stuff:
 
         self.in_workspace = pnPoly(position[0], position[1])
 
-        return self.valid == 5
+        return self.valid == self.QUEUE_SIZE // 2
 
     def residual(self, position):
         return norm(self.gaussian.residual_of(position))
@@ -139,7 +146,7 @@ class Stuff:
     def getStuff(self):
         # get stuff if the category has more than 5 votes
         max_category = max(self.category, key=self.category.count)
-        if self.category.count(max_category) > 5:
+        if self.category.count(max_category) > self.QUEUE_SIZE // 2:
             return self.id, max_category, self.super_category, self.gaussian.x, self.in_workspace
         else:  # return none if the category has less than 5 votes
             return self.id, 0, "none", self.gaussian.x, self.in_workspace
@@ -154,6 +161,8 @@ class CategoryEvaluation(Node):
         self.tf_buffer = Buffer()
         self.tf_listener = TransformListener(self.tf_buffer, self)
         self.last_stamp = None
+
+        self.good_super_categories = set()
 
         self.create_subscription(
             DetectedObj, "/detection_ml/detected_obj", self.obj_callback, 10
@@ -170,9 +179,12 @@ class CategoryEvaluation(Node):
 
         self.stuff_pub = self.create_publisher(
             StuffList, "/category_eval/stuff_list", 10)
+        
+        self.box_list_sub = self.create_subscription(
+            BoxList, "/box_list", self.box_list_callback, 10)
 
-        self.stuff_pub_timer = self.create_timer(1.0, self.publish_stuff_point)
-
+        self.stuff_pub_timer = self.create_timer(0.01, self.publish_stuff_point)
+        
         self.talk_client = self.create_client(Talk, "talk")
 
     def publish_stuff_point(self):
@@ -196,6 +208,7 @@ class CategoryEvaluation(Node):
         self.stuff_pub.publish(stuff_list)
 
     # TODO: pick different stuff on different peek
+
     def get_stuff_callback(
         self, request: GetStuff.Request, response: GetStuff.Response
     ):
@@ -216,7 +229,7 @@ class CategoryEvaluation(Node):
                 stuff = None
                 # only peek the stuff in workspace
                 for s in self.list_of_stuff:
-                    if s.in_workspace:
+                    if s.in_workspace and s.valid >= Stuff.QUEUE_SIZE // 2 and super_category_aruco_dict[s.super_category] in self.good_super_categories:
                         stuff = s
                         break
                 if stuff is None:
@@ -240,6 +253,22 @@ class CategoryEvaluation(Node):
             response.success = False
             response.stuff = Object()
             return response
+    
+    def box_list_callback(self, msg: BoxList):
+        box_set = set()
+        box: Box
+        for box in msg.boxes:
+            box_set.add(box.aruco_id)
+        
+        stuff_set = set()
+        for stuff in self.list_of_stuff:
+            stuff_set.add(super_category_aruco_dict[stuff.super_category])
+        
+        # intersection of the two sets
+        self.good_super_categories = box_set.intersection(stuff_set)
+
+
+                
 
     def prune_none(self):
         for stuff in self.list_of_stuff:
