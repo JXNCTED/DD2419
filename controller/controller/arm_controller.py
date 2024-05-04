@@ -95,7 +95,7 @@ class ArmController(Node):
 
             self.rate.sleep()
 
-            z = 0.02  # compensate for the gravity
+            z = 0.01  # compensate for the gravity
 
             q1, q2, q3 = j12_ik(sqrt(x**2 + y**2), z)
             if q1 == 0 and q2 == 0 and q3 == 0:
@@ -158,9 +158,12 @@ class ArmController(Node):
             self.rate_place.sleep()
             z = 0.05
 
-            x, y = 0, 0.15
+            # x, y = 0, 0.15
+            x, y = self.object_position
             angle = 0
+            # q1, q2, q3 = j12_ik(sqrt(x**2 + y**2), z)
             q1, q2, q3 = j12_ik(sqrt(x**2 + y**2), z)
+
             if q1 == 0 and q2 == 0 and q3 == 0:
                 self.get_logger().warn("Invalid position")
                 result = Arm.Result()
@@ -169,8 +172,7 @@ class ArmController(Node):
                 return result
 
             self.command_list[0] = -1
-            self.command_list[1] = 12000 - \
-                int((angle - atan2(x, y)) * 18000 / pi)
+            self.command_list[1] = 12000
             self.command_list[2] = 12000 - \
                 int(q3 * 18000 / pi) + int(pi / 2 * 18000 / pi)
             self.command_list[3] = 12000 + int(q2 * 18000 / pi)
@@ -209,9 +211,9 @@ class ArmController(Node):
 
             self.command_list[0] = 3000
             self.command_list[1] = 12000
-            self.command_list[2] = 2000
-            self.command_list[3] = 16000
-            self.command_list[4] = 8000
+            self.command_list[2] = 12000
+            self.command_list[3] = 12000
+            self.command_list[4] = 12000
             self.command_list[5] = 12000
 
             msg = Int16MultiArray()
@@ -243,6 +245,8 @@ class ArmController(Node):
             return rclpy.action.GoalResponse.ACCEPT
         elif goal_request.command == "place":
             self.current_command = goal_request.command
+            self.object_angle = goal_request.angle
+            self.object_position = goal_request.position
             self.get_logger().info(f'Accepting {goal_request.command}')
             return rclpy.action.GoalResponse.ACCEPT
         else:

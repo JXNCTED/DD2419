@@ -27,7 +27,7 @@ class PursuitActionServer(Node):
         self.tf_buffer = Buffer()
         self.tf_listener = TransformListener(
             self.tf_buffer, self, spin_thread=True)
-        
+
         self.odom_to_map_tf = TransformStamped()
 
         self._action_server = ActionServer(
@@ -85,11 +85,11 @@ class PursuitActionServer(Node):
         twist = Twist()
         # align the robot with start point
         angle = np.arctan2(goal_point.y - self.odom_y,
-                           goal_point.x - self.odom_x) 
+                           goal_point.x - self.odom_x)
         while abs(angle - self.odom_yaw) > 0.1:
             self.rate.sleep()
             angle = np.arctan2(goal_point.y - self.odom_y,
-                                 goal_point.x - self.odom_x) 
+                               goal_point.x - self.odom_x)
             # self.get_logger().info(f"Aligning with start point: {angle - self.odom_yaw}")
             twist.linear.x = 0.0
             twist.angular.z = 0.4 * np.sign(angle - self.odom_yaw)
@@ -132,10 +132,16 @@ class PursuitActionServer(Node):
 
         # align with the goal point
         self.rate.sleep()
+
         angle = np.arctan2(goal_point.y - self.odom_y,
-                           goal_point.x - self.odom_x) 
-        while abs(angle - self.odom_yaw) > 0.1:
-            # self.get_logger().info(f"Aligning with goal point: {angle - self.odom_yaw}")
+                           goal_point.x - self.odom_x)
+
+
+        self.get_logger().info(
+            f"Aligning with goal point: {angle - self.odom_yaw}")
+        while abs(angle - self.odom_yaw) > 0.05:
+            self.get_logger().info(
+                f"Aligning with goal point: {angle - self.odom_yaw}")
             self.rate.sleep()
             angle = np.arctan2(goal_point.y - self.odom_y,
                                goal_point.x - self.odom_x)
@@ -199,7 +205,7 @@ class PursuitActionServer(Node):
         #     2.0 * (w * z + x * y), w * w + x * x - y * y - z * z)
 
         # for simplicty, let the arm center for approach center
-        CAMERA_ARM_OFFSET = 0.04
+        CAMERA_ARM_OFFSET = 0.055
 
         # self.odom_x = msg.pose.pose.position.x + \
         #     np.cos(self.odom_yaw) * CAMERA_ARM_OFFSET
@@ -215,7 +221,7 @@ class PursuitActionServer(Node):
             self.get_logger().error(
                 f"Failed to lookup transform: {str(e)}")
             # return
-        
+
         odom_pose = msg.pose.pose
         map_pose: Pose
         map_pose = do_transform_pose(
@@ -228,10 +234,10 @@ class PursuitActionServer(Node):
         self.odom_yaw = np.arctan2(
             2.0 * (w * z + x * y), w * w + x * x - y * y - z * z)
 
-        self.odom_x = map_pose.position.x + \
-            np.cos(self.odom_yaw) * CAMERA_ARM_OFFSET
-        self.odom_y = map_pose.position.y + \
-            np.sin(self.odom_yaw) * CAMERA_ARM_OFFSET
+        self.odom_x = map_pose.position.x - CAMERA_ARM_OFFSET * \
+            np.sin(self.odom_yaw)
+        self.odom_y = map_pose.position.y - CAMERA_ARM_OFFSET * \
+            np.cos(self.odom_yaw)
 
 
 def main(args=None):
