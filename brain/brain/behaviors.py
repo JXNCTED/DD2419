@@ -22,6 +22,7 @@ from action_msgs.msg import GoalStatus
 from typing import TypedDict
 from detection_interfaces.srv import GetStuff, GetBox
 from geometry_msgs.msg import Point, Pose
+from tf2_ros import Buffer, TransformListener
 
 
 from mapping_interfaces.srv import PathPlanObject, PathPlan, PathPlanBox
@@ -55,6 +56,7 @@ class Exploration(pt.composites.Sequence):
             ExplorePointBehavior(),
         ])
 
+
 class MainSequence(pt.composites.Sequence):
     def __init__(self, name="MainSequence"):
         super(MainSequence, self).__init__(name=name, memory=True)
@@ -63,7 +65,6 @@ class MainSequence(pt.composites.Sequence):
             pt.decorators.FailureIsRunning(
                 name="PPPP failure is running", child=PPPP()),
             CheckExplorationCompletion(),
-            Done(),
         ])
 
 
@@ -88,6 +89,8 @@ class PPP(pt.composites.Sequence):
         self.add_children([
             Pick(),
             Place(),
+            # Pop(),
+            # Done(),
             pt.decorators.Inverter(name="invert_pop", child=Pop()),
         ])
 
@@ -180,7 +183,8 @@ class Peek(TemplateBehaviour):
 
     def initialise(self) -> None:
         super().initialise()
-        self.client.wait_for_service()
+        while(not self.client.wait_for_service(timeout_sec=1)):
+            self.get_logger().info("service not available, waiting...")
         self.state = pt.common.Status.RUNNING
 
         request = GetStuff.Request()
@@ -211,6 +215,11 @@ class Peek(TemplateBehaviour):
     def update(self):
         rclpy.spin_once(self, timeout_sec=0.01)
         return self.state
+    
+    def terminate(self, new_status: Status) -> None:
+        self.future = None
+        self.state = pt.common.Status.RUNNING
+        return super().terminate(new_status)
 
 
 class ArmToHome(TemplateBehaviour):
@@ -257,7 +266,6 @@ class ArmToHome(TemplateBehaviour):
         self.position_reached = diff < 2000
 
     def update(self):
-
         return pt.common.Status.SUCCESS
 
 
@@ -281,8 +289,8 @@ class PlanToBoxBehavior(TemplateBehaviour):
         self.pursuit_client.wait_for_server()
 
         path_plan_request = PathPlanBox.Request()
-        path_plan_request.target_box_id = int(self.blackboard.current_target_box['box_id'])
-
+        path_plan_request.target_box_id = int(
+            self.blackboard.current_target_box['box_id'])
 
         self.path_plan_future = self.path_plan_client.call_async(
             path_plan_request)
@@ -352,9 +360,6 @@ class PlanToObjectBehavior(TemplateBehaviour):
 
         self.state = pt.common.Status.RUNNING
 
-        # self.tf_buffer = Buffer()
-        # self.tf_listener = TransformListener(
-        #     self.tf_buffer, self, spin_thread=False)
 
     def initialise(self) -> None:
         super().initialise()
@@ -408,6 +413,7 @@ class PlanToObjectBehavior(TemplateBehaviour):
         if not goal_handle.accepted:
             self.state = pt.common.Status.FAILURE
             return
+        self.pursuit_future = None
 
         self.get_result_future = goal_handle.get_result_async()
         self.get_result_future.add_done_callback(self.get_result_callback)
@@ -423,13 +429,19 @@ class PlanToObjectBehavior(TemplateBehaviour):
         else:
             self.state = pt.common.Status.FAILURE
 
-        self.pursuit_future = None
         self.get_result_future = None
 
     def update(self):
         # global current_object
         rclpy.spin_once(self, timeout_sec=0.01)
         return self.state
+    
+    def terminate(self, new_status: Status) -> None:
+        self.path_plan_future = None
+        self.pursuit_future = None
+        self.get_result_future = None
+        self.state = pt.common.Status.RUNNING
+        return super().terminate(new_status)
 
 
 class ApproachObjectBehavior(TemplateBehaviour):
@@ -580,7 +592,7 @@ class PickObjectBehavior(TemplateBehaviour):
 
         self.register_bb('pick_pos', read_access=True, write_access=False)
         self.register_bb('current_target_object',
-                            read_access=True, write_access=False)
+                         read_access=True, write_access=False)
 
         self.action_client = ActionClient(self, Arm, 'arm')
 
@@ -596,7 +608,7 @@ class PickObjectBehavior(TemplateBehaviour):
         if self.blackboard.current_target_object['super_category'] == 'cube' or self.blackboard.current_target_object['super_category'] == 'sphere':
             goal_msg.angle = 0.0
         else:
-            goal_msg.angle = -self.blackboard.pick_pos['angle']
+            goal_msg.angle = self.blackboard.pick_pos['angle']
 
         self.action_client.wait_for_server()
 
@@ -683,20 +695,41 @@ class PlaceBehavior(TemplateBehaviour):
         super(PlaceBehavior, self).__init__(name=name)
 
         self.action_client = ActionClient(self, Arm, 'arm')
-
         self.state = pt.common.Status.RUNNING
+
+        self.HOME_POSITION = [12000 for i in range(12)]
+        for i in range(6):
+            self.HOME_POSITION[i+6] = 800
+        self.HOME_POSITION[0] = 3000
+        self.HOME_POSITION[1] = 12000
+        self.HOME_POSITION[2] = 2000
+        self.HOME_POSITION[3] = 16000
+        self.HOME_POSITION[4] = 8000
+        self.HOME_POSITION[5] = 12000
+
+        self.arm_pub = self.create_publisher(
+            Int16MultiArray, '/multi_servo_cmd_sub', 10)
+
+
+        self.tf_buffer = Buffer()
+        self.tf_listener = TransformListener(
+            self.tf_buffer, self, spin_thread=True)
+        
+        self.sleep_rate = self.create_rate(1/3)
 
     def initialise(self) -> None:
         super().initialise()
         goal_msg = Arm.Goal()
         goal_msg.command = "place"
-        goal_msg.position = [0.0, 0.0]
+        goal_msg.position = [0.0, 0.15]
         goal_msg.angle = 0.0
 
         self.action_client.wait_for_server()
 
         self.send_goal_future = self.action_client.send_goal_async(goal_msg)
         self.send_goal_future.add_done_callback(self.goal_response_callback)
+
+        
 
     def goal_response_callback(self, future):
         goal_handle = future.result()
@@ -722,6 +755,16 @@ class PlaceBehavior(TemplateBehaviour):
     def update(self):
         rclpy.spin_once(self, timeout_sec=0.01)
         return self.state
+    
+    def terminate(self, new_status: Status) -> None:
+        self.send_goal_future = None
+        self.get_result_future = None
+        self.state = pt.common.Status.RUNNING
+
+        self.sleep_rate.sleep()
+        self.arm_pub.publish(Int16MultiArray(data=self.HOME_POSITION))
+
+        return super().terminate(new_status)
 
 
 class CheckTaskCompletion(pt.behaviour.Behaviour):
