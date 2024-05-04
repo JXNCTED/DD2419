@@ -139,7 +139,7 @@ class PursuitActionServer(Node):
 
         self.get_logger().info(
             f"Aligning with goal point: {angle - self.odom_yaw}")
-        while abs(angle - self.odom_yaw) > 0.05:
+        while abs(angle - self.odom_yaw) > 0.08: # 5 degress?
             self.get_logger().info(
                 f"Aligning with goal point: {angle - self.odom_yaw}")
             self.rate.sleep()
@@ -206,15 +206,7 @@ class PursuitActionServer(Node):
 
         # for simplicty, let the arm center for approach center
         CAMERA_ARM_OFFSET = 0.055
-
-        # self.odom_x = msg.pose.pose.position.x + \
-        #     np.cos(self.odom_yaw) * CAMERA_ARM_OFFSET
-        # self.odom_y = msg.pose.pose.position.y + \
-        #     np.sin(self.odom_yaw) * CAMERA_ARM_OFFSET
-
         try:
-            # odom_to_map_tf = self.tf_buffer.lookup_transform(
-            #     'odom', 'map', msg.header.stamp, timeout=rclpy.duration.Duration(seconds=1.0))
             self.odom_to_map_tf = self.tf_buffer.lookup_transform(
                 'map', 'odom', rclpy.time.Time().to_msg(), timeout=rclpy.duration.Duration(seconds=1.0))
         except Exception as e:
@@ -234,10 +226,8 @@ class PursuitActionServer(Node):
         self.odom_yaw = np.arctan2(
             2.0 * (w * z + x * y), w * w + x * x - y * y - z * z)
 
-        self.odom_x = map_pose.position.x - CAMERA_ARM_OFFSET * \
-            np.sin(self.odom_yaw)
-        self.odom_y = map_pose.position.y - CAMERA_ARM_OFFSET * \
-            np.cos(self.odom_yaw)
+        self.odom_x = map_pose.position.x + CAMERA_ARM_OFFSET * np.sin(self.odom_yaw)
+        self.odom_y = map_pose.position.y + CAMERA_ARM_OFFSET * np.cos(self.odom_yaw)
 
 
 def main(args=None):

@@ -230,7 +230,7 @@ class LidarLandmarker : public rclcpp::Node
 
             // only add to cloud if icp is good
 
-            if (icp.getFitnessScore() < 0.2 and
+            if (icp.getFitnessScore() < 0.1 and
                 addMapCnt++ < 120)  // stop adding to map after 2 minutes?
             {
                 pcl::transformPointCloud(

@@ -165,7 +165,7 @@ class Place(pt.composites.Sequence):
         self.add_children([
             GetBoxPositionBehavior(),
             PlanToBoxBehavior(),
-            # ApproachBoxBehavior(),
+            ApproachBoxBehavior(),
             PlaceBehavior(),
         ])
 
@@ -184,7 +184,7 @@ class Peek(TemplateBehaviour):
     def initialise(self) -> None:
         super().initialise()
         while(not self.client.wait_for_service(timeout_sec=1)):
-            self.get_logger().info("service not available, waiting...")
+            print("[Peek] waiting for service")
         self.state = pt.common.Status.RUNNING
 
         request = GetStuff.Request()
@@ -284,6 +284,7 @@ class PlanToBoxBehavior(TemplateBehaviour):
 
     def initialise(self) -> None:
         super().initialise()
+        print("[PlanToBoxBehavior] initialising")
 
         self.path_plan_client.wait_for_service()
         self.pursuit_client.wait_for_server()
@@ -443,6 +444,77 @@ class PlanToObjectBehavior(TemplateBehaviour):
         self.state = pt.common.Status.RUNNING
         return super().terminate(new_status)
 
+
+class ApproachBoxBehavior(TemplateBehaviour):
+    """
+    use realsense to approach the box
+    """
+
+    def __init__(self, name="ApproachBoxBehavior"):
+        super().__init__(name=name)
+
+        self.action_client = ActionClient(self, Approach, 'approach')
+        # self.future = None
+
+        # self.initialised = False
+
+        self.change_camera_mode_pub = self.create_publisher(
+            String, '/detection_ml/change_mode', 10)
+
+        self.register_bb('current_target_box',
+                         read_access=True, write_access=True)
+
+        self.state = pt.common.Status.RUNNING
+
+    def initialise(self) -> None:
+        super().initialise()
+        self.state = pt.common.Status.RUNNING
+
+        self.change_camera_mode_pub.publish(String(data='front-camera'))
+
+        goal_msg = Approach.Goal()
+        goal_msg.target = f"aruco_{self.blackboard.current_target_box['box_id']}"
+
+        self.action_client.wait_for_server()
+
+        self.send_goal_future = self.action_client.send_goal_async(goal_msg)
+        self.send_goal_future.add_done_callback(self.goal_response_callback)
+
+    def goal_response_callback(self, future):
+
+        goal_handle = future.result()
+        if not goal_handle.accepted:
+            self.state = pt.common.Status.FAILURE
+            self.send_goal_future = None
+            self.get_result_future = None
+            return
+
+        self.get_result_future = goal_handle.get_result_async()
+        self.get_result_future.add_done_callback(self.get_result_callback)
+
+    def get_result_callback(self, future):
+        result = future.result().result
+        if result.success:
+            self.state = pt.common.Status.SUCCESS
+        else:
+            self.state = pt.common.Status.SUCCESS
+            # self.state = pt.common.Status.FAILURE
+
+        self.send_goal_future = None
+        self.get_result_future = None
+
+    def update(self):
+        # global current_object
+
+        rclpy.spin_once(self, timeout_sec=0.01)
+        return self.state
+    
+    def terminate(self, new_status: Status) -> None:
+        self.change_camera_mode_pub.publish(String(data='front-camera'))
+        self.send_goal_future = None
+        self.get_result_future = None
+        self.state = pt.common.Status.RUNNING
+        return super().terminate(new_status)
 
 class ApproachObjectBehavior(TemplateBehaviour):
     """

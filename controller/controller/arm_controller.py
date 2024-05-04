@@ -173,8 +173,14 @@ class ArmController(Node):
 
             self.command_list[0] = -1
             self.command_list[1] = 12000
-            self.command_list[2] = 12000 - \
-                int(q3 * 18000 / pi) + int(pi / 2 * 18000 / pi)
+
+            # for horizontal configuration
+            # self.command_list[2] = 12000 - \
+            #     int(q3 * 18000 / pi) + int(pi / 2 * 18000 / pi)
+
+            # for vertical configuration
+            self.command_list[2] = 12000 - int(q3 * 18000 / pi)
+
             self.command_list[3] = 12000 + int(q2 * 18000 / pi)
             self.command_list[4] = 12000 - int(q1 * 18000 / pi)
             self.command_list[5] = 12000 + int(atan2(x, y) * 18000 / pi)
