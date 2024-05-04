@@ -356,7 +356,7 @@ auto GridMap::planPathBox(const double &startX,
                 goalXOnGrid,
                 goalYOnGrid);
 
-    expandGridBox(goalBoxId);
+    expandGridBox(goalBoxId, 0.2);
 
     std::vector<std::pair<int, int>> pathVec =
         aStar(startXOnGrid, startYOnGrid, goalXOnGrid, goalYOnGrid);
@@ -408,7 +408,7 @@ auto GridMap::planPath(const double &startX,
                 goalXOnGrid,
                 goalYOnGrid);
 
-    expandGrid(goalObjId);
+    expandGrid(goalObjId, 0.2);
 
     std::vector<std::pair<int, int>> pathVec =
         aStar(startXOnGrid, startYOnGrid, goalXOnGrid, goalYOnGrid);
@@ -477,12 +477,24 @@ void GridMap::expandGrid(const int &id, const float &radius)
 {
     expandedGrid.setZero();
     const int EXPAND_RADIUS     = radius / gridSize;
-    const int EXPAND_OBJ_RADIUS = 0.1 / gridSize;
+    const int EXPAND_OBJ_RADIUS = 0.2 / gridSize;
     for (int i = 0; i < sizeX; i++)
     {
         for (int j = 0; j < sizeY; j++)
         {
             setOnesAroundPoint(i, j, EXPAND_RADIUS);
+        }
+    }
+
+    for (const auto &stuff : stuffList)
+    {
+        if (stuff.first != id)
+        {
+            setOnesAroundPoint(
+                stuff.second.first, stuff.second.second, EXPAND_OBJ_RADIUS);
+            RCLCPP_INFO(rclcpp::get_logger("GridMap::expandGrid"),
+                        "expanding %d",
+                        stuff.first);
         }
     }
 
@@ -494,14 +506,6 @@ void GridMap::expandGrid(const int &id, const float &radius)
                 stuff.second.first, stuff.second.second, EXPAND_OBJ_RADIUS);
             RCLCPP_INFO(rclcpp::get_logger("GridMap::expandGrid"),
                         "clearing %d",
-                        stuff.first);
-        }
-        else
-        {
-            setOnesAroundPoint(
-                stuff.second.first, stuff.second.second, EXPAND_OBJ_RADIUS);
-            RCLCPP_INFO(rclcpp::get_logger("GridMap::expandGrid"),
-                        "expanding %d",
                         stuff.first);
         }
     }
