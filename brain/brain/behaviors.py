@@ -106,7 +106,7 @@ class Pop(TemplateBehaviour):
         self.state = pt.common.Status.RUNNING
 
     def initialise(self) -> None:
-        super().initialise()
+        # super().initialise()
         self.client.wait_for_service()
         self.state = pt.common.Status.RUNNING
 
@@ -165,7 +165,7 @@ class Place(pt.composites.Sequence):
         self.add_children([
             GetBoxPositionBehavior(),
             PlanToBoxBehavior(),
-            ApproachBoxBehavior(),
+            # ApproachBoxBehavior(),
             PlaceBehavior(),
         ])
 
@@ -182,7 +182,7 @@ class Peek(TemplateBehaviour):
         self.state = pt.common.Status.RUNNING
 
     def initialise(self) -> None:
-        super().initialise()
+        # super().initialise()
         while(not self.client.wait_for_service(timeout_sec=1)):
             print("[Peek] waiting for service")
         self.state = pt.common.Status.RUNNING
@@ -219,7 +219,9 @@ class Peek(TemplateBehaviour):
     def terminate(self, new_status: Status) -> None:
         self.future = None
         self.state = pt.common.Status.RUNNING
-        return super().terminate(new_status)
+        self.logger.info("Peek terminated")
+        breakpoint()
+        # return super().terminate(new_status)
 
 
 class ArmToHome(TemplateBehaviour):
@@ -283,7 +285,7 @@ class PlanToBoxBehavior(TemplateBehaviour):
         self.state = pt.common.Status.RUNNING
 
     def initialise(self) -> None:
-        super().initialise()
+        # super().initialise()
         print("[PlanToBoxBehavior] initialising")
 
         self.path_plan_client.wait_for_service()
@@ -363,8 +365,8 @@ class PlanToObjectBehavior(TemplateBehaviour):
 
 
     def initialise(self) -> None:
-        super().initialise()
-
+        self.logger.info("PlanToObjectBehaviour initialising")
+        # super().initialise()
         self.path_plan_client.wait_for_service()
         self.pursuit_client.wait_for_server()
         path_plan_request = PathPlanObject.Request()
@@ -442,7 +444,7 @@ class PlanToObjectBehavior(TemplateBehaviour):
         self.pursuit_future = None
         self.get_result_future = None
         self.state = pt.common.Status.RUNNING
-        return super().terminate(new_status)
+        # return super().terminate(new_status)
 
 
 class ApproachBoxBehavior(TemplateBehaviour):
@@ -467,7 +469,7 @@ class ApproachBoxBehavior(TemplateBehaviour):
         self.state = pt.common.Status.RUNNING
 
     def initialise(self) -> None:
-        super().initialise()
+        # super().initialise()
         self.state = pt.common.Status.RUNNING
 
         self.change_camera_mode_pub.publish(String(data='front-camera'))
@@ -510,11 +512,11 @@ class ApproachBoxBehavior(TemplateBehaviour):
         return self.state
     
     def terminate(self, new_status: Status) -> None:
-        self.change_camera_mode_pub.publish(String(data='front-camera'))
-        self.send_goal_future = None
-        self.get_result_future = None
+        # self.change_camera_mode_pub.publish(String(data='front-camera'))
+        # self.send_goal_future = None
+        # self.get_result_future = None
         self.state = pt.common.Status.RUNNING
-        return super().terminate(new_status)
+        # return super().terminate(new_status)
 
 class ApproachObjectBehavior(TemplateBehaviour):
     """
@@ -538,7 +540,7 @@ class ApproachObjectBehavior(TemplateBehaviour):
         self.state = pt.common.Status.RUNNING
 
     def initialise(self) -> None:
-        super().initialise()
+        # super().initialise()
         self.state = pt.common.Status.RUNNING
 
         self.change_camera_mode_pub.publish(String(data='front-camera'))
@@ -604,7 +606,7 @@ class FineTuneObjectPositionBehavior(TemplateBehaviour):
         self.register_bb('pick_pos', read_access=True, write_access=True)
 
     def initialise(self) -> None:
-        super().initialise()
+        # super().initialise()
 
         self.state = pt.common.Status.RUNNING
         self.camera_mode_pub.publish(String(data='arm-camera'))
@@ -651,7 +653,7 @@ class FineTuneObjectPositionBehavior(TemplateBehaviour):
 
     def terminate(self, new_status: Status) -> None:
         self.camera_mode_pub.publish(String(data='front-camera'))
-        return super().terminate(new_status)
+        # return super().terminate(new_status)
 
 
 class PickObjectBehavior(TemplateBehaviour):
@@ -671,7 +673,7 @@ class PickObjectBehavior(TemplateBehaviour):
         self.state = pt.common.Status.RUNNING
 
     def initialise(self) -> None:
-        super().initialise()
+        # super().initialise()
         goal_msg = Arm.Goal()
         goal_msg.command = "pick"
         goal_msg.position = [-float(self.blackboard.pick_pos['x']),
@@ -730,7 +732,7 @@ class GetBoxPositionBehavior(TemplateBehaviour):
         self.state = pt.common.Status.RUNNING
 
     def initialise(self) -> None:
-        super().initialise()
+        # super().initialise()
         self.client.wait_for_service()
         self.state = pt.common.Status.RUNNING
 
@@ -790,7 +792,7 @@ class PlaceBehavior(TemplateBehaviour):
         self.sleep_rate = self.create_rate(1/3)
 
     def initialise(self) -> None:
-        super().initialise()
+        # super().initialise()
         goal_msg = Arm.Goal()
         goal_msg.command = "place"
         goal_msg.position = [0.0, 0.15]
@@ -836,7 +838,7 @@ class PlaceBehavior(TemplateBehaviour):
         self.sleep_rate.sleep()
         self.arm_pub.publish(Int16MultiArray(data=self.HOME_POSITION))
 
-        return super().terminate(new_status)
+        # return super().terminate(new_status)
 
 
 class CheckTaskCompletion(pt.behaviour.Behaviour):
@@ -857,7 +859,7 @@ class ExplorePointBehavior(TemplateBehaviour):
         self.state = pt.common.Status.RUNNING
 
     def initialise(self) -> None:
-        super().initialise()
+        # super().initialise()
 
         goal_msg = Explore.Goal()
 

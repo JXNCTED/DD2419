@@ -137,22 +137,26 @@ class ApproachActionServer(Node):
 
             while True:
                 tf_map_base = self.tf_buffer.lookup_transform('map', 'base_link', rclpy.time.Time())
-                yaw = np.arctan2(2 * (tf_map_base.transform.rotation.w * tf_map_base.transform.rotation.z + tf_map_base.transform.rotation.x * tf_map_base.transform.rotation.y),
-                                1 - 2 * (tf_map_base.transform.rotation.y**2 + tf_map_base.transform.rotation.z**2))
+
+                qw = tf_map_base.transform.rotation.w
+                qx = tf_map_base.transform.rotation.x
+                qy = tf_map_base.transform.rotation.y
+                qz = tf_map_base.transform.rotation.z
+                yaw = np.arctan2(2 * (qw * qz + qx * qy), qw**2 + qz**2 - qx**2 - qy**2)
 
                 box_pose = self.box_list[int(self.target.split('_')[1]) - 1]
                 dx = box_pose[0] - tf_map_base.transform.translation.x
                 dy = box_pose[1] - tf_map_base.transform.translation.y
 
-                angle = np.arctan2(dy, dx) - yaw
-                
+                angle = np.arctan2(dx, dy) - yaw
 
-                self.get_logger().info(f'angle: {angle}')
+                self.get_logger().info(f'yaw: {yaw}, target: {np.arctan2(dx, dy)}')
+
                 if abs(angle) < 0.1:
                     break
 
                 twist.linear.x = 0.0
-                twist.angular.z = -0.4 * angle
+                twist.angular.z = 0.2 if angle > 0 else -0.2
 
                 self._publish_vel.publish(twist)
             
