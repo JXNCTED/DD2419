@@ -1,6 +1,6 @@
 #include "mapping/GridMap.hpp"
 
-#include <assert.h>
+// #include <assert.h>
 
 #include <fstream>
 #include <vector>
@@ -308,7 +308,8 @@ auto GridMap::planPath(const double &startX,
 
     RCLCPP_INFO(rclcpp::get_logger("GridMap::planPath"), "received, planning");
 
-    expandGrid();
+    // expandGrid();
+    expandGrid(startXOnGrid, startYOnGrid, 0.26f);
     std::vector<std::pair<int, int>> pathVec =
         aStar(startXOnGrid, startYOnGrid, goalXOnGrid, goalYOnGrid);
     if (pathVec.empty())
@@ -356,7 +357,8 @@ auto GridMap::planPathBox(const double &startX,
                 goalXOnGrid,
                 goalYOnGrid);
 
-    expandGridBox(goalBoxId, 0.2);
+    // expandGridBox(goalBoxId, 0.2);
+    expandGridBox(startXOnGrid, startYOnGrid, goalBoxId, 0.26f);
 
     std::vector<std::pair<int, int>> pathVec =
         aStar(startXOnGrid, startYOnGrid, goalXOnGrid, goalYOnGrid);
@@ -408,7 +410,8 @@ auto GridMap::planPath(const double &startX,
                 goalXOnGrid,
                 goalYOnGrid);
 
-    expandGrid(goalObjId, 0.2);
+    // expandGrid(goalObjId, 0.2);
+    expandGrid(startXOnGrid, startYOnGrid, goalObjId, 0.26f);
 
     std::vector<std::pair<int, int>> pathVec =
         aStar(startXOnGrid, startYOnGrid, goalXOnGrid, goalYOnGrid);
@@ -440,7 +443,10 @@ auto GridMap::planPath(const double &startX,
     return path;
 }
 
-void GridMap::expandGrid(const float &radius)
+// void GridMap::expandGrid(const float &radius)
+void GridMap::expandGrid(const int &robotXOnGrid,
+                         const int &robotYOnGrid,
+                         const float &radius)
 {
     expandedGrid.setZero();
     const int EXPAND_RADIUS = radius / gridSize;
@@ -451,11 +457,17 @@ void GridMap::expandGrid(const float &radius)
             setOnesAroundPoint(i, j, EXPAND_RADIUS);
         }
     }
+
+    setZeroAroundPoint(robotXOnGrid, robotYOnGrid, 0.2 / gridSize);
     // cv::imshow("expandedGrid", expandedGridCV);
     RCLCPP_INFO(rclcpp::get_logger("GridMap::expandGrid"), "expanded");
 }
 
-void GridMap::expandGridBox(const int &id, const float &radius)
+// void GridMap::expandGridBox(const int &id, const float &radius)
+void GridMap::expandGridBox(const int &robotXOnGrid,
+                            const int &robotYOnGrid,
+                            const int &id,
+                            const float &radius)
 {
     expandedGrid.setZero();
     const int EXPAND_RADIUS     = radius / gridSize;
@@ -469,11 +481,16 @@ void GridMap::expandGridBox(const int &id, const float &radius)
     }
     const auto &box = boxList.at(id);
     setZeroAroundPoint(box.first, box.second, EXPAND_BOX_RADIUS);
+    setZeroAroundPoint(robotXOnGrid, robotYOnGrid, EXPAND_BOX_RADIUS);
     RCLCPP_INFO(
         rclcpp::get_logger("GridMap::expandGridBox"), "clearing %d", box.first);
 }
 
-void GridMap::expandGrid(const int &id, const float &radius)
+// void GridMap::expandGrid(const int &id, const float &radius)
+void GridMap::expandGrid(const int &robotXOnGrid,
+                         const int &robotYOnGrid,
+                         const int &id,
+                         const float &radius)
 {
     expandedGrid.setZero();
     const int EXPAND_RADIUS     = radius / gridSize;
@@ -498,17 +515,22 @@ void GridMap::expandGrid(const int &id, const float &radius)
         }
     }
 
-    for (const auto &stuff : stuffList)
-    {
-        if (stuff.first == id)
-        {
-            setZeroAroundPoint(
-                stuff.second.first, stuff.second.second, EXPAND_OBJ_RADIUS);
-            RCLCPP_INFO(rclcpp::get_logger("GridMap::expandGrid"),
-                        "clearing %d",
-                        stuff.first);
-        }
-    }
+    // for (const auto &stuff : stuffList)
+    // {
+    //     if (stuff.first == id)
+    //     {
+    //         setZeroAroundPoint(
+    //             stuff.second.first, stuff.second.second, EXPAND_OBJ_RADIUS);
+    //         RCLCPP_INFO(rclcpp::get_logger("GridMap::expandGrid"),
+    //                     "clearing %d",
+    //                     stuff.first);
+    //     }
+    // }
+
+    setZeroAroundPoint(
+        stuffList.at(id).first, stuffList.at(id).second, EXPAND_OBJ_RADIUS);
+
+    setZeroAroundPoint(robotXOnGrid, robotYOnGrid, EXPAND_OBJ_RADIUS);
 
     // cv::imshow("expandedGrid", expandedGridCV);
     RCLCPP_INFO(rclcpp::get_logger("GridMap::expandGrid"), "expanded");

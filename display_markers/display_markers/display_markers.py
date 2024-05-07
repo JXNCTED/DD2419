@@ -14,7 +14,7 @@ from math import cos, sin
 import tf2_geometry_msgs
 
 from aruco_msgs.msg import MarkerArray, Marker
-from geometry_msgs.msg import TransformStamped
+from geometry_msgs.msg import TransformStamped, Pose
 from detection_interfaces.msg import BoxList
 from detection_interfaces.msg import Box as BoxMsg
 from typing import Final
@@ -176,13 +176,20 @@ class DisplayMarkers(Node):
             # Updates the box with the new position and orientation
             box_yaw = euler_from_quaternion(
                 [t.transform.rotation.x, t.transform.rotation.y, t.transform.rotation.z, t.transform.rotation.w])[2]
-            # THIS IS STRANGE??
-            box_center = np.array([
-                t.transform.translation.x,
-                t.transform.translation.y
-            ])
+            
+            box_front = Pose()
+            box_front.position.z = 0.3 # 30 cm in front of the box
 
-            self.boxes[marker.id].update(box_center, box_yaw)
+            box_front_map = tf2_geometry_msgs.do_transform_pose(
+                box_front, t)
+
+            # box_center = np.array([
+            #     t.transform.translation.x,
+            #     t.transform.translation.y
+            # ])
+
+            # self.boxes[marker.id].update(box_center, box_yaw)
+            self.boxes[marker.id].update([box_front_map.position.x, box_front_map.position.y], box_yaw)
 
             # Publish the message.
             try:
@@ -201,15 +208,17 @@ class DisplayMarkers(Node):
                 continue
 
             marker = VisMarker()
-            marker.header.frame_id = "map"
-            marker.header.stamp = self.get_clock().now().to_msg()
+            # marker.header.frame_id = "map"
+            # marker.header.stamp = self.get_clock().now().to_msg()
+            marker.header.frame_id = f"aruco_{box.aruco_id}"
             marker.ns = "box"
             marker.id = box.aruco_id
             marker.type = VisMarker.CUBE
             marker.action = VisMarker.MODIFY
-            marker.pose.position.x = position[0]
-            marker.pose.position.y = position[1]
-            marker.pose.position.z = 0.0
+            # marker.pose.position.x = position[0]
+            # marker.pose.position.y = position[1]
+            # marker.pose.position.z = 0.0
+            marker.pose.position.x = -Box.BOX_WIDTH / 2
             box_q = quaternion_from_euler(0, 0, position[2])
             marker.pose.orientation.x = box_q[0]
             marker.pose.orientation.y = box_q[1]
@@ -226,18 +235,29 @@ class DisplayMarkers(Node):
             # box_list.boxes.append(marker.pose)
             box_msg = BoxMsg()
             box_msg.aruco_id = box.aruco_id
-            box_msg.pose = marker.pose
+            box_msg.pose.position.x = position[0]
+            box_msg.pose.position.y = position[1]
+            box_msg.pose.position.z = 0.0
+            box_msg.center_pose.position.x = position[0] - (Box.BOX_WIDTH / 2 + 0.3) * cos(position[2])
+            box_msg.center_pose.position.y = position[1] - (Box.BOX_WIDTH / 2 + 0.3) * sin(position[2])
+            box_msg.center_pose.position.z = 0.0
             box_list.boxes.append(box_msg)
             text_marker = VisMarker()
-            text_marker.header.frame_id = "map"
-            text_marker.header.stamp = self.get_clock().now().to_msg()
+            # text_marker.header.frame_id = "map"
+            # text_marker.header.stamp = self.get_clock().now().to_msg()
+            text_marker.header.frame_id = f"aruco_{box.aruco_id}"
+
             text_marker.ns = "box"
             text_marker.id = box.aruco_id + 100
             text_marker.type = VisMarker.TEXT_VIEW_FACING
             text_marker.action = VisMarker.MODIFY
-            text_marker.pose.position.x = position[0]
-            text_marker.pose.position.y = position[1]
+            # text_marker.pose.position.x = position[0]
+            # text_marker.pose.position.y = position[1]
+            # text_marker.pose.position.z = 0.2
+
+            text_marker.pose.position.x = -Box.BOX_WIDTH / 2
             text_marker.pose.position.z = 0.2
+
             text_marker.pose.orientation.w = 1.0
             text_marker.text = f"box_{box.aruco_id}"
             text_marker.lifetime = rclpy.duration.Duration(seconds=0).to_msg()

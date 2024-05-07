@@ -59,7 +59,7 @@ class ArmController(Node):
         self.arm_pos_sub_ = self.create_subscription(
             JointState, '/servo_pos_publisher', self.arm_pos_callback, 10)
 
-        self.rate = self.create_rate(1/2)
+        self.rate = self.create_rate(1/4)
         self.rate_place = self.create_rate(1/2)  # sleep
 
         self.action_server_ = ActionServer(

@@ -161,11 +161,21 @@ class GridMap
      * @brief Expand the grid to c-space
      *
      */
-    void expandGrid(const float &radius = 0.21f);
+    void expandGrid(const int &robotXOnGrid,
+                    const int &robotYOnGrid,
+                    const float &radius = 0.21f);
 
-    void expandGrid(const int &id, const float &radius = 0.21f);
+    // void expandGrid(const int &id, const float &radius = 0.21f);
+    void expandGrid(const int &robotXOnGrid,
+                    const int &robotYOnGrid,
+                    const int &id,
+                    const float &radius = 0.21f);
 
-    void expandGridBox(const int &id, const float &radius = 0.21f);
+    // void expandGridBox(const int &id, const float &radius = 0.21f);
+    void expandGridBox(const int &robotXOnGrid,
+                       const int &robotYOnGrid,
+                       const int &id,
+                       const float &radius = 0.21f);
     // helper function for expandGrid, set obstacles around a point
     /**
      * @brief Set every points within the radius of the given point as

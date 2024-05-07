@@ -102,7 +102,7 @@ class ApproachActionServer(Node):
         box: Box
         for i, box in enumerate(msg.boxes):
             index = box.aruco_id - 1
-            self.box_list[index] = [box.pose.position.x, box.pose.position.y]
+            self.box_list[index] = [box.center_pose.position.x, box.center_pose.position.y]
 
 
     def detected_pos_callback(self, msg: DetectedObj):
@@ -189,7 +189,7 @@ class ApproachActionServer(Node):
                 self._publish_vel.publish(twist)
                 cnt = 0
                 pose = None
-                while (cnt < 50):
+                while (cnt < 35):
                     for (pose_det, id) in self.markers:
                         delta = self.get_clock().now().nanoseconds - \
                             rclpy.time.Time().from_msg(self.aruco_stamp).nanoseconds
@@ -219,7 +219,7 @@ class ApproachActionServer(Node):
 
             # find the target from objects
             cnt = 0
-            TIMEOUT = 100
+            TIMEOUT = 75
             while (cnt < TIMEOUT):
                 for (point_det, category) in self.objects:
                     if str(category) == self.target:

@@ -165,7 +165,7 @@ class Place(pt.composites.Sequence):
         self.add_children([
             GetBoxPositionBehavior(),
             PlanToBoxBehavior(),
-            # ApproachBoxBehavior(),
+            ApproachBoxBehavior(),
             PlaceBehavior(),
         ])
 
@@ -296,6 +296,8 @@ class PlanToBoxBehavior(TemplateBehaviour):
     def initialise(self) -> None:
         # super().initialise()
         print("[PlanToBoxBehavior] initialising")
+
+        self.state = pt.common.Status.RUNNING
 
         self.path_plan_client.wait_for_service()
         self.pursuit_client.wait_for_server()
@@ -669,6 +671,7 @@ class PickObjectBehavior(TemplateBehaviour):
 
     def initialise(self) -> None:
         # super().initialise()
+        self.state = pt.common.Status.RUNNING
         goal_msg = Arm.Goal()
         goal_msg.command = "pick"
         goal_msg.position = [-float(self.blackboard.pick_pos['x']),
