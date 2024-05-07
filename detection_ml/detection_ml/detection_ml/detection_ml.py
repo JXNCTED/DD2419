@@ -87,16 +87,16 @@ class DetectionMLNode(Node):
         #     Image, "/camera/color/image_raw", self.img_callback, 10)
 
         self.image_sub = self.create_subscription(
-            Image, "/image_raw", self.arm_img_callback, 10)
+            Image, "/image_raw", self.arm_img_callback, 5)
 
         self.arm_timeout_timer = self.create_timer(
             5, self.arm_timeout_callback)
 
         self.rgbd_sub = self.create_subscription(
-            RGBD, "/camera/rgbd", self.realsense_rbgd_callback, 10)
+            RGBD, "/camera/rgbd", self.realsense_rbgd_callback, 5)
 
         self.change_mode_sub = self.create_subscription(
-            String, "/detection_ml/change_mode", self.change_mode_callback, 10)
+            String, "/detection_ml/change_mode", self.change_mode_callback, 5)
 
         # see the detection_interfaces package for the message definition
         self.detected_obj_pub = self.create_publisher(

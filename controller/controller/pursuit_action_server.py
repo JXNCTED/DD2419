@@ -30,6 +30,8 @@ class PursuitActionServer(Node):
 
         self.odom_to_map_tf = TransformStamped()
 
+        self.running = False
+
         self._action_server = ActionServer(
             self,
             Pursuit,
@@ -81,6 +83,8 @@ class PursuitActionServer(Node):
         result = Pursuit.Result()
         result.success = False
 
+        self.running = True
+
         goal_point = self.waypoints[-1]
         twist = Twist()
         # align the robot with start point
@@ -102,6 +106,7 @@ class PursuitActionServer(Node):
                 self._publish_vel.publish(twist)
                 goal_handle.canceled()
                 self.get_logger('Goal canceled')
+                self.running = False
                 return result
             if np.hypot(self.waypoints[-1].x - self.odom_x, self.waypoints[-1].y - self.odom_y) < 0.19:
                 self.waypoints = []
@@ -163,6 +168,7 @@ class PursuitActionServer(Node):
             self.get_logger().warn('Goal not succeeded, aborting...')
             goal_handle.abort()
 
+        self.running = False
         return result
 
     def velocity(self, target, lin_v=0.1):
@@ -197,6 +203,8 @@ class PursuitActionServer(Node):
         Extract the x, y and yaw from the odometry.
         https://robotics.stackexchange.com/questions/16471/get-yaw-from-quaternion
         """
+        if not self.running:
+            return
         # x = msg.pose.pose.orientation.x
         # y = msg.pose.pose.orientation.y
         # z = msg.pose.pose.orientation.z
@@ -233,7 +241,7 @@ class PursuitActionServer(Node):
 def main(args=None):
     rclpy.init(args=args)
 
-    executor = rclpy.executors.MultiThreadedExecutor(3)
+    executor = rclpy.executors.MultiThreadedExecutor()
     pursuit_action_server = PursuitActionServer()
 
     rclpy.spin(pursuit_action_server, executor=executor)

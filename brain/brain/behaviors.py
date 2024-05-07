@@ -24,7 +24,6 @@ from detection_interfaces.srv import GetStuff, GetBox
 from geometry_msgs.msg import Point, Pose
 from tf2_ros import Buffer, TransformListener
 
-
 from mapping_interfaces.srv import PathPlanObject, PathPlan, PathPlanBox
 
 
@@ -74,7 +73,8 @@ class PPPP(pt.composites.Selector):
         super(PPPP, self).__init__(name=name, memory=True)
         self.add_children([
             # if peek fails, that means no more objects to pick, which indicates the task is done
-            pt.decorators.Inverter(name="invert_peek", child=Peek()),
+            # pt.decorators.Inverter(name="invert_peek", child=Peek()),
+            Peek(),
             PPP(),
         ])
 
@@ -183,8 +183,9 @@ class Peek(TemplateBehaviour):
 
     def initialise(self) -> None:
         # super().initialise()
+        self.logger.info("Peek initialising")
         while(not self.client.wait_for_service(timeout_sec=1)):
-            print("[Peek] waiting for service")
+            self.logger.warning("[Peek] waiting for service")
         self.state = pt.common.Status.RUNNING
 
         request = GetStuff.Request()
@@ -196,10 +197,16 @@ class Peek(TemplateBehaviour):
     def future_callback(self, future):
         response = future.result()
         if response is None:
-            self.state = pt.common.Status.FAILURE
+            # self.state = pt.common.Status.FAILURE
+            self.state = pt.common.Status.SUCCESS
             return
 
-        self.state = pt.common.Status.SUCCESS
+        if response.success is False:
+            # self.state = pt.common.Status.FAILURE
+            self.state = pt.common.Status.SUCCESS
+        else:
+            # self.state = pt.common.Status.SUCCESS
+            self.state = pt.common.Status.FAILURE
         self.future = None
 
         # self.blackboard.current_target_object = str(response.stuff_id)
@@ -210,7 +217,9 @@ class Peek(TemplateBehaviour):
         current_obj['position'] = response.stuff.position.point
         self.blackboard.current_target_object = current_obj
         self.future = None
-        self.state = pt.common.Status.SUCCESS
+
+        self.logger.info(f"peeking object {self.blackboard.current_target_object['stuff_id']}")
+        # self.state = pt.common.Status.SUCCESS
 
     def update(self):
         rclpy.spin_once(self, timeout_sec=0.01)
@@ -218,10 +227,10 @@ class Peek(TemplateBehaviour):
     
     def terminate(self, new_status: Status) -> None:
         self.future = None
-        self.state = pt.common.Status.RUNNING
-        self.logger.info("Peek terminated")
-        breakpoint()
-        # return super().terminate(new_status)
+        self.logger.info(f"peak {self.status} -> {new_status}")
+        # self.state = pt.common.Status.RUNNING
+        # breakpoint()
+        return super().terminate(new_status)
 
 
 class ArmToHome(TemplateBehaviour):
@@ -385,20 +394,6 @@ class PlanToObjectBehavior(TemplateBehaviour):
             return
 
         waypoints = []
-        # transfrom waypoints from map to odom
-        # try:
-        #     t = self.tf_buffer.lookup_transform(
-        #         'odom', 'map', self.get_clock().now(), timeout=rclpy.time.Duration(seconds=5))
-        # except Exception as e:
-        #     self.get_logger().error(str(e))
-        #     self.state = pt.common.Status.FAILURE
-        #     self.path_plan_future = None
-        #     return
-
-        # for pose in result.path.poses:
-        #     pose_odom = tf2_geometry_msgs.do_transform_pose(pose, t)
-        #     waypoints.insert(0, Point(
-        #         x=pose_odom.pose.position.x, y=pose_odom.pose.position.y))
 
         for pose in result.path.poses:
             waypoints.insert(0, Point(
@@ -785,11 +780,11 @@ class PlaceBehavior(TemplateBehaviour):
             Int16MultiArray, '/multi_servo_cmd_sub', 10)
 
 
-        self.tf_buffer = Buffer()
-        self.tf_listener = TransformListener(
-            self.tf_buffer, self, spin_thread=True)
+        # self.tf_buffer = Buffer()
+        # self.tf_listener = TransformListener(
+        #     self.tf_buffer, self, spin_thread=True)
         
-        self.sleep_rate = self.create_rate(1/3)
+        # self.sleep_rate = self.create_rate(1/3)
 
     def initialise(self) -> None:
         # super().initialise()
@@ -835,9 +830,8 @@ class PlaceBehavior(TemplateBehaviour):
         self.get_result_future = None
         self.state = pt.common.Status.RUNNING
 
-        self.sleep_rate.sleep()
+        # self.sleep_rate.sleep()
         self.arm_pub.publish(Int16MultiArray(data=self.HOME_POSITION))
-
         # return super().terminate(new_status)
 
 

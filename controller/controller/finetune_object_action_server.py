@@ -15,6 +15,9 @@ from filterpy.kalman import KalmanFilter
 from threading import Lock
 from rclpy.callback_groups import ReentrantCallbackGroup
 from threading import Lock
+# from viztracer import VizTracer
+
+
 super_cls_dict = {
     0: "none",
     1: "cube",
@@ -48,6 +51,8 @@ class FinetuneObjectActionServer(Node):
                                [0., 0., 1.]])
 
         self.img = None
+
+        self.running = False
 
         self.filter = KalmanFilter(dim_x=4, dim_z=2)
         self.filter.x = np.array([0, 0, 0, 0])  # x, dx, y, dy
@@ -95,6 +100,8 @@ class FinetuneObjectActionServer(Node):
         )
 
     def arm_detected_obj_callback(self, msg: Float32MultiArray):
+        if not self.running:
+            return
         self.last_valid_measurement_stamp = self.get_clock().now()
         self.detected_pos = msg.data
         with self.detected_obj_lock:
@@ -116,11 +123,14 @@ class FinetuneObjectActionServer(Node):
         self.filter.update([center_x, center_y])
 
     def arm_camera_image_callback(self, msg: Image):
+        if not self.running:
+            return
         img = CvBridge().imgmsg_to_cv2(msg, 'bgr8')
         self.img = cv2.undistort(img, self.K_arm, self.coeffs_arm)
 
     def execute_callback(self, goal_handle):
         self.get_logger().info('Executing goal...')
+        self.running = True
         result = Finetune.Result()
 
         cnt = 0
@@ -149,6 +159,7 @@ class FinetuneObjectActionServer(Node):
                     self.twist_pub.publish(twist)
                     result.success = False
                     goal_handle.abort()
+                    self.running = False
                     return result
                 continue
             else:
@@ -239,6 +250,7 @@ class FinetuneObjectActionServer(Node):
         if len(valid_contours) == 0:
             self.get_logger().warn('No valid contours found')
             goal_handle.abort()
+            self.running = False
             return result
 
         rect = cv2.minAreaRect(np.concatenate(valid_contours))
@@ -264,6 +276,7 @@ class FinetuneObjectActionServer(Node):
         self.filter.predict()
 
         goal_handle.succeed()
+        self.running = False
         return result
 
     def goal_callback(self, goal_request):
@@ -285,13 +298,22 @@ class FinetuneObjectActionServer(Node):
 
 
 def main():
+    # tracer = VizTracer()
+    # tracer.start()
     rclpy.init()
-    executor = rclpy.executors.MultiThreadedExecutor(3)
+    executor = rclpy.executors.MultiThreadedExecutor()
     finetune_object_action_server = FinetuneObjectActionServer()
-
     try:
-        rclpy.spin(finetune_object_action_server, executor)
+        executor.add_node(finetune_object_action_server)
+        while executor.context.ok():
+            executor.spin_once()
+        # rclpy.spin(finetune_object_action_server, executor)
     except KeyboardInterrupt:
         pass
 
+    # print("stop tracing...")
+    # tracer.stop()
+    # tracer.save('finetune_object_action_server.html')
+
     rclpy.shutdown()
+

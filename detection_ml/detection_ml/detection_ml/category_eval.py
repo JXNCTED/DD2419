@@ -212,6 +212,7 @@ class CategoryEvaluation(Node):
     def get_stuff_callback(
         self, request: GetStuff.Request, response: GetStuff.Response
     ):
+        self.get_logger().info(f"get_stuff_callback: {request.pop} {request.pop_id}")
         if self.list_of_stuff:
             if request.pop:
                 self.get_logger().info("pop stuff")
@@ -220,6 +221,7 @@ class CategoryEvaluation(Node):
                 for i, s in enumerate(self.list_of_stuff):
                     if s.id == pop_id:
                         stuff = self.list_of_stuff.pop(i)
+                        self.get_logger().info(f"popping {stuff.id}, now {len(self.list_of_stuff)} stuffs")
                         break
                 if stuff is None:
                     response.success = False

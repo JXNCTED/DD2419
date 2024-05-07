@@ -76,7 +76,7 @@ class DisplayMarkers(Node):
         )
 
         self.viz_publisher = self.create_publisher(
-            VisMarkerArray, '/box_visualization', 10)
+            VisMarkerArray, '/box_visualization', 1)
         self.srv = self.create_service(
             GetBox, 'get_box', self.get_box_callback)
 
@@ -178,7 +178,7 @@ class DisplayMarkers(Node):
                 [t.transform.rotation.x, t.transform.rotation.y, t.transform.rotation.z, t.transform.rotation.w])[2]
             # THIS IS STRANGE??
             box_center = np.array([
-                t.transform.translation.x + Box.BOX_WIDTH/2 * cos(box_yaw),
+                t.transform.translation.x,
                 t.transform.translation.y
             ])
 
