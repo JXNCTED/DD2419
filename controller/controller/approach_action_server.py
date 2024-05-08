@@ -5,28 +5,35 @@ from rclpy.node import Node
 from rclpy.action import ActionServer, GoalResponse, CancelResponse
 from rclpy.callback_groups import ReentrantCallbackGroup
 
-from geometry_msgs.msg import Twist, TransformStamped
+from geometry_msgs.msg import Twist, Transform
 import rclpy.time
+from tf2_geometry_msgs import do_transform_pose
 from robp_interfaces.action import Approach
 from aruco_msgs.msg import MarkerArray
 from tf2_ros import Buffer, TransformListener
+
 
 from detection_interfaces.msg import DetectedObj, BoxList, Box
 
 
 def velocity(pose):
-
     x = pose.position.z
     y = -pose.position.x
+    theta = np.arctan2(x, y)
+    DISP = 0.15
 
-    v = 0.2
-    dist = np.sqrt(x**2 + y**2)
-    alpha = np.arctan2(y, x)
+    # make the robot goto 15cm in front of the marker
+    x, y = x-np.sin(theta)*DISP, y-np.cos(theta)*DISP
+    theta = np.arctan2(x, y)
 
-    r = dist / (2 * np.sin(alpha))
-    w = v / r
+    v = 0.1
+    d = np.sqrt(x**2 + y**2)
+    R = d / (2 * np.sin(theta / 2))
+    l = np.pi * R * theta
+    t = l / v
+    w = theta / t
 
-    return v, w
+    return v, w, t
 
 
 class ApproachActionServer(Node):
@@ -45,7 +52,8 @@ class ApproachActionServer(Node):
         self.object_stamp = rclpy.time.Time()
 
         self.tf_buffer = Buffer()
-        self.tf_listener = TransformListener(self.tf_buffer, self, spin_thread=True)
+        self.tf_listener = TransformListener(
+            self.tf_buffer, self, spin_thread=True)
 
         # all possible targets
         self.ACCEPTABLE_TARGETS = [
@@ -89,21 +97,21 @@ class ApproachActionServer(Node):
             callback_group=self._cb_group
         )
 
-        self.box_sub = self.create_subscription(BoxList, '/box_list', self.box_callback, qos_profile=10, callback_group=self._cb_group)
-
+        self.box_sub = self.create_subscription(
+            BoxList, '/box_list', self.box_callback, qos_profile=10, callback_group=self._cb_group)
 
     def aruco_callback(self, msg: MarkerArray):
         self.aruco_stamp = msg.header.stamp
         self.markers.clear()
         for marker in msg.markers:
             self.markers.append((marker.pose.pose, marker.id))
-    
+
     def box_callback(self, msg: BoxList):
         box: Box
         for i, box in enumerate(msg.boxes):
             index = box.aruco_id - 1
-            self.box_list[index] = [box.center_pose.position.x, box.center_pose.position.y]
-
+            self.box_list[index] = [
+                box.center_pose.position.x, box.center_pose.position.y]
 
     def detected_pos_callback(self, msg: DetectedObj):
         self.object_stamp = msg.header.stamp
@@ -130,19 +138,20 @@ class ApproachActionServer(Node):
             goal_handle.abort()
             return result
 
-
         if self.target in self.ACCEPTABLE_ARUCOS:
             # first align with the marker
             twist = Twist()
 
             while True:
-                tf_map_base = self.tf_buffer.lookup_transform('map', 'base_link', rclpy.time.Time())
+                tf_map_base = self.tf_buffer.lookup_transform(
+                    'map', 'base_link', rclpy.time.Time())
 
                 qw = tf_map_base.transform.rotation.w
                 qx = tf_map_base.transform.rotation.x
                 qy = tf_map_base.transform.rotation.y
                 qz = tf_map_base.transform.rotation.z
-                yaw = np.arctan2(2 * (qw * qz + qx * qy), qw**2 + qz**2 - qx**2 - qy**2)
+                yaw = np.arctan2(2 * (qw * qz + qx * qy), qw **
+                                 2 + qz**2 - qx**2 - qy**2)
 
                 box_pose = self.box_list[int(self.target.split('_')[1]) - 1]
                 dx = box_pose[0] - tf_map_base.transform.translation.x
@@ -150,16 +159,18 @@ class ApproachActionServer(Node):
 
                 angle = np.arctan2(dx, dy) - yaw
 
-                self.get_logger().info(f'yaw: {yaw}, target: {np.arctan2(dx, dy)}')
+                self.get_logger().info(
+                    f'yaw: {yaw}, target: {np.arctan2(dx, dy)}')
 
-                if abs(angle) < 0.1:
+                # break if the angle is small enough or the target is in the view
+                if abs(angle) < 0.1 or int(self.target.split('_')[1]) in [id for (_, id) in self.markers]:
                     break
 
                 twist.linear.x = 0.0
                 twist.angular.z = 0.2 if angle > 0 else -0.2
 
                 self._publish_vel.publish(twist)
-            
+
             for _ in range(50):
                 twist.linear.x = 0.0
                 twist.angular.z = 0.0
@@ -182,37 +193,43 @@ class ApproachActionServer(Node):
                 goal_handle.abort()
                 return result
 
+            # while (pose.position.z > 0.25):
+            #     self.get_logger().info(f'distance: {pose.position.z}')
+            #     twist.linear.x, twist.angular.z, t = velocity(pose)
+            #     self._publish_vel.publish(twist)
+            #     cnt = 0
+            #     pose = None
+            #     while (cnt < 35):
+            #         for (pose_det, id) in self.markers:
+            #             delta = self.get_clock().now().nanoseconds - \
+            #                 rclpy.time.Time().from_msg(self.aruco_stamp).nanoseconds
+            #             if f"aruco_{id}" == self.target and delta < 3e9:
+            #                 pose = pose_det
+            #                 break
+            #         if pose is not None:
+            #             break
+            #         self.rate.sleep()
+            #         cnt += 1
+            #     if pose is None:
+            #         break
 
-            while (pose.position.z > 0.25):
-                self.get_logger().info(f'distance: {pose.position.z}')
-                twist.linear.x, twist.angular.z = velocity(pose)
+            twist.linear.x, twist.angular.z, t = velocity(pose)
+            rate = self.create_rate(1.0/t, self.get_clock())
+            self._publish_vel.publish(twist)
+            self.rate.sleep()
+
+            # self.rate.sleep()
+            for _ in range(100):
+                twist.linear.x = 0.0
+                twist.angular.z = 0.0
                 self._publish_vel.publish(twist)
-                cnt = 0
-                pose = None
-                while (cnt < 35):
-                    for (pose_det, id) in self.markers:
-                        delta = self.get_clock().now().nanoseconds - \
-                            rclpy.time.Time().from_msg(self.aruco_stamp).nanoseconds
-                        if f"aruco_{id}" == self.target and delta < 3e9:
-                            pose = pose_det
-                            break
-                    if pose is not None:
-                        break
-                    self.rate.sleep()
-                    cnt += 1
-                if pose is None:
-                    break
-
                 self.rate.sleep()
 
-            twist.linear.x = 0.0
-            twist.angular.z = 0.0
-            self._publish_vel.publish(twist)
-            if pose is None:
-                self.get_logger().warn("timeout")
-                goal_handle.abort()
-                result.success = False
-                return result
+            # if pose is None:
+            #     self.get_logger().warn("timeout")
+            #     goal_handle.abort()
+            #     result.success = False
+            #     return result
 
         elif self.target in self.ACCEPTABLE_TARGETS:
             point = None
