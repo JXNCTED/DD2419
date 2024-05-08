@@ -8,6 +8,7 @@ from sensor_msgs.msg import JointState
 from rclpy.action import ActionServer
 from robp_interfaces.action import Arm
 from math import pi, sin, cos, atan2, sqrt, acos, asin
+from geometry_msgs.msg import Twist
 
 from numpy import clip
 
@@ -59,8 +60,11 @@ class ArmController(Node):
         self.arm_pos_sub_ = self.create_subscription(
             JointState, '/servo_pos_publisher', self.arm_pos_callback, 10)
 
+        self.twist_pub = self.create_publisher(
+            Twist, '/motor_controller/twist', 10)
+
         self.rate = self.create_rate(1/4)
-        self.rate_place = self.create_rate(1/2)  # sleep
+        self.backing_rate_1s = self.create_rate(1)
 
         self.action_server_ = ActionServer(
             self, Arm, 'arm', execute_callback=self.execute_callback, goal_callback=self.goal_callback, cancel_callback=self.cancel_callback
@@ -155,7 +159,7 @@ class ArmController(Node):
             self.get_logger().info("\033[92mPicked the object\033[0m")
 
         elif self.current_command == "place":
-            self.rate_place.sleep()
+            self.rate.sleep()
             z = 0.05
 
             # x, y = 0, 0.15
@@ -199,7 +203,7 @@ class ArmController(Node):
 
             self.arm_pub_.publish(msg)
 
-            self.rate_place.sleep()
+            self.rate.sleep()
 
             # now open the gripper
             self.command_list[0] = 0
@@ -213,7 +217,7 @@ class ArmController(Node):
 
             self.arm_pub_.publish(msg)
 
-            self.rate_place.sleep()
+            self.rate.sleep()
 
             self.command_list[0] = 3000
             self.command_list[1] = 12000
@@ -227,6 +231,16 @@ class ArmController(Node):
             msg.data.extend(move_time)
 
             self.arm_pub_.publish(msg)
+
+        # backing off a bit
+        twist = Twist()
+        twist.linear.x = -0.05
+        self.twist_pub.publish(twist)
+        self.backing_rate_1s.sleep()
+
+        twist.linear.x = 0
+        self.twist_pub.publish(twist)
+        self.backing_rate_1s.sleep()
 
         result = Arm.Result()
         result.success = True
