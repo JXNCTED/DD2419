@@ -64,7 +64,7 @@ class ArmController(Node):
             Twist, '/motor_controller/twist', 10)
 
         self.rate = self.create_rate(1/4)
-        self.backing_rate_1s = self.create_rate(1)
+        self.backing_rate_100 = self.create_rate(100)
 
         self.action_server_ = ActionServer(
             self, Arm, 'arm', execute_callback=self.execute_callback, goal_callback=self.goal_callback, cancel_callback=self.cancel_callback
@@ -179,11 +179,11 @@ class ArmController(Node):
             self.command_list[1] = 12000
 
             # for horizontal configuration
-            # self.command_list[2] = 12000 - \
-            #     int(q3 * 18000 / pi) + int(pi / 2 * 18000 / pi)
+            self.command_list[2] = 12000 - \
+                int(q3 * 18000 / pi) + int(pi / 2 * 18000 / pi)
 
             # for vertical configuration
-            self.command_list[2] = 12000 - int(q3 * 18000 / pi)
+            # self.command_list[2] = 12000 - int(q3 * 18000 / pi)
 
             self.command_list[3] = 12000 + int(q2 * 18000 / pi)
             self.command_list[4] = 12000 - int(q1 * 18000 / pi)
@@ -232,15 +232,20 @@ class ArmController(Node):
 
             self.arm_pub_.publish(msg)
 
-        # backing off a bit
+        self.get_logger().info("Backing off a bit")
         twist = Twist()
-        twist.linear.x = -0.05
-        self.twist_pub.publish(twist)
-        self.backing_rate_1s.sleep()
-
-        twist.linear.x = 0
-        self.twist_pub.publish(twist)
-        self.backing_rate_1s.sleep()
+        # twist.linear.x = -0.1
+        # self.twist_pub.publish(twist)
+        # self.backing_rate_1s.sleep()
+        for _ in range(400):
+            twist.linear.x = -0.1
+            self.twist_pub.publish(twist)
+            self.backing_rate_100.sleep()
+        
+        for _ in range(50):
+            twist.linear.x = 0.0
+            self.twist_pub.publish(twist)
+            self.backing_rate_100.sleep()
 
         result = Arm.Result()
         result.success = True

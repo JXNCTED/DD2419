@@ -21,7 +21,7 @@ from rclpy.action import ActionClient
 from action_msgs.msg import GoalStatus
 from typing import TypedDict
 from detection_interfaces.srv import GetStuff, GetBox
-from geometry_msgs.msg import Point, Pose
+from geometry_msgs.msg import Point, Pose, PoseStamped
 from tf2_ros import Buffer, TransformListener
 
 from mapping_interfaces.srv import PathPlanObject, PathPlan, PathPlanBox
@@ -63,7 +63,8 @@ class MainSequence(pt.composites.Sequence):
             Exploration(),
             pt.decorators.FailureIsRunning(
                 name="PPPP failure is running", child=PPPP()),
-            CheckExplorationCompletion(),
+            # CheckExplorationCompletion(),
+            Done()
         ])
 
 
@@ -793,7 +794,7 @@ class PlaceBehavior(TemplateBehaviour):
         # super().initialise()
         goal_msg = Arm.Goal()
         goal_msg.command = "place"
-        goal_msg.position = [0.0, 0.15]
+        goal_msg.position = [0.0, 0.13]
         goal_msg.angle = 0.0
 
         self.action_client.wait_for_server()
@@ -900,16 +901,88 @@ class CheckExplorationCompletion(pt.behaviour.Behaviour):
         return pt.common.Status.RUNNING
 
 
-class Done(pt.behaviour.Behaviour):
-    '''
-    always return running
-    '''
+class Done(TemplateBehaviour):
+    """
+    nav back to origin and declare done
+    """
 
     def __init__(self, name="Done"):
         super(Done, self).__init__(name=name)
 
+        self.path_plan_client = self.create_client(
+            PathPlan, 'path_plan')
+
+        self.state = pt.common.Status.RUNNING
+
+    def initialise(self) -> None:
+        goal_pose = PoseStamped()
+        goal_pose.header.frame_id = "map"
+        goal_pose.pose.position.x = 0.0
+        goal_pose.pose.position.y = 0.0
+
+        self.path_plan_client.wait_for_service()
+
+        path_plan_request = PathPlan.Request()
+        path_plan_request.goal_pose = goal_pose
+
+        self.path_plan_future = self.path_plan_client.call_async(
+            path_plan_request)
+        
+        self.path_plan_future.add_done_callback(self.path_plan_future_callback)
+
+    def path_plan_future_callback(self, future):
+        result = future.result()
+        if result is None:
+            self.state = pt.common.Status.FAILURE
+            return
+
+        waypoints = []
+        for pose in result.path.poses:
+            waypoints.insert(0, Point(
+                x=pose.pose.position.x, y=pose.pose.position.y))
+
+        goal_msg = Pursuit.Goal()
+        goal_msg.waypoints = waypoints
+
+        self.pursuit_client = ActionClient(self, Pursuit, 'pursuit')
+        self.pursuit_client.wait_for_server()
+
+        self.pursuit_future = self.pursuit_client.send_goal_async(goal_msg)
+        self.pursuit_future.add_done_callback(self.pursuit_future_callback)
+
+    def pursuit_future_callback(self, future):
+        goal_handle = future.result()
+        if not goal_handle.accepted:
+            self.state = pt.common.Status.FAILURE
+            return
+
+        self.get_result_future = goal_handle.get_result_async()
+        self.get_result_future.add_done_callback(self.get_result_callback)
+
+    def get_result_callback(self, future):
+        result = future.result().result
+        if result is None:
+            self.state = pt.common.Status.FAILURE
+            return
+
+        if result.success:
+            self.state = pt.common.Status.RUNNING
+        else:
+            self.state = pt.common.Status.FAILURE
+
+        self.pursuit_future = None
+        self.get_result_future = None
+    
+    def terminate(self, new_status: Status) -> None:
+        self.path_plan_future = None
+        self.pursuit_future = None
+        self.get_result_future = None
+        self.state = pt.common.Status.RUNNING
+
     def update(self):
-        return pt.common.Status.RUNNING
+        rclpy.spin_once(self, timeout_sec=0.01)
+        return self.state
+
 
 
 class PickPosDict(TypedDict):

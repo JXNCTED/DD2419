@@ -1,6 +1,7 @@
 
 import numpy as np
 import rclpy
+import rclpy.logging
 from rclpy.node import Node
 from rclpy.action import ActionServer, GoalResponse, CancelResponse
 from rclpy.callback_groups import ReentrantCallbackGroup
@@ -24,14 +25,17 @@ def velocity(pose):
 
     # make the robot goto 15cm in front of the marker
     x, y = x-np.sin(theta)*DISP, y-np.cos(theta)*DISP
-    theta = np.arctan2(x, y)
+    theta = np.arctan2(y, x)
 
     v = 0.1
     d = np.sqrt(x**2 + y**2)
     R = d / (2 * np.sin(theta / 2))
-    l = np.pi * R * theta
+    l = R * theta
     t = l / v
     w = theta / t
+
+    # rclpy.logging.get_logger('approach_action_server').info(
+    #     f'x: {x}, y: {y}x theta: {theta}, v: {v}, w: {w}, t: {t}')
 
     return v, w, t
 
@@ -189,7 +193,7 @@ class ApproachActionServer(Node):
 
             if pose is None:
                 self.get_logger().warn(
-                    f" Target{self.target} not found, aborting goal.")
+                    f" Target {self.target} not found, aborting goal.")
                 goal_handle.abort()
                 return result
 
@@ -214,11 +218,11 @@ class ApproachActionServer(Node):
             #         break
 
             twist.linear.x, twist.angular.z, t = velocity(pose)
+            self.get_logger().info(f'v: {twist.linear.x}, w: {twist.angular.z}, t: {t}')
             rate = self.create_rate(1.0/t, self.get_clock())
             self._publish_vel.publish(twist)
-            self.rate.sleep()
+            rate.sleep()
 
-            # self.rate.sleep()
             for _ in range(100):
                 twist.linear.x = 0.0
                 twist.angular.z = 0.0
@@ -291,11 +295,11 @@ class ApproachActionServer(Node):
                 # return result
 
         # go forward a bit
-        twist = Twist()
-        for _ in range(150):  # 30cm
-            twist.linear.x = 0.2
-            self._publish_vel.publish(twist)
-            self.rate.sleep()
+        # twist = Twist()
+        # for _ in range(150):  # 30cm
+        #     twist.linear.x = 0.2
+        #     self._publish_vel.publish(twist)
+        #     self.rate.sleep()
 
         for _ in range(50):
             twist.linear.x = 0.0
