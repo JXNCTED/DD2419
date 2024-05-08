@@ -22,9 +22,12 @@ def velocity(pose):
     y = -pose.position.x
     theta = np.arctan2(x, y)
     DISP = 0.15
+    CAMERA_OFFSET = 0.05
+
 
     # make the robot goto 15cm in front of the marker
     x, y = x-np.sin(theta)*DISP, y-np.cos(theta)*DISP
+    y = y + CAMERA_OFFSET
     theta = np.arctan2(y, x)
 
     v = 0.1
