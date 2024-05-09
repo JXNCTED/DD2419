@@ -41,7 +41,7 @@ configurable_parameters = [{'name': 'camera_name',                  'default': '
                            {'name': 'depth_module.exposure.2',      'default': '1', 'description': 'Depth module second exposure value. Used for hdr_merge filter'},
                            {'name': 'depth_module.gain.2',          'default': '16', 'description': 'Depth module second gain value. Used for hdr_merge filter'},
                            {'name': 'enable_sync',                  'default': 'true', 'description': "'enable sync mode'"},
-                           {'name': 'enable_rgbd',                  'default': 'false', 'description': "'enable rgbd topic'"},
+                           {'name': 'enable_rgbd',                  'default': 'true', 'description': "'enable rgbd topic'"},
                            {'name': 'enable_gyro',                  'default': 'true', 'description': "'enable gyro stream'"},
                            {'name': 'enable_accel',                 'default': 'true', 'description': "'enable accel stream'"},
                            {'name': 'gyro_fps',                     'default': '0', 'description': "''"},
@@ -99,8 +99,7 @@ def launch_setup(context, params, param_name_suffix=''):
             executable='realsense2_camera_node',
             parameters=[params, params_from_file],
             output=LaunchConfiguration('output' + param_name_suffix),
-            arguments=['--ros-args', '--log-level',
-                       LaunchConfiguration('log_level' + param_name_suffix)],
+            arguments=['--ros-args', '--log-level', 'warn'],
             emulate_tty=True,
         )
     ]

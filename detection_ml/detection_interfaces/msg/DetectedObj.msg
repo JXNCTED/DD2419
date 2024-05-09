@@ -1,4 +1,2 @@
 std_msgs/Header header
-geometry_msgs/PointStamped[] position
-int16[] category
-float32[] confidence
+Object[] obj

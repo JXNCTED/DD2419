@@ -13,6 +13,13 @@ find_package(rosidl_default_generators REQUIRED)
 
 rosidl_generate_interfaces(${PROJECT_NAME}
   "msg/DetectedObj.msg"
+  "msg/Object.msg"
+  "msg/Stuff.msg"
+  "msg/StuffList.msg"
+  "msg/Box.msg"
+  "msg/BoxList.msg"
+  "srv/GetStuff.srv"
+  "srv/GetBox.srv"
   DEPENDENCIES geometry_msgs std_msgs
 )
 

@@ -26,5 +26,5 @@ __pycache__/
 *.so
 .cache/
 
-AMENT_IGNORE
 COLCON_IGNORE
+AMENT_IGNORE

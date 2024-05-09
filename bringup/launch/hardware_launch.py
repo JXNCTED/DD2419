@@ -47,7 +47,7 @@ def generate_launch_description():
 
     aruco_marker_publisher_params = {
         'image_is_rectified': True,
-        'marker_size': 0.0625,
+        'marker_size': 0.05,
         'reference_frame': '',
         'camera_frame': 'camera_color_optical_frame',
     }
@@ -101,9 +101,10 @@ def generate_launch_description():
                 'inverted': False,
                 'angle_compensate': True,
             }],
+            ros_arguments=['--log-level', 'warn'],
         ),
         Node(executable='static_transform_publisher', package='tf2_ros', arguments=[
-            '--child-frame-id', 'lidar_link', '--frame-id', 'base_link']),
+            '--child-frame-id', 'lidar_link', '--frame-id', 'base_link', '--x', '0.01987', '--y', '0.0925', '--z', '0.14956']),
 
 
         # camera on arm

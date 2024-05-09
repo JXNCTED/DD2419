@@ -357,7 +357,7 @@ void setup()
 	delay(500);
 	servo1.move_time(16000, 500);
 	delay(500);
-	servo1.move_time(2000, 500);
+	servo1.move_time(3000, 500);
 	delay(500);
 
 	// Read in servo positions

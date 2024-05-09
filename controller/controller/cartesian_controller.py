@@ -36,7 +36,7 @@ class CartesianController(Node):
         WHEEL_RADIUS = 0.0352
         WHEEL_BASE = 0.23
 
-        KP = 0.5
+        KP = 0.8
         KI = 0.8
 
         DT = 50 / 1000

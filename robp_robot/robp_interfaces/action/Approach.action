@@ -1,0 +1,6 @@
+# The approaching target, one of the categories of the object {1, 2, ..., 14}, or aruco marker id {aruco_0, aruco_1, etc.}
+string target 
+---
+bool success # True if the target was reached
+---
+float64 distance # The distance to the target

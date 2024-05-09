@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.8)
 project(odometry)
 
 if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
-  add_compile_options(-Wall -Wextra -Wpedantic)
+  add_compile_options(-Wall -Wextra -Wno-pedantic)
 endif()
 
 # find dependencies
@@ -19,17 +19,27 @@ find_package(tf2_geometry_msgs REQUIRED)
 find_package(OpenCV REQUIRED)
 find_package(PCL REQUIRED)
 
+# add_subdirectory(Fusion)
+add_subdirectory(Fusion/Fusion)
+
 
 
 add_executable(vi_odom src/vi_odom.cpp)
 add_executable(wheel_odom src/wheel_odom.cpp)
 add_executable(filter_odom src/filter_odom.cpp)
 add_executable(lidar_compensator src/lidar_compensator.cpp)
+add_executable(lidar_landmarker src/lidar_landmarker.cpp)
 
 add_library(ekf src/ekf.cpp)
 target_include_directories(ekf PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
   $<INSTALL_INTERFACE:include>)
+
+target_include_directories(filter_odom PUBLIC
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+  $<INSTALL_INTERFACE:include>
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/Fusion>)
+
 
 target_include_directories(vi_odom PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
@@ -44,10 +54,20 @@ target_include_directories(lidar_compensator PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
   $<INSTALL_INTERFACE:include>)
 
+target_include_directories(lidar_landmarker PUBLIC
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+  $<INSTALL_INTERFACE:include>)
+
 target_link_libraries(lidar_compensator ${PCL_LIBRARIES})
+target_link_libraries(lidar_landmarker ${PCL_LIBRARIES})
 
 
 target_compile_features(vi_odom PUBLIC c_std_99 cxx_std_17)  # Require C99 and C++17
+target_compile_features(wheel_odom PUBLIC c_std_99 cxx_std_17)  # Require C99 and C++17
+target_compile_features(filter_odom PUBLIC c_std_99 cxx_std_17)  # Require C99 and C++17
+target_compile_features(lidar_compensator PUBLIC c_std_99 cxx_std_17)  # Require C99 and C++17
+target_compile_features(lidar_landmarker PUBLIC c_std_99 cxx_std_17)  # Require C99 and C++17
+
 ament_target_dependencies(
   vi_odom
   "pcl_conversions"
@@ -84,6 +104,8 @@ ament_target_dependencies(
   "tf2_geometry_msgs"
 )
 
+target_link_libraries(filter_odom ekf Fusion)
+
 ament_target_dependencies(
   lidar_compensator
   "pcl_conversions"
@@ -94,12 +116,25 @@ ament_target_dependencies(
   "nav_msgs"
 )
 
+ament_target_dependencies(
+  lidar_landmarker
+  "pcl_conversions"
+  "PCL"
+  "sensor_msgs"
+  "rclcpp"
+  "geometry_msgs"
+  "nav_msgs"
+  "robp_interfaces"
+  "tf2_ros"
+)
+
 
 install(TARGETS 
   vi_odom 
   wheel_odom 
   filter_odom
   lidar_compensator
+  lidar_landmarker
   DESTINATION lib/${PROJECT_NAME})
 
 if(BUILD_TESTING)

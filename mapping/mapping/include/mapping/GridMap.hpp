@@ -23,6 +23,11 @@
 class GridMap
 {
    public:
+    enum class GridType
+    {
+        LiDAR,
+        RGBD
+    };
     // constructors
     GridMap() = delete;
     /**
@@ -54,46 +59,49 @@ class GridMap
      * @param x x coordinate
      * @param y y coordinate
      * @param belief probability of occupancy
+     * @param type type of the grid, LiDAR or RGBD
      */
-    void setGridBelief(const double &x, const double &y, const double &belief);
+    void setGridBelief(const double &x,
+                       const double &y,
+                       const double &belief,
+                       const GridType &type);
     /**
      * @brief Set log belief in the grid
      *
      * @param x x coordinate
      * @param y y coordinate
      * @param logBelief log probability of occupancy
+     * @param type type of the grid, LiDAR or RGBD
      */
     void setGridLogBelief(const double &x,
                           const double &y,
-                          const double &logBelief);
+                          const double &logBelief,
+                          const GridType &type);
 
     /**
      * @brief Get the Grid Size object
      *
      * @return double grid cell size
      */
-    double getGridSize() { return gridSize; }
+    auto getGridSize() -> double { return gridSize; }
     /**
      * @brief Get the log belief
      *
      * @param x x coordinate
      * @param y y coordinate
+     * @param type type of the grid, LiDAR or RGBD
      * @return double log probability of occupancy
      */
-    double getGridLogBelief(const double &x, const double &y);
+    auto getGridLogBelief(const double &x,
+                          const double &y,
+                          const GridType &type) -> double;
     // APIs
     /**
      * @brief get the ros message of the occupancy grid
      *
      * @return nav_msgs::msg::OccupancyGrid ros message of the occupancy grid
      */
-    nav_msgs::msg::OccupancyGrid toRosOccGrid();
-    /**
-     * @brief save the map to the given directory
-     *
-     * @param dir directory to save the map
-     */
-    void saveMap(const std::string &dir);
+    auto toRosOccGrid() -> nav_msgs::msg::OccupancyGrid;
 
     // plan path in map coordinate
     /**
@@ -105,10 +113,18 @@ class GridMap
      * @param goalY goal coordinate in map frame
      * @return nav_msgs::msg::Path
      */
-    nav_msgs::msg::Path planPath(const double &startX,
-                                 const double &startY,
-                                 const double &goalX,
-                                 const double &goalY);
+    auto planPath(const double &startX,
+                  const double &startY,
+                  const double &goalX,
+                  const double &goalY) -> nav_msgs::msg::Path;
+
+    auto planPath(const double &startX,
+                  const double &startY,
+                  const int &goalObjId) -> nav_msgs::msg::Path;
+
+    auto planPathBox(const double &startX,
+                     const double &startY,
+                     const int &goalBoxId) -> nav_msgs::msg::Path;
 
     /**
      * @brief Set the occupancy for the workspace
@@ -118,6 +134,13 @@ class GridMap
      */
     void setLineSegmentOccupied(
         const std::vector<std::pair<double, double>> &lineSegments);
+
+    void updateStuffList(
+        const std::map<int, std::pair<double, double>> &stuffList);
+
+    void updateBoxList(const std::map<int, std::pair<double, double>> &boxList);
+
+    auto getFrontier() -> std::vector<std::pair<double, double>>;
 
    private:
     // a star algorithm
@@ -138,16 +161,33 @@ class GridMap
      * @brief Expand the grid to c-space
      *
      */
-    void expandGrid(const float &radius = 0.3f);
+    void expandGrid(const int &robotXOnGrid,
+                    const int &robotYOnGrid,
+                    const float &radius = 0.21f);
+
+    // void expandGrid(const int &id, const float &radius = 0.21f);
+    void expandGrid(const int &robotXOnGrid,
+                    const int &robotYOnGrid,
+                    const int &id,
+                    const float &radius = 0.21f);
+
+    // void expandGridBox(const int &id, const float &radius = 0.21f);
+    void expandGridBox(const int &robotXOnGrid,
+                       const int &robotYOnGrid,
+                       const int &id,
+                       const float &radius = 0.21f);
     // helper function for expandGrid, set obstacles around a point
     /**
-     * @brief Set every points within the radius of the given point as occupied
+     * @brief Set every points within the radius of the given point as
+     * occupied
      *
      * @param x point of coordinate on grid
      * @param y point of coordinate on grid
      * @param radius radius of the circle
      */
     void setOnesAroundPoint(const int &x, const int &y, const int &radius);
+
+    void setZeroAroundPoint(const int &x, const int &y, const int &radius);
     // ros message of the occupancy grid
     nav_msgs::msg::OccupancyGrid rosOccGrid;
     // size of the grid
@@ -155,14 +195,19 @@ class GridMap
     int sizeX = 0, sizeY = 0;
     int startX = 0, startY = 0;
     // belief of the grid, occupancy grid, lidar only for now
-    Eigen::MatrixXd gridBelief;
+    // Eigen::MatrixXd gridBelief;
     // expanded grid
     Eigen::MatrixXi expandedGrid;
     // known obstacles
     Eigen::MatrixXi knownGrid;
     // not implemented yet, for RGBD and expanded grid
     //     cv::Mat expandedGridCV;
-    //     Eigen::MatrixXd gridBeliefLiDAR;
-    //     Eigen::MatrixXd gridBeliefRGBD;
+    Eigen::MatrixXd gridBeliefLiDAR;
+    Eigen::MatrixXd gridBeliefRGBD;
     rclcpp::Time lastUpdated;
+
+    //  a map from stuff id in eval_category to its position in grid map frame,
+    //  therefore int
+    std::map<int, std::pair<int, int>> stuffList;
+    std::map<int, std::pair<int, int>> boxList;
 };

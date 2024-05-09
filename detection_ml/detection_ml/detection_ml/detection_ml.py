@@ -9,16 +9,36 @@ import rclpy
 from dd2419_detector_baseline.detector import Detector
 import time
 import numpy as np
-from std_msgs.msg import Float32MultiArray
+from std_msgs.msg import String, Float32MultiArray
 import torch_tensorrt
-from PIL import Image as PILImage
-from geometry_msgs.msg import PointStamped
 from detection_interfaces.msg import DetectedObj
+from detection_interfaces.msg import Object
+from geometry_msgs.msg import PointStamped
+from realsense2_camera_msgs.msg import RGBD
+
+cls_dict = {
+    0: "none",
+    1: "bc",
+    2: "binky",
+    3: "box",
+    4: "bs",
+    5: "gc",
+    6: "gs",
+    7: "hugo",
+    8: "kiki",
+    9: "muddles",
+    10: "oakie",
+    11: "rc",
+    12: "rs",
+    13: "slush",
+    14: "wc"
+}
 
 
 class DetectionMLNode(Node):
     def __init__(self):
         super().__init__('detection_ml')
+        self.mode = "front-camera"  # or "arm-camera"
         self.last_time = time.time()
 
         # This is to export the model to tensorrt
@@ -52,69 +72,162 @@ class DetectionMLNode(Node):
         )
         self.get_logger().info("Model loaded")
 
-        self.K = None
+        # self.K = None
 
-        self.np_depth = None
+        # self.np_depth = None
+
+        self.K_arm = np.array([[513.34301, 0., 307.89617],
+                               [0., 513.84807, 244.62007],
+                               [0., 0., 1.]])
+
+        self.coeffs_arm = np.array(
+            [-0.474424, 0.207336, -0.002361, 0.000427, 0.000000])
+
+        # self.image_sub = self.create_subscription(
+        #     Image, "/camera/color/image_raw", self.img_callback, 10)
 
         self.image_sub = self.create_subscription(
-            Image, "/camera/color/image_raw", self.img_callback, 10)
+            Image, "/image_raw", self.arm_img_callback, 5)
 
-        # this is the aligned depth camera info and image
-        self.cam_info_sub = self.create_subscription(
-            CameraInfo, "/camera/aligned_depth_to_color/camera_info", self.cam_info_callback, 10)
-        self.depth_sub = self.create_subscription(
-            Image, "/camera/aligned_depth_to_color/image_raw", self.depth_callback, 10)
+        self.arm_timeout_timer = self.create_timer(
+            5, self.arm_timeout_callback)
+
+        self.rgbd_sub = self.create_subscription(
+            RGBD, "/camera/rgbd", self.realsense_rbgd_callback, 5)
+
+        self.change_mode_sub = self.create_subscription(
+            String, "/detection_ml/change_mode", self.change_mode_callback, 5)
 
         # see the detection_interfaces package for the message definition
         self.detected_obj_pub = self.create_publisher(
             DetectedObj, "/detection_ml/detected_obj", 10)
+        
+        self.detection_img_pub = self.create_publisher(
+            Image, "/detection_ml/detection_img", 10)
 
         # publish the bounding box just as an multiarray
+
         self.bounding_box_pub = self.create_publisher(
             Float32MultiArray, "/detection_ml/bounding_box", 10)
 
+        self.arm_bounding_box_pub = self.create_publisher(
+            Float32MultiArray, "/detection_ml/arm_bounding_box", 10)
+
         # publish the pose of each category. For visualization only, could not handle multiple objects of the same category
         NUM_CLASSES = 15
-        self.pose_pubs = [self.create_publisher(
-            PointStamped, f"/detection_ml/pose{i}", 10) for i in range(NUM_CLASSES)]
 
         self.get_logger().info("Node initialized")
 
-    # store the camera intrinsics
-    def cam_info_callback(self, msg: CameraInfo):
-        self.K = np.array(msg.k).reshape(3, 3)
-
-    # store the depth image
-    def depth_callback(self, msg: Image):
-        bridge = cv_bridge.CvBridge()
-        img = bridge.imgmsg_to_cv2(msg, "passthrough")
-        self.np_depth = img
+    def change_mode_callback(self, msg: String):
+        if msg.data == "front-camera":
+            self.mode = "front-camera"
+            self.get_logger().info(f"Mode changed to {self.mode}")
+        elif msg.data == "arm-camera":
+            self.mode = "arm-camera"
+            self.get_logger().info(f"Mode changed to {self.mode}")
+        else:
+            self.get_logger().warn("Invalid mode")
+            return
 
     # project the bounding box to depth and get the position from camera_optical_frame
-    def get_position(self, bb):
+    def get_position(self, K, depth, bb):
         x, y, w, h = bb[0], bb[1], bb[2], bb[3]
         u = x + w/2
         v = y + h/2
-        world_z = self.np_depth[int(v), int(u)]
-        if world_z == 0:
+        world_z = depth[int(v), int(u)]
+        if world_z == 0 or world_z < 200 or world_z > 1000:
             return np.array([0.0, 0.0, 0.0])
-        world_x = (u - self.K[0, 2]) * world_z / self.K[0, 0]
-        world_y = (v - self.K[1, 2]) * world_z / self.K[1, 1]
+        world_x = (u - K[0, 2]) * world_z / K[0, 0]
+        world_y = (v - K[1, 2]) * world_z / K[1, 1]
         return np.array([world_x, world_y, world_z]) / 1000.0
 
-    def img_callback(self, msg: Image):
-        if self.K is None:
+    def realsense_rbgd_callback(self, msg: RGBD):
+        if self.mode == "arm-camera":
+            return
+
+        K = np.array(msg.rgb_camera_info.k).reshape(3, 3)
+
+        bridge = cv_bridge.CvBridge()
+        img = bridge.imgmsg_to_cv2(msg.rgb, "rgb8")
+        depth = bridge.imgmsg_to_cv2(msg.depth, "passthrough")
+
+        input_img = torch.stack([self.val_input_transforms(img)]).to(
+            "cuda")
+        with torch.no_grad():
+            out = self.trt_model(input_img)
+        DETECT_THRESHOLD = 0.95
+        bbs = self.model.out_to_bbs(out, DETECT_THRESHOLD)
+
+        show_img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+        IOU_THRESHOLD = 0.5
+        # apply non-maximum suppression
+        bbs_nms = non_max_suppression(bbs[0], IOU_THRESHOLD)
+        length = len(bbs_nms)
+        detected_obj = DetectedObj()
+        detected_obj.header = msg.rgb.header
+
+        for bb in bbs_nms:
+            x, y, w, h, score, category = int(bb[0]), int(bb[1]), int(
+                bb[2]), int(bb[3]), round(bb[4], 2), int(bb[5])
+
+            cata_str = f"{cls_dict[category]}/{category}"
+            # draw the bounding box and the category. For visualization only
+            # when running, comment out if no valid display is available
+            cv2.rectangle(show_img, (x, y), (x+w, y+h),
+                          color=(0, 255, 0), thickness=2)
+            cv2.putText(show_img, cata_str, (x, y),
+                        cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
+            position = self.get_position(K, depth, bb)
+            if (position == np.array([0.0, 0.0, 0.0])).all():
+                continue
+            pose = PointStamped()
+            pose.header = msg.rgb.header
+            pose.point.x = position[0]
+            pose.point.y = position[1]
+            pose.point.z = position[2]
+
+            obj = Object()
+            obj.category = category
+            obj.confidence = score
+            obj.position = pose
+            detected_obj.obj.append(obj)
+
+        if length > 0:
+            self.detected_obj_pub.publish(detected_obj)
+            bbs_np = np.array(bbs_nms).flatten()
+            self.bounding_box_pub.publish(Float32MultiArray(data=bbs_np))
+
+        fps = round(1/(time.time()-self.last_time), 2)
+        self.last_time = time.time()
+        status_str = f"FPS: {fps}"
+        cv2.putText(show_img, status_str, (10, 30),
+                    cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
+        self.detection_img_pub.publish(bridge.cv2_to_imgmsg(show_img))
+        # cv2.imshow("detections", show_img)
+        # cv2.waitKey(1)
+
+    def arm_timeout_callback(self):
+        self.get_logger().warn("Arm camera does not receive image for 5 seconds")
+
+    def arm_img_callback(self, msg: Image):
+        self.arm_timeout_timer.reset()
+        if self.mode == "front-camera":
+            return
+        if self.K_arm is None:
             self.get_logger().info("No camera info received yet")
             return
 
         # convert the image to tensor and run the model
         bridge = cv_bridge.CvBridge()
         img = bridge.imgmsg_to_cv2(msg, "rgb8")
+        img = cv2.undistort(img, self.K_arm, self.coeffs_arm)
+        img = cv2.blur(img, (5, 5))
+
         input_img = torch.stack([self.val_input_transforms(img)]).to(
             "cuda")
         with torch.no_grad():
             out = self.trt_model(input_img)
-        DETECT_THRESHOLD = 0.9
+        DETECT_THRESHOLD = 0.95
         bbs = self.model.out_to_bbs(out, DETECT_THRESHOLD)
 
         show_img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
@@ -128,23 +241,8 @@ class DetectionMLNode(Node):
         for bb in bbs_nms:
             x, y, w, h, score, category = int(bb[0]), int(bb[1]), int(
                 bb[2]), int(bb[3]), round(bb[4], 2), int(bb[5])
-            position = self.get_position(bb)
-            # handle obviously wrong position
-            if (position == np.array([0.0, 0.0, 0.0])).all():
-                continue
-            pose = PointStamped()
-            pose.header.frame_id = "camera_color_optical_frame"
-            pose.header.stamp = msg.header.stamp
-            pose.point.x = position[0]
-            pose.point.y = position[1]
-            pose.point.z = position[2]
-            # self.pose_pub.publish(pose)
-            self.pose_pubs[category].publish(pose)
-            detected_obj.position.append(pose)
-            detected_obj.category.append(category)
-            detected_obj.confidence.append(score)
 
-            cata_str = f"{category} scr:{score}"
+            cata_str = f"{cls_dict[category]}/{category}"
             # draw the bounding box and the category. For visualization only
             # when running, comment out if no valid display is available
             cv2.rectangle(show_img, (x, y), (x+w, y+h),
@@ -153,20 +251,17 @@ class DetectionMLNode(Node):
                         cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
 
         if length > 0:
-            self.detected_obj_pub.publish(detected_obj)
+            bbs_np = np.array(bbs_nms).flatten()
+            self.arm_bounding_box_pub.publish(Float32MultiArray(data=bbs_np))
 
         fps = round(1/(time.time()-self.last_time), 2)
         self.last_time = time.time()
         status_str = f"FPS: {fps}"
         cv2.putText(show_img, status_str, (10, 30),
                     cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
-        cv2.imshow("detections", show_img)
-        cv2.waitKey(1)
-
-        if len(bbs_nms) > 0:
-            bbs_nms = np.array(bbs_nms)
-            self.bounding_box_pub.publish(
-                Float32MultiArray(data=bbs_nms.flatten()))
+        self.detection_img_pub.publish(bridge.cv2_to_imgmsg(show_img))
+        # cv2.imshow("detections", show_img)
+        # cv2.waitKey(1)
 
 
 def non_max_suppression(boxes, threshold):

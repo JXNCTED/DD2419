@@ -14,6 +14,9 @@ find_package(std_msgs REQUIRED)
 
 rosidl_generate_interfaces(${PROJECT_NAME}
   "srv/PathPlan.srv"
+  "srv/PathPlanObject.srv"
+  "srv/PathPlanBox.srv"
+  "srv/GetFrontier.srv"
   DEPENDENCIES geometry_msgs nav_msgs std_msgs
 )
 # uncomment the following section in order to fill in

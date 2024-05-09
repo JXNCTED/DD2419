@@ -1,0 +1,4 @@
+---
+# success=False if no frontier, meaning exploration is done
+bool success 
+geometry_msgs/Point p

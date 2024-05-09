@@ -26,7 +26,8 @@ setup(
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
-            'detection_ml = detection_ml.detection_ml:main'
+            'detection_ml = detection_ml.detection_ml:main',
+            'category_eval = detection_ml.category_eval:main'
         ],
     },
 )

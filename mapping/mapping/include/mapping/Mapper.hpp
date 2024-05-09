@@ -9,7 +9,10 @@
  *
  */
 #pragma once
+#include <detection_interfaces/msg/detail/box_list__struct.hpp>
+#include "detection_interfaces/msg/stuff_list.hpp"
 #include "mapping/GridMap.hpp"
+#include "sensor_msgs/msg/laser_scan.hpp"
 #include "sensor_msgs/msg/point_cloud2.hpp"
 
 // pose struct
@@ -37,8 +40,30 @@ class Mapper
      * @param laserPtr Ptr to the laser scan message
      * @param pose current pose of the robot in map frame
      */
-    void updateMapLidar(const sensor_msgs::msg::PointCloud2::SharedPtr laserPtr,
+    void updateMapLiDAR(const sensor_msgs::msg::PointCloud2::SharedPtr laserPtr,
                         const Pose &pose);
+
+    // ovloaded function for easy testing
+    void updateMapLiDAR(const sensor_msgs::msg::LaserScan::SharedPtr laserPtr,
+                        const Pose &pose);
+
+    /**
+     * @brief Update the map with the RGBD data
+     *
+     * @param rgbdPtr Ptr to the RGBD message
+     * @param pose current pose of the robot in map frame
+     */
+    // void updateMapRGBD(const sensor_msgs::msg::PointCloud2::SharedPtr
+    // rgbdPtr,
+    //                    const Pose &pose);
+    void updateMapRGBD(const sensor_msgs::msg::LaserScan::SharedPtr rgbdPtr,
+                       const Pose &pose);
+
+    void updateMapStuffList(
+        const detection_interfaces::msg::StuffList::SharedPtr stuffListPtr);
+    
+    void updateMapBoxList(
+        const detection_interfaces::msg::BoxList::SharedPtr boxListPtr);
 
    private:
     /**
@@ -47,8 +72,12 @@ class Mapper
      * @param coor coordinate to be updated
      * @param pOcc occupancy probability
      */
-    void updateGrid(const Eigen::Vector2d coor, const double &pOcc);
+    void updateGrid(const Eigen::Vector2d coor,
+                    const double &pOcc,
+                    const GridMap::GridType &type);
 
     // pointer to the grid map, initialized in the constructor
     GridMap *map;
+    std::map<int, std::pair<double, double>> stuffList;
+    std::map<int, std::pair<double, double>> boxList;
 };

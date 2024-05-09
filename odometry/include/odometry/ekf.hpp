@@ -1,62 +1,59 @@
 #pragma once
 #include <eigen3/Eigen/Dense>
-
-using ProcessModelFunc     = Eigen::VectorXd (*)(Eigen::VectorXd, Eigen::VectorXd);
-using ObservationModelFunc = Eigen::VectorXd (*)(Eigen::VectorXd);
-using VecMatFunc           = Eigen::MatrixXd (*)(Eigen::VectorXd);
-using VoidMatFunc          = Eigen::MatrixXd (*)(void);
+#include <mutex>
 
 class EKF
 {
    public:
-    EKF() = delete;
+    using ProcessModelFunc     = Eigen::VectorXd (*)(Eigen::VectorXd,
+                                                 Eigen::VectorXd,
+                                                 const double &);
+    using ObservationModelFunc = Eigen::VectorXd (*)(Eigen::VectorXd);
+    using VecMatFunc  = Eigen::MatrixXd (*)(Eigen::VectorXd, const double &);
+    using VoidMatFunc = Eigen::MatrixXd (*)();
+
+    EKF() = default;
     EKF(const size_t &n,
         const ProcessModelFunc &f,
-        const ObservationModelFunc &h,
         const VecMatFunc &j_f,
-        const VecMatFunc &j_h,
-        const VoidMatFunc &update_q,
-        const VecMatFunc &update_r,
-        const Eigen::MatrixXd &P0);
+        const Eigen::MatrixXd &Q,
+        const Eigen::MatrixXd &P);
 
     void init(const Eigen::VectorXd &x0);
 
-    Eigen::VectorXd predict(const Eigen::VectorXd &u);
+    auto predict(const Eigen::VectorXd &u, const double &dt) -> Eigen::VectorXd;
 
-    Eigen::VectorXd update(const Eigen::VectorXd &z);
+    auto update(const Eigen::VectorXd &z,
+                const VecMatFunc &j_h,
+                const Eigen::MatrixXd &R,
+                const double &dt) -> Eigen::VectorXd;
+
+    auto getState() -> Eigen::VectorXd { return x; }
+
+    auto isInitialized() -> bool { return initialized; }
 
    private:
+    bool initialized = false;
     // system dim
-    const size_t n;
+    size_t n;
 
     // process function
     ProcessModelFunc f;
-    // observation function
-    ObservationModelFunc h;
 
     // process jacobian
     VecMatFunc jacobian_f;
-    Eigen::MatrixXd F;
 
     // observation jacobian
-    VecMatFunc jacobian_h;
     Eigen::MatrixXd H;
 
     // process noise covariance
-    VoidMatFunc update_Q;
     Eigen::MatrixXd Q;
 
-    // observe noise covariance
-    VecMatFunc update_R;
-    Eigen::MatrixXd R;
-
     // error state covariance
-    Eigen::MatrixXd P_pri;
-    Eigen::MatrixXd P_post;
+    Eigen::MatrixXd P;
 
     // Kalman gain
     Eigen::MatrixXd K;
 
-    Eigen::VectorXd x_pri;
-    Eigen::VectorXd x_post;
+    Eigen::VectorXd x;
 };

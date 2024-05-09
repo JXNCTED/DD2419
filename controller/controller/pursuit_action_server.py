@@ -1,12 +1,16 @@
 import numpy as np
 import rclpy
+import rclpy.duration
 from rclpy.node import Node
 from rclpy.action import ActionServer, GoalResponse, CancelResponse
 from rclpy.callback_groups import ReentrantCallbackGroup
 
 from nav_msgs.msg import Odometry
-from geometry_msgs.msg import Twist
+from geometry_msgs.msg import Twist, Pose
+import rclpy.time
 from robp_interfaces.action import Pursuit
+from tf2_ros import Buffer, TransformListener
+from tf2_geometry_msgs import do_transform_pose, TransformStamped
 
 
 class PursuitActionServer(Node):
@@ -19,6 +23,14 @@ class PursuitActionServer(Node):
         self._cb_group = ReentrantCallbackGroup()
         self.waypoints = []
         self.rate = self.create_rate(100, self.get_clock())
+
+        self.tf_buffer = Buffer()
+        self.tf_listener = TransformListener(
+            self.tf_buffer, self, spin_thread=True)
+
+        self.odom_to_map_tf = TransformStamped()
+
+        self.running = False
 
         self._action_server = ActionServer(
             self,
@@ -71,28 +83,45 @@ class PursuitActionServer(Node):
         result = Pursuit.Result()
         result.success = False
 
+        self.running = True
+
         goal_point = self.waypoints[-1]
+        twist = Twist()
+        # align the robot with start point
+        angle = np.arctan2(goal_point.y - self.odom_y,
+                           goal_point.x - self.odom_x)
+        while abs(angle - self.odom_yaw) > 0.1:
+            self.rate.sleep()
+            angle = np.arctan2(goal_point.y - self.odom_y,
+                               goal_point.x - self.odom_x)
+            # self.get_logger().info(f"Aligning with start point: {angle - self.odom_yaw}")
+            twist.linear.x = 0.0
+            twist.angular.z = 0.4 * np.sign(angle - self.odom_yaw)
+            self._publish_vel.publish(twist)
+
         while (len(self.waypoints) > 0):
             if goal_handle.is_cancel_requested:
-                twist = Twist()
                 twist.linear.x = 0.0
                 twist.angular.z = 0.0
                 self._publish_vel.publish(twist)
                 goal_handle.canceled()
                 self.get_logger('Goal canceled')
+                self.running = False
                 return result
-            if np.hypot(self.waypoints[-1].x - self.odom_x, self.waypoints[-1].y - self.odom_y) < 0.1:
+            if np.hypot(self.waypoints[-1].x - self.odom_x, self.waypoints[-1].y - self.odom_y) < 0.19:
                 self.waypoints = []
+                result.success = True
                 break
             for waypoint in self.waypoints:
                 # TODO: make this a parameter to to set
-                LOOK_AHEAD = 0.2
+                LOOK_AHEAD = 0.10
                 # if current waypoint is beyond LOOK_AHEAD, use it as waypoint
                 # I imagine this could cause a problem if the last waypoint is
                 # beyond 0.1 but within 0.2 could check for this case and move
                 # based on time to the goal point.
                 if np.hypot(waypoint.x - self.odom_x, waypoint.y - self.odom_y) > LOOK_AHEAD:
                     break
+
                 self.waypoints.pop(0)
             if len(self.waypoints) == 0:
                 break
@@ -105,21 +134,44 @@ class PursuitActionServer(Node):
             self.rate.sleep()
 
         twist = Twist()
-        twist.linear.x = 0.0
-        twist.angular.z = 0.0
-        self._publish_vel.publish(twist)
 
-        if np.hypot(goal_point.x - self.odom_x, goal_point.y - self.odom_y) < 0.1:
-            self.get_logger().info('Reached goal')
+        # align with the goal point
+        self.rate.sleep()
+
+        angle = np.arctan2(goal_point.y - self.odom_y,
+                           goal_point.x - self.odom_x)
+
+
+        self.get_logger().info(
+            f"Aligning with goal point: {angle - self.odom_yaw}")
+        while abs(angle - self.odom_yaw) > 0.08: # 5 degress?
+            self.get_logger().info(
+                f"Aligning with goal point: {angle - self.odom_yaw}")
+            self.rate.sleep()
+            angle = np.arctan2(goal_point.y - self.odom_y,
+                               goal_point.x - self.odom_x)
+            twist.linear.x = 0.0
+            twist.angular.z = 0.4 * np.sign(angle - self.odom_yaw)
+            self._publish_vel.publish(twist)
+
+        # stop the robot
+        for _ in range(10):
+            twist.linear.x = 0.0
+            twist.angular.z = 0.0
+            self._publish_vel.publish(twist)
+            self.rate.sleep()
+
+        if result.success:
+            self.get_logger().info('\033[92mGoal succeeded\033[0m')
             goal_handle.succeed()
-            result.success = True
         else:
-            self.get_logger().info('Failed to reach goal')
+            self.get_logger().warn('Goal not succeeded, aborting...')
             goal_handle.abort()
 
+        self.running = False
         return result
 
-    def velocity(self, target, lin_v=0.5):
+    def velocity(self, target, lin_v=0.1):
         """
         Calculate the angular velocity from the constant linear velocity,
         the position of the robot and the waypoint using a circle.
@@ -146,25 +198,50 @@ class PursuitActionServer(Node):
         t = arc_length / lin_v  # time to move to the waypoint, not used atm
         return lin_v, ang_v, t
 
-    def odom_callback(self, msg):
+    def odom_callback(self, msg: Odometry):
         """
         Extract the x, y and yaw from the odometry.
         https://robotics.stackexchange.com/questions/16471/get-yaw-from-quaternion
         """
-        self.odom_x = msg.pose.pose.position.x
-        self.odom_y = msg.pose.pose.position.y
-        x = msg.pose.pose.orientation.x
-        y = msg.pose.pose.orientation.y
-        z = msg.pose.pose.orientation.z
-        w = msg.pose.pose.orientation.w
+        if not self.running:
+            return
+        # x = msg.pose.pose.orientation.x
+        # y = msg.pose.pose.orientation.y
+        # z = msg.pose.pose.orientation.z
+        # w = msg.pose.pose.orientation.w
+        # self.odom_yaw = np.arctan2(
+        #     2.0 * (w * z + x * y), w * w + x * x - y * y - z * z)
+
+        # for simplicty, let the arm center for approach center
+        CAMERA_ARM_OFFSET = 0.055
+        try:
+            self.odom_to_map_tf = self.tf_buffer.lookup_transform(
+                'map', 'odom', rclpy.time.Time().to_msg(), timeout=rclpy.duration.Duration(seconds=1.0))
+        except Exception as e:
+            self.get_logger().error(
+                f"Failed to lookup transform: {str(e)}")
+            # return
+
+        odom_pose = msg.pose.pose
+        map_pose: Pose
+        map_pose = do_transform_pose(
+            odom_pose, self.odom_to_map_tf)
+
+        x = map_pose.orientation.x
+        y = map_pose.orientation.y
+        z = map_pose.orientation.z
+        w = map_pose.orientation.w
         self.odom_yaw = np.arctan2(
             2.0 * (w * z + x * y), w * w + x * x - y * y - z * z)
+
+        self.odom_x = map_pose.position.x + CAMERA_ARM_OFFSET * np.sin(self.odom_yaw)
+        self.odom_y = map_pose.position.y + CAMERA_ARM_OFFSET * np.cos(self.odom_yaw)
 
 
 def main(args=None):
     rclpy.init(args=args)
 
-    executor = rclpy.executors.MultiThreadedExecutor(3)
+    executor = rclpy.executors.MultiThreadedExecutor()
     pursuit_action_server = PursuitActionServer()
 
     rclpy.spin(pursuit_action_server, executor=executor)
