@@ -31,23 +31,27 @@ class Box:
 
     def __init__(self, aruco_id, P=100, R=1, Q=0.1):
         # x, y and yaw of the center of the box
-        self.filter = KalmanFilter(dim_x=3, dim_z=3)
-        self.filter.x = np.array([0, 0, 0])
-        self.filter.F = np.eye(3)
-        self.filter.H = np.eye(3)
-        self.filter.P = np.eye(3) * P
-        self.filter.R = np.eye(3) * R
-        self.filter.Q = np.eye(3) * Q
+        self.filter = KalmanFilter(dim_x=2, dim_z=2)
+        self.filter.x = np.array([0, 0])
+        self.filter.F = np.eye(2)
+        self.filter.H = np.eye(2)
+        self.filter.P = np.eye(2) * P
+        self.filter.R = np.eye(2) * R
+        self.filter.Q = np.eye(2) * Q
+
+        self.yaw = 0
 
         self.aruco_id = aruco_id  # aruco marker id
 
     def update(self, position, yaw):
         self.filter.predict()
         self.filter.update(np.array(
-            [position[0], position[1], yaw]))
+            [position[0], position[1]]))
+        
+        self.yaw = (self.yaw + yaw) / 2
 
     def get_position(self):
-        return np.array([self.filter.x[0], self.filter.x[1], self.filter.x[2]], dtype=np.float64)
+        return np.array([self.filter.x[0], self.filter.x[1], self.yaw], dtype=np.float64)
 
 
 class DisplayMarkers(Node):
@@ -208,17 +212,17 @@ class DisplayMarkers(Node):
                 continue
 
             marker = VisMarker()
-            # marker.header.frame_id = "map"
+            marker.header.frame_id = "map"
             # marker.header.stamp = self.get_clock().now().to_msg()
-            marker.header.frame_id = f"aruco_{box.aruco_id}"
+            # marker.header.frame_id = f"aruco_{box.aruco_id}"
             marker.ns = "box"
             marker.id = box.aruco_id
             marker.type = VisMarker.CUBE
             marker.action = VisMarker.MODIFY
-            # marker.pose.position.x = position[0]
-            # marker.pose.position.y = position[1]
-            # marker.pose.position.z = 0.0
-            marker.pose.position.x = -Box.BOX_WIDTH / 2
+            # marker.pose.position.x = -Box.BOX_WIDTH / 2
+            marker.pose.position.x = position[0] - (Box.BOX_LENGTH / 2 + 0.3) * sin(position[2])
+            marker.pose.position.y = position[1] +(Box.BOX_LENGTH / 2 + 0.3) * cos(position[2])
+            marker.pose.position.z = 0.0
             box_q = quaternion_from_euler(0, 0, position[2])
             marker.pose.orientation.x = box_q[0]
             marker.pose.orientation.y = box_q[1]
@@ -238,24 +242,19 @@ class DisplayMarkers(Node):
             box_msg.pose.position.x = position[0]
             box_msg.pose.position.y = position[1]
             box_msg.pose.position.z = 0.0
-            box_msg.center_pose.position.x = position[0] - (Box.BOX_WIDTH / 2 + 0.3) * cos(position[2])
-            box_msg.center_pose.position.y = position[1] - (Box.BOX_WIDTH / 2 + 0.3) * sin(position[2])
+            box_msg.center_pose.position.x = position[0] - (Box.BOX_WIDTH / 2 + 0.3) * sin(position[2])
+            box_msg.center_pose.position.y = position[1] + (Box.BOX_WIDTH / 2 + 0.3) * cos(position[2])
             box_msg.center_pose.position.z = 0.0
             box_list.boxes.append(box_msg)
             text_marker = VisMarker()
-            # text_marker.header.frame_id = "map"
-            # text_marker.header.stamp = self.get_clock().now().to_msg()
-            text_marker.header.frame_id = f"aruco_{box.aruco_id}"
+            text_marker.header.frame_id = "map"
 
             text_marker.ns = "box"
             text_marker.id = box.aruco_id + 100
             text_marker.type = VisMarker.TEXT_VIEW_FACING
             text_marker.action = VisMarker.MODIFY
-            # text_marker.pose.position.x = position[0]
-            # text_marker.pose.position.y = position[1]
-            # text_marker.pose.position.z = 0.2
-
-            text_marker.pose.position.x = -Box.BOX_WIDTH / 2
+            text_marker.pose.position.x = position[0] - (Box.BOX_LENGTH / 2 + 0.3) * sin(position[2])
+            text_marker.pose.position.y = position[1] + (Box.BOX_LENGTH / 2 + 0.3) * cos(position[2])
             text_marker.pose.position.z = 0.2
 
             text_marker.pose.orientation.w = 1.0

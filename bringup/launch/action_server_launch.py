@@ -12,12 +12,16 @@ def generate_launch_description():
             package='controller', executable='approach_action_server', name='approach_action_server'),
         Node(
             package='controller', executable='arm_controller', name='arm_controller'),
-        Node(
-            package='controller', executable='dummy_explorer_action_server', name='dummy_explorer_action_server'),
+        # Node(
+        #     package='controller', executable='dummy_explorer_action_server', name='dummy_explorer_action_server'),
         Node(
             package='controller', executable='finetune_object_action_server', name='finetune_object_action_server'),
         Node(
+            package='controller', executable='navigator', name='navigator'),
+        Node(
             package='controller', executable='pursuit_action_server', name='pursuit_action_server'),
+        Node(
+            package='exploration', executable='spinny', name='spinny'),
         Node(
             package='talking', executable='talking', name='talking'),
     ])

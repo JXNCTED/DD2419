@@ -13,6 +13,7 @@ from geometry_msgs.msg import Twist
 from numpy import clip
 
 
+
 def j12_ik(x, z):
     """
     joint 1 and 2 inverse kinematics
@@ -260,7 +261,9 @@ class ArmController(Node):
 
         if goal_request.command == "pick":
             self.current_command = goal_request.command
-            self.object_angle = goal_request.angle
+            # wrap angle within pi/2
+            self.object_angle = (goal_request.angle + pi) % (2 * pi) - pi
+            # self.object_angle = goal_request.angle
             self.object_position = goal_request.position
             if (self.object_position[1] < 0.148):
                 self.get_logger().warn("increase y position")

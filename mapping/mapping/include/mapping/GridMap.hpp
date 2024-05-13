@@ -187,6 +187,9 @@ class GridMap
      */
     void setOnesAroundPoint(const int &x, const int &y, const int &radius);
 
+    // bad naming, fuck it
+    void mySetOnesAroundPoint(const int &x, const int &y, const int &radius);
+
     void setZeroAroundPoint(const int &x, const int &y, const int &radius);
     // ros message of the occupancy grid
     nav_msgs::msg::OccupancyGrid rosOccGrid;

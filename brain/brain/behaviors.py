@@ -52,19 +52,21 @@ class Exploration(pt.composites.Sequence):
     def __init__(self, name="Exploration"):
         super(Exploration, self).__init__(name=name, memory=True)
         self.add_children([
-            ExplorePointBehavior(),
+            SpinnyExplorationBehavior(),
         ])
 
 
-class MainSequence(pt.composites.Sequence):
+class MainSequence(pt.composites.Selector):
     def __init__(self, name="MainSequence"):
         super(MainSequence, self).__init__(name=name, memory=True)
         self.add_children([
             Exploration(),
-            pt.decorators.FailureIsRunning(
-                name="PPPP failure is running", child=PPPP()),
+            # PPPP(),
+            pt.decorators.SuccessIsFailure(
+                name="PPPP success is failure", child=PPPP()),
+            # pt.decorators.FailureIsRunning(
+            #     name="PPPP failure is running", child=PPPP()),
             # CheckExplorationCompletion(),
-            Done()
         ])
 
 
@@ -74,7 +76,8 @@ class PPPP(pt.composites.Selector):
         super(PPPP, self).__init__(name=name, memory=True)
         self.add_children([
             # if peek fails, that means no more objects to pick, which indicates the task is done
-            # pt.decorators.Inverter(name="invert_peek", child=Peek()),
+            # pt.decorators.Inverter(
+            #     name="Peek invert", child=Peek()),
             Peek(),
             PPP(),
         ])
@@ -92,7 +95,8 @@ class PPP(pt.composites.Sequence):
             Place(),
             # Pop(),
             # Done(),
-            pt.decorators.Inverter(name="invert_pop", child=Pop()),
+            pt.decorators.SuccessIsFailure(
+                name="Pop Success is Failure", child=Pop()),
         ])
 
 
@@ -185,7 +189,7 @@ class Peek(TemplateBehaviour):
     def initialise(self) -> None:
         # super().initialise()
         self.logger.info("Peek initialising")
-        while(not self.client.wait_for_service(timeout_sec=1)):
+        while (not self.client.wait_for_service(timeout_sec=1)):
             self.logger.warning("[Peek] waiting for service")
         self.state = pt.common.Status.RUNNING
 
@@ -219,13 +223,14 @@ class Peek(TemplateBehaviour):
         self.blackboard.current_target_object = current_obj
         self.future = None
 
-        self.logger.info(f"peeking object {self.blackboard.current_target_object['stuff_id']}")
+        self.logger.info(
+            f"peeking object {self.blackboard.current_target_object['stuff_id']}")
         # self.state = pt.common.Status.SUCCESS
 
     def update(self):
         rclpy.spin_once(self, timeout_sec=0.01)
         return self.state
-    
+
     def terminate(self, new_status: Status) -> None:
         self.future = None
         self.logger.info(f"peak {self.status} -> {new_status}")
@@ -375,7 +380,6 @@ class PlanToObjectBehavior(TemplateBehaviour):
 
         self.state = pt.common.Status.RUNNING
 
-
     def initialise(self) -> None:
         self.logger.info("PlanToObjectBehaviour initialising")
         # super().initialise()
@@ -436,7 +440,7 @@ class PlanToObjectBehavior(TemplateBehaviour):
         # global current_object
         rclpy.spin_once(self, timeout_sec=0.01)
         return self.state
-    
+
     def terminate(self, new_status: Status) -> None:
         self.path_plan_future = None
         self.pursuit_future = None
@@ -508,13 +512,14 @@ class ApproachBoxBehavior(TemplateBehaviour):
 
         rclpy.spin_once(self, timeout_sec=0.01)
         return self.state
-    
+
     def terminate(self, new_status: Status) -> None:
         # self.change_camera_mode_pub.publish(String(data='front-camera'))
         # self.send_goal_future = None
         # self.get_result_future = None
         self.state = pt.common.Status.RUNNING
         # return super().terminate(new_status)
+
 
 class ApproachObjectBehavior(TemplateBehaviour):
     """
@@ -783,26 +788,25 @@ class PlaceBehavior(TemplateBehaviour):
         self.arm_pub = self.create_publisher(
             Int16MultiArray, '/multi_servo_cmd_sub', 10)
 
+        self.wild_west_talk_client = self.create_client(Talk, "talk")
 
         # self.tf_buffer = Buffer()
         # self.tf_listener = TransformListener(
         #     self.tf_buffer, self, spin_thread=True)
-        
+
         # self.sleep_rate = self.create_rate(1/3)
 
     def initialise(self) -> None:
         # super().initialise()
         goal_msg = Arm.Goal()
         goal_msg.command = "place"
-        goal_msg.position = [0.0, 0.13]
+        goal_msg.position = [0.0, 0.10]
         goal_msg.angle = 0.0
 
         self.action_client.wait_for_server()
 
         self.send_goal_future = self.action_client.send_goal_async(goal_msg)
         self.send_goal_future.add_done_callback(self.goal_response_callback)
-
-        
 
     def goal_response_callback(self, future):
         goal_handle = future.result()
@@ -818,6 +822,13 @@ class PlaceBehavior(TemplateBehaviour):
     def get_result_callback(self, future):
         result = future.result().result
         if result.success:
+            # say put
+            talk_request = Talk.Request()
+            sound_string = String()
+            sound_string.data = "put"
+            talk_request.sound = sound_string
+            self.wild_west_talk_client.call_async(talk_request)
+
             self.state = pt.common.Status.SUCCESS
         else:
             self.state = pt.common.Status.FAILURE
@@ -828,7 +839,7 @@ class PlaceBehavior(TemplateBehaviour):
     def update(self):
         rclpy.spin_once(self, timeout_sec=0.01)
         return self.state
-    
+
     def terminate(self, new_status: Status) -> None:
         self.send_goal_future = None
         self.get_result_future = None
@@ -848,16 +859,18 @@ class CheckTaskCompletion(pt.behaviour.Behaviour):
         return pt.common.Status.RUNNING
 
 
-class ExplorePointBehavior(TemplateBehaviour):
-    def __init__(self, name="ExplorePointBehavior"):
-        super(ExplorePointBehavior, self).__init__(name=name)
+class SpinnyExplorationBehavior(TemplateBehaviour):
+    def __init__(self, name="SpinnyExplore"):
+        super(SpinnyExplorationBehavior, self).__init__(name=name)
 
-        self.action_client = ActionClient(self, Explore, 'explore')
+        self.action_client = ActionClient(self, Explore, 'exploration')
 
         self.state = pt.common.Status.RUNNING
 
     def initialise(self) -> None:
         # super().initialise()
+
+        self.state = pt.common.Status.RUNNING
 
         goal_msg = Explore.Goal()
 
@@ -892,15 +905,6 @@ class ExplorePointBehavior(TemplateBehaviour):
         return self.state
 
 
-class CheckExplorationCompletion(pt.behaviour.Behaviour):
-    def __init__(self, name="CheckExplorationCompletion"):
-        super(CheckExplorationCompletion, self).__init__(name=name)
-
-    def update(self):
-        # place holder for the check exploration completion behavior
-        return pt.common.Status.RUNNING
-
-
 class Done(TemplateBehaviour):
     """
     nav back to origin and declare done
@@ -913,6 +917,8 @@ class Done(TemplateBehaviour):
             PathPlan, 'path_plan')
 
         self.state = pt.common.Status.RUNNING
+
+        self.wild_west_talk_client = self.create_client(Talk, "talk")
 
     def initialise(self) -> None:
         goal_pose = PoseStamped()
@@ -927,7 +933,7 @@ class Done(TemplateBehaviour):
 
         self.path_plan_future = self.path_plan_client.call_async(
             path_plan_request)
-        
+
         self.path_plan_future.add_done_callback(self.path_plan_future_callback)
 
     def path_plan_future_callback(self, future):
@@ -966,13 +972,20 @@ class Done(TemplateBehaviour):
             return
 
         if result.success:
+            # say done
+            talk_request = Talk.Request()
+            sound_string = String()
+            sound_string.data = "done"
+            talk_request.sound = sound_string
+            self.wild_west_talk_client.call_async(talk_request)
+
             self.state = pt.common.Status.RUNNING
         else:
             self.state = pt.common.Status.FAILURE
 
         self.pursuit_future = None
         self.get_result_future = None
-    
+
     def terminate(self, new_status: Status) -> None:
         self.path_plan_future = None
         self.pursuit_future = None
@@ -982,7 +995,6 @@ class Done(TemplateBehaviour):
     def update(self):
         rclpy.spin_once(self, timeout_sec=0.01)
         return self.state
-
 
 
 class PickPosDict(TypedDict):

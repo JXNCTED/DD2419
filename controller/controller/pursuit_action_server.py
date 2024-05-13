@@ -87,9 +87,11 @@ class PursuitActionServer(Node):
 
         goal_point = self.waypoints[-1]
         twist = Twist()
-        # align the robot with start point
+        #  the robot with start point
         angle = np.arctan2(goal_point.y - self.odom_y,
                            goal_point.x - self.odom_x)
+        self.get_logger().info(
+            f"Aligning with start point: {angle - self.odom_yaw}")
         while abs(angle - self.odom_yaw) > 0.1:
             self.rate.sleep()
             angle = np.arctan2(goal_point.y - self.odom_y,
@@ -105,7 +107,7 @@ class PursuitActionServer(Node):
                 twist.angular.z = 0.0
                 self._publish_vel.publish(twist)
                 goal_handle.canceled()
-                self.get_logger('Goal canceled')
+                self.get_logger().info('Goal canceled')
                 self.running = False
                 return result
             if np.hypot(self.waypoints[-1].x - self.odom_x, self.waypoints[-1].y - self.odom_y) < 0.19:

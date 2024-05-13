@@ -26,6 +26,7 @@ setup(
             'finetune_object_action_server = controller.finetune_object_action_server:main',
             'approach_action_server = controller.approach_action_server:main',
             'dummy_explorer_action_server = controller.dummy_explorer_action_server:main',
+            'navigator = controller.navigator:main',
         ],
     },
 )

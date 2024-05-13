@@ -26,7 +26,9 @@ class Talking(Node):
                 self.SOUND_PATH, request.sound.data + self.SOUND_SUFFIX)
 
             self.get_logger().info(f"Playing sound: {sound_path}")
-            playsound(sound_path)
+
+            # make this async
+            playsound(sound_path, block=False)
             response.empty = Empty()
         except Exception as e:
             self.get_logger().error(f"Error: {e}")

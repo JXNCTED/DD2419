@@ -458,7 +458,17 @@ void GridMap::expandGrid(const int &robotXOnGrid,
         }
     }
 
+    for (const auto &stuff : stuffList)
+    {
+        mySetOnesAroundPoint(
+            stuff.second.first, stuff.second.second, 0.25 / gridSize);
+        RCLCPP_INFO(rclcpp::get_logger("GridMap::expandGrid"),
+                    "expanding %d",
+                    stuff.first);
+    }
+
     setZeroAroundPoint(robotXOnGrid, robotYOnGrid, 0.2 / gridSize);
+
     // cv::imshow("expandedGrid", expandedGridCV);
     RCLCPP_INFO(rclcpp::get_logger("GridMap::expandGrid"), "expanded");
 }
@@ -479,6 +489,16 @@ void GridMap::expandGridBox(const int &robotXOnGrid,
             setOnesAroundPoint(i, j, EXPAND_RADIUS);
         }
     }
+
+    for (const auto &stuff : stuffList)
+    {
+        mySetOnesAroundPoint(
+            stuff.second.first, stuff.second.second, EXPAND_BOX_RADIUS);
+        RCLCPP_INFO(rclcpp::get_logger("GridMap::expandGridBox"),
+                    "expanding %d",
+                    stuff.first);
+    }
+
     const auto &box = boxList.at(id);
     setZeroAroundPoint(box.first, box.second, EXPAND_BOX_RADIUS);
     setZeroAroundPoint(robotXOnGrid, robotYOnGrid, EXPAND_BOX_RADIUS);
@@ -494,7 +514,7 @@ void GridMap::expandGrid(const int &robotXOnGrid,
 {
     expandedGrid.setZero();
     const int EXPAND_RADIUS     = radius / gridSize;
-    const int EXPAND_OBJ_RADIUS = 0.2 / gridSize;
+    const int EXPAND_OBJ_RADIUS = 0.23/ gridSize;
     for (int i = 0; i < sizeX; i++)
     {
         for (int j = 0; j < sizeY; j++)
@@ -507,7 +527,7 @@ void GridMap::expandGrid(const int &robotXOnGrid,
     {
         if (stuff.first != id)
         {
-            setOnesAroundPoint(
+            mySetOnesAroundPoint(
                 stuff.second.first, stuff.second.second, EXPAND_OBJ_RADIUS);
             RCLCPP_INFO(rclcpp::get_logger("GridMap::expandGrid"),
                         "expanding %d",
@@ -515,17 +535,6 @@ void GridMap::expandGrid(const int &robotXOnGrid,
         }
     }
 
-    // for (const auto &stuff : stuffList)
-    // {
-    //     if (stuff.first == id)
-    //     {
-    //         setZeroAroundPoint(
-    //             stuff.second.first, stuff.second.second, EXPAND_OBJ_RADIUS);
-    //         RCLCPP_INFO(rclcpp::get_logger("GridMap::expandGrid"),
-    //                     "clearing %d",
-    //                     stuff.first);
-    //     }
-    // }
 
     setZeroAroundPoint(
         stuffList.at(id).first, stuffList.at(id).second, EXPAND_OBJ_RADIUS);
@@ -550,6 +559,24 @@ void GridMap::setZeroAroundPoint(const int &x, const int &y, const int &radius)
                 continue;
             }
             expandedGrid(xOnGrid, yOnGrid) = 0;
+        }
+    }
+}
+
+void GridMap::mySetOnesAroundPoint(const int& x, const int& y, const int& radius)
+{
+    for (int i = -radius; i <= radius; i++)
+    {
+        for (int j = -radius; j <= radius; j++)
+        {
+            int xOnGrid = x + i;
+            int yOnGrid = y + j;
+            if (xOnGrid < 0 or xOnGrid >= sizeX or yOnGrid < 0 or
+                yOnGrid >= sizeY)
+            {
+                continue;
+            }
+            expandedGrid(xOnGrid, yOnGrid) = 1;
         }
     }
 }
@@ -694,13 +721,37 @@ auto GridMap::getFrontier() -> std::vector<std::pair<double, double>>
     // get the frontier for frontier-based exploration
     std::vector<std::pair<double, double>> frontier;
 
+    expandedGrid.setZero();
+
+    const int EXPAND_RADIUS = 0.26 / gridSize;
+    for (int i = 0; i < sizeX; i++)
+    {
+        for (int j = 0; j < sizeY; j++)
+        {
+            setOnesAroundPoint(i, j, EXPAND_RADIUS);
+            if (gridBeliefRGBD(i, j) == 0.5)
+            {
+                expandedGrid(i, j) = 1;
+            }
+        }
+    }
+
+    for (const auto &stuff : stuffList)
+    {
+        setOnesAroundPoint(
+            stuff.second.first, stuff.second.second, 0.2 / gridSize);
+        RCLCPP_INFO(rclcpp::get_logger("GridMap::getFrontier"),
+                    "expanding %d",
+                    stuff.first);
+    }
+
     // for every grid point
     for (int i = 0; i < sizeX; i++)
     {
         for (int j = 0; j < sizeY; j++)
         {
             // for every unknown grid
-            if (gridBeliefRGBD(i, j) != 0.5)  // known
+            if (expandedGrid(i, j) == 0)  // unoccupied
             {
                 bool isFrontier = false;
                 // for every neighbor
@@ -714,7 +765,7 @@ auto GridMap::getFrontier() -> std::vector<std::pair<double, double>>
                         {
                             continue;
                         }
-                        if (gridBeliefRGBD(x, y) == 0.5)  // unknown
+                        if (gridBeliefRGBD(x, y) == 0.5)  // and next to unknown
                         {
                             isFrontier = true;
                             break;

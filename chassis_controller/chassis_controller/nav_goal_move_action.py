@@ -5,7 +5,7 @@ from mapping_interfaces.srv import PathPlan
 from nav_msgs.msg import Path, Odometry
 from geometry_msgs.msg import PoseStamped
 from rclpy.action import ActionClient, ActionServer, GoalResponse, CancelResponse
-from geometry_msgs.msg import Point
+from geometry_msgs.msg import Point, Twist
 from robp_interfaces.action import Pursuit
 from rclpy.callback_groups import ReentrantCallbackGroup
 from robp_interfaces.action import NavGoal
@@ -21,7 +21,6 @@ class NavGoalMove(Node):
         # request object
         self.req = PathPlan.Request()
         self.current_pose = PoseStamped()
-        self.goal_pose = PoseStamped()
 
         self._cb_group = ReentrantCallbackGroup()
         self._action_server = ActionServer(
@@ -34,12 +33,18 @@ class NavGoalMove(Node):
             cancel_callback=self.cancel_callback,
         )
 
-        self.path_planned_pub = self.create_publisher(Path, "/path_planned", 10)
-        self.odom_sub_ = self.create_subscription(
-            Odometry, "/odom", self.odom_callback, 10
+        self.path_planned_pub = self.create_publisher(
+            Path, "/path_planned", 10)
+
+        self.twist_pub = self.create_publisher(
+            Twist, "/motor_controller/twist", 10
         )
+
         self.pursuit_client = ActionClient(self, Pursuit, "pursuit")
-        self._loop_rate = self.create_rate(10, self.get_clock())
+        self._loop_rate = self.create_rate(1, self.get_clock())
+        
+        # hack spin rate
+        self.spin_rate = self.create_rate(100)
 
     def destroy(self):
         """Cleanup"""
@@ -47,7 +52,6 @@ class NavGoalMove(Node):
         super().destroy_node()
 
     def goal_callback(self, goal_request):
-        self.goal_pose = goal_request.goal
         self.get_logger().info("Accepting the goal request")
         return GoalResponse.ACCEPT
 
@@ -57,7 +61,6 @@ class NavGoalMove(Node):
         return CancelResponse.ACCEPT
 
     def execute_callback(self, goal_handle):
-        self.req.current_pose = self.current_pose
         self.req.goal_pose = goal_handle.request.goal_pose
         self.impossible = False
         self.at_goal = False
@@ -65,6 +68,8 @@ class NavGoalMove(Node):
 
         result = NavGoal.Result()
         result.done = False
+
+        twist = Twist()
 
         while not self.impossible:
             self.stop_pursuit = False
@@ -75,13 +80,27 @@ class NavGoalMove(Node):
             if self.at_goal:
                 result.done = True
                 goal_handle.succeed()
-                break
+                self.get_logger().info("at goal, doing 360")
+                # a hack to spin at the endof the nav goal
+                for _ in range(400):
+                    twist.angular.z = 0.6
+                    self.twist_pub.publish(twist)
+                    self.spin_rate.sleep()
+                for _ in range(100):
+                    twist.angular.z = 0.0
+                    self.twist_pub.publish(twist)
+                    self.spin_rate.sleep()
+                return result
+                # break
             if goal_handle.is_cancel_requested:
                 goal_handle.canceled()
-                break
+                result.done = False
+                return result
+                # break
             self.stop_pursuit = True
             self._loop_rate.sleep()
-
+        result.done = False
+        goal_handle.abort()
         return result
 
     def path_callback(self, future_path):
@@ -94,8 +113,9 @@ class NavGoalMove(Node):
         self.get_logger().info("Path planned published...")
         waypoints = []
         for pose in response.path.poses:
-            #TODO: transform wazpoints from map to odom frame
-            waypoints.insert(0, Point(x=pose.pose.position.x, y=pose.pose.position.y))
+            # TODO: transform wazpoints from map to odom frame
+            waypoints.insert(
+                0, Point(x=pose.pose.position.x, y=pose.pose.position.y))
         goal_msg = Pursuit.Goal()
         goal_msg.waypoints = waypoints
 
@@ -115,7 +135,8 @@ class NavGoalMove(Node):
         self.get_logger().info("Pursuit goal accepted")
 
         if self.universal_goal_handle.is_cancel_requested:
-            goal_handle.cancel_goal_async()  # There is a future, I don't care. But perhaps the cancel_request should wait for this to cancel before canceling itself.
+            # There is a future, I don't care. But perhaps the cancel_request should wait for this to cancel before canceling itself.
+            goal_handle.cancel_goal_async()
             return
 
         pursuit_result = goal_handle.get_result_async()
@@ -129,17 +150,15 @@ class NavGoalMove(Node):
                 break
 
     def pursuit_result_callback(self, future):
-        pursuit_result = future.result()
+        pursuit_result = future.result().result
+ 
         if pursuit_result.success:
             self.get_logger().info("Pursuit succeeded")
             self.at_goal = True
+
         else:
             self.get_logger().info("Pursuit failed")
             self.impossible = True
-
-    def odom_callback(self, msg: Odometry):
-        self.current_pose.pose = msg.pose.pose
-        self.current_pose.header = msg.header
 
 
 def main():

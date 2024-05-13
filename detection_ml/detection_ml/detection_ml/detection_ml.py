@@ -101,7 +101,7 @@ class DetectionMLNode(Node):
         # see the detection_interfaces package for the message definition
         self.detected_obj_pub = self.create_publisher(
             DetectedObj, "/detection_ml/detected_obj", 10)
-        
+
         self.detection_img_pub = self.create_publisher(
             Image, "/detection_ml/detection_img", 10)
 
@@ -165,6 +165,7 @@ class DetectionMLNode(Node):
         length = len(bbs_nms)
         detected_obj = DetectedObj()
         detected_obj.header = msg.rgb.header
+        detected_obj.image = msg.rgb
 
         for bb in bbs_nms:
             x, y, w, h, score, category = int(bb[0]), int(bb[1]), int(
@@ -172,7 +173,6 @@ class DetectionMLNode(Node):
 
             cata_str = f"{cls_dict[category]}/{category}"
             # draw the bounding box and the category. For visualization only
-            # when running, comment out if no valid display is available
             cv2.rectangle(show_img, (x, y), (x+w, y+h),
                           color=(0, 255, 0), thickness=2)
             cv2.putText(show_img, cata_str, (x, y),
@@ -190,6 +190,7 @@ class DetectionMLNode(Node):
             obj.category = category
             obj.confidence = score
             obj.position = pose
+            obj.bbox = [x, y, w, h]
             detected_obj.obj.append(obj)
 
         if length > 0:

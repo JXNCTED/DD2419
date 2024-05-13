@@ -71,7 +71,6 @@ class FinetuneObjectActionServer(Node):
                                   [0, 0, 0, 0.1]])
         self.last_valid_measurement_stamp = None
 
-
         self.rate = self.create_rate(100)
         self.wiggle_rate = self.create_rate(5)
 
@@ -91,7 +90,7 @@ class FinetuneObjectActionServer(Node):
 
         self.twist_pub = self.create_publisher(
             Twist, '/motor_controller/twist', 10, callback_group=cb_group)
-        
+
         self.fine_tune_pub = self.create_publisher(
             Image, '/finetune', 10)
 
@@ -154,9 +153,20 @@ class FinetuneObjectActionServer(Node):
                 if (cnt > 10):
                     self.get_logger().warn('No valid measurement. timeout')
                     twist = Twist()
-                    twist.linear.x = 0.0
-                    twist.angular.z = 0.0
-                    self.twist_pub.publish(twist)
+
+                    self.get_logger().info('backing off...')
+                    for _ in range(3):
+                        twist.linear.x = -0.1
+                        twist.angular.z = 0.0
+                        self.twist_pub.publish(twist)
+                        self.wiggle_rate.sleep()
+                    
+                    for _ in range(3):
+                        twist.linear.x = 0.0
+                        twist.angular.z = 0.0
+                        self.twist_pub.publish(twist)
+                        self.wiggle_rate.sleep()
+
                     result.success = False
                     goal_handle.abort()
                     self.running = False
@@ -249,7 +259,11 @@ class FinetuneObjectActionServer(Node):
 
         if len(valid_contours) == 0:
             self.get_logger().warn('No valid contours found')
-            goal_handle.abort()
+            # goal_handle.abort()
+            # goal_handle.succeed()
+            result.success = True
+            result.position = [world_x, world_y]  # not sure if this is correct
+            result.angle = 0.0
             self.running = False
             return result
 
@@ -262,7 +276,7 @@ class FinetuneObjectActionServer(Node):
                    5, (255, 0, 0), -1)
         cv2.circle(img, CENTER, 5, (0, 255, 255), -1)
         cv2.rectangle(display_img, (int(CENTER[0] - THRES[0]), int(CENTER[1] - THRES[1])),
-                          (int(CENTER[0] + THRES[0]), int(CENTER[1] + THRES[1])), (0, 255, 255), 2)
+                      (int(CENTER[0] + THRES[0]), int(CENTER[1] + THRES[1])), (0, 255, 255), 2)
         self.fine_tune_pub.publish(CvBridge().cv2_to_imgmsg(img))
         self.get_logger().info(
             f'world_x: {world_x}, world_y: {world_y}, angle: {rect[2]}')
@@ -270,7 +284,16 @@ class FinetuneObjectActionServer(Node):
         self.get_logger().info('\033[92mFinetune succeeded\033[0m')
         result.success = True
         result.position = [world_x, world_y]  # not sure if this is correct
-        result.angle = rect[2] / 180.0 * pi
+        # result.angle = rect[2] / 180.0 * pi
+        rect_wid = rect[1][0]
+        rect_hei = rect[1][1]
+        if rect_wid < rect_hei:
+            result.angle = rect[2] / 180.0 * pi
+        else:
+            result.angle = (rect[2] + 90) / 180.0 * pi
+
+        result.angle = (result.angle + pi) % (2 * pi) - \
+            pi  # normalize to [-pi, pi]
 
         self.filter.x = np.array([0, 0, 0, 0])
         self.filter.predict()
@@ -316,4 +339,3 @@ def main():
     # tracer.save('finetune_object_action_server.html')
 
     rclpy.shutdown()
-

@@ -9,6 +9,8 @@
  *
  */
 #include <fstream>
+#include <geometry_msgs/msg/detail/point_stamped__struct.hpp>
+#include <geometry_msgs/msg/detail/pose_stamped__struct.hpp>
 #include <memory>
 #include <rclcpp/publisher.hpp>
 #include <rclcpp/subscription.hpp>
@@ -66,6 +68,10 @@ class MappingNode : public rclcpp::Node
 
         plan_path_pub_ =
             this->create_publisher<nav_msgs::msg::Path>("/plan_path", 10);
+
+        path_plan_target_pub_ =
+            this->create_publisher<geometry_msgs::msg::PointStamped>(
+                "/path_plan_target", 10);
 
         stuff_list_sub_ =
             this->create_subscription<detection_interfaces::msg::StuffList>(
@@ -155,6 +161,13 @@ class MappingNode : public rclcpp::Node
         RCLCPP_INFO(rclcpp::get_logger("planPath"), "Incoming request");
 
         geometry_msgs::msg::TransformStamped transform_stamped_map_odom;
+
+        geometry_msgs::msg::PointStamped target_point;
+        target_point.point           = request->goal_pose.pose.position;
+        target_point.header.frame_id = "map";
+        target_point.header.stamp    = this->now();
+
+        path_plan_target_pub_->publish(target_point);
 
         // geometry_msgs::msg::TransformStamped transform_stamped_odom_map;
         tf2::TimePoint time_point = tf2::TimePoint(
@@ -377,6 +390,9 @@ class MappingNode : public rclcpp::Node
     rclcpp::Publisher<nav_msgs::msg::OccupancyGrid>::SharedPtr occu_pub_;
     rclcpp::Publisher<nav_msgs::msg::Path>::SharedPtr plan_path_pub_;
     rclcpp::TimerBase::SharedPtr timer_;
+
+    rclcpp::Publisher<geometry_msgs::msg::PointStamped>::SharedPtr
+        path_plan_target_pub_;
 
     geometry_msgs::msg::TransformStamped transform_stamped_map_lidar;
     geometry_msgs::msg::TransformStamped transform_stamped_map_camera;

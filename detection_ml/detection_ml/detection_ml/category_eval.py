@@ -23,6 +23,10 @@ from robp_interfaces.srv import Talk
 
 import csv
 
+from cv_bridge import CvBridge
+import cv2
+import os
+
 
 cls_dict = {
     0: "none",
@@ -42,6 +46,7 @@ cls_dict = {
     14: "wc",
 }
 
+
 super_cls_dict = {
     "none": "none",
     "bc": "cube",
@@ -59,7 +64,10 @@ super_cls_dict = {
     "slush": "animal",
     "wc": "cube",
 
+
 }
+
+EVIDENCE_PATH = "/home/group7/evidence"
 
 super_category_aruco_dict = {
     "cube": 1,
@@ -130,7 +138,6 @@ class Stuff:
         self.gaussian.predict()
         self.gaussian.update(position)
 
-
         self.valid += 1
 
         self.super_category = super_cls_dict[cls_dict[max(
@@ -162,6 +169,8 @@ class CategoryEvaluation(Node):
         self.tf_listener = TransformListener(self.tf_buffer, self)
         self.last_stamp = None
 
+        self.per_class_cnt = {k: 0 for k in cls_dict.keys()}
+
         self.good_super_categories = set()
 
         self.create_subscription(
@@ -179,12 +188,13 @@ class CategoryEvaluation(Node):
 
         self.stuff_pub = self.create_publisher(
             StuffList, "/category_eval/stuff_list", 10)
-        
+
         self.box_list_sub = self.create_subscription(
             BoxList, "/box_list", self.box_list_callback, 10)
 
-        self.stuff_pub_timer = self.create_timer(0.01, self.publish_stuff_point)
-        
+        self.stuff_pub_timer = self.create_timer(
+            0.01, self.publish_stuff_point)
+
         self.talk_client = self.create_client(Talk, "talk")
 
     def publish_stuff_point(self):
@@ -212,7 +222,8 @@ class CategoryEvaluation(Node):
     def get_stuff_callback(
         self, request: GetStuff.Request, response: GetStuff.Response
     ):
-        self.get_logger().info(f"get_stuff_callback: {request.pop} {request.pop_id}")
+        self.get_logger().info(
+            f"get_stuff_callback: {request.pop} {request.pop_id}")
         if self.list_of_stuff:
             if request.pop:
                 self.get_logger().info("pop stuff")
@@ -221,7 +232,8 @@ class CategoryEvaluation(Node):
                 for i, s in enumerate(self.list_of_stuff):
                     if s.id == pop_id:
                         stuff = self.list_of_stuff.pop(i)
-                        self.get_logger().info(f"popping {stuff.id}, now {len(self.list_of_stuff)} stuffs")
+                        self.get_logger().info(
+                            f"popping {stuff.id}, now {len(self.list_of_stuff)} stuffs")
                         break
                 if stuff is None:
                     response.success = False
@@ -255,22 +267,19 @@ class CategoryEvaluation(Node):
             response.success = False
             response.stuff = Object()
             return response
-    
+
     def box_list_callback(self, msg: BoxList):
         box_set = set()
         box: Box
         for box in msg.boxes:
             box_set.add(box.aruco_id)
-        
+
         stuff_set = set()
         for stuff in self.list_of_stuff:
             stuff_set.add(super_category_aruco_dict[stuff.super_category])
-        
+
         # intersection of the two sets
         self.good_super_categories = box_set.intersection(stuff_set)
-
-
-                
 
     def prune_none(self):
         for stuff in self.list_of_stuff:
@@ -361,6 +370,8 @@ class CategoryEvaluation(Node):
     def obj_callback(self, msg: DetectedObj):
         self.last_stamp = msg.header.stamp
         obj: Object
+        img = CvBridge().imgmsg_to_cv2(msg.image, "bgr8")
+
         for obj in msg.obj:
             # skip none and box
             if obj.category == cls_dict["none"] or obj.category == cls_dict["box"]:
@@ -394,6 +405,17 @@ class CategoryEvaluation(Node):
                         f"new stuff: {cls_dict[obj.category]} at {position.point.x, position.point.y}"
                     )
 
+                    x, y, w, h = obj.bbox
+                    img_new = img.copy()
+                    cv2.rectangle(img_new, (x, y),
+                                  (x + w, y + h), (0, 255, 0), 2)
+                    cv2.putText(img_new, cls_dict[obj.category], (x, y - 10),
+                                cv2.FONT_HERSHEY_SIMPLEX, 0.9, (36, 255, 12), 2)
+
+                    cv2.imwrite(os.path.join(
+                        EVIDENCE_PATH, f"{cls_dict[obj.category]}_{self.per_class_cnt[obj.category]}.jpg"), img_new)
+                    self.per_class_cnt[obj.category] += 1
+
                     talk_request = Talk.Request()
                     sound_string = String()
                     sound_string.data = cls_dict[obj.category]
@@ -411,6 +433,10 @@ class CategoryEvaluation(Node):
 def main():
     rclpy.init()
     node = CategoryEvaluation()
+    # clear the evidence folder
+    for file in os.listdir(EVIDENCE_PATH):
+        os.remove(os.path.join(EVIDENCE_PATH, file))
+
     try:
         rclpy.spin(node)
     except KeyboardInterrupt:
